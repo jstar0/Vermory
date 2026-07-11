@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "case_id": "G01-language-default-local-override",
+  "manifest_sha256": "2e6abdab3e8072b2a0277b011218fc8d40e12e63cf3184c4dc9fbe6048ab1fdb",
+  "events_sha256": "6e29dc66fdfa32ee9f5105d18ebb8c02c88f252cda3db68858d0f1341e93dc2f",
+  "files": [
+    {
+      "path": "fixtures/global-rule.md",
+      "sha256": "97568b109ee1ff19fdded469d90716146279e5fcaebdf8c62fc6a38d98a8c924",
+      "bytes": 259
+    },
+    {
+      "path": "fixtures/mcm-task.md",
+      "sha256": "fdbe7d3524de7357758dc74f5f09e43c0e96bc596018f116da992c38dcaed5ac",
+      "bytes": 368
+    }
+  ]
+}

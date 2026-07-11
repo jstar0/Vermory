@@ -1,0 +1,203 @@
+# Vermory Hypothesis Register
+
+Status: review candidate
+
+Date: 2026-07-11
+
+## 1. Purpose
+
+This register contains implementation choices that appear reasonable but have not earned permanent design authority.
+
+Each hypothesis must remain falsifiable. Passing unit tests proves that an implementation matches the hypothesis; it does not prove that the hypothesis matches reality.
+
+Statuses are:
+
+```text
+proposed       reasoned candidate without sufficient real evidence
+testing        currently exercised by a frozen experiment
+supported      evidence supports continued use, but revision remains possible
+accepted       frozen for a named release contract
+rejected       evidence showed the hypothesis should not continue
+```
+
+## 2. Register
+
+### H-001: Go modular monolith
+
+- Status: `proposed`
+- Candidate: one Go codebase with HTTP, MCP, worker, and CLI roles.
+- Reason: preserves clear domain boundaries without early distributed-system cost.
+- Evidence needed: the first three continuity paths can share domain services without client-specific semantics leaking into the core.
+- Falsifier: one role requires materially different availability, security, scaling, or deployment semantics that cannot be isolated inside the modular monolith.
+- Decision gate: after the first real-client batch and failure-recovery experiment.
+
+### H-002: PostgreSQL-native operational stack
+
+- Status: `supported`
+- Candidate: PostgreSQL plus pgvector is sufficient for the native deployment; Redis, Neo4j, Qdrant, and Elasticsearch are not default dependencies.
+- Existing evidence: backend lifecycle, B01-B10, 200-record, 1,000-record, deletion, ARM64, and AMD64 tests support the retrieval substrate.
+- Evidence needed: formation, hybrid retrieval, concurrent update/delete, sealed quality cases, and long-running operation.
+- Falsifier: a required constitutional behavior cannot be implemented reliably or within calibrated profiles without another default service.
+- Decision gate: after the second evidence batch and first operational profile.
+
+### H-003: Logical source-observation-memory separation
+
+- Status: `testing`
+- Candidate: preserve distinct logical concepts for source, observation, governed memory, history, projection, and delivery.
+- Reason: prevents raw input, durable memory, vector state, and generated context from becoming one undifferentiated text pool.
+- Experiment 0 signal: `W01-synapseloom-continuity` requires historical conversation observations to remain distinct from current repository authority; `S01-deletion-and-source-injection` requires an untrusted source instruction, governed scope, deleted target, and valid related guidance to remain behaviorally distinct.
+- Evidence artifact: `artifacts/experiment-0/experiment-0-v1/report.json` and `report.md` under the same run directory.
+- Evidence needed: real cases require independent provenance, formation, deletion, or delivery behavior for these concepts.
+- Falsifier: two concepts remain observably identical across all first- and second-batch workflows and their separation creates only maintenance cost.
+- Decision gate: after mapping both evidence batches to required operations.
+
+### H-004: Candidate physical schema
+
+- Status: `proposed`
+- Candidate entities include tenants, continuities, bindings, sources, versions, observations, memories, revisions, evidence links, relations, events, projections, deliveries, jobs, and audits.
+- Reason: this shape can express the current known lifecycle without making embeddings authoritative.
+- Evidence needed: every entity must support at least one frozen query, invariant, state transition, or audit requirement.
+- Falsifier: an entity has no independent behavior; required operations demand a missing boundary; or transaction consistency becomes unnecessarily complex.
+- Decision gate: schema version 0.1 after discovery mapping; schema version 1 only after two materially different batches.
+
+No table name or one-to-one mapping between logical and physical entities is accepted by this hypothesis.
+
+### H-005: Revision-oriented updates
+
+- Status: `testing`
+- Candidate: ordinary updates append revisions and explicit change events; privacy deletion can erase protected content while retaining permitted content-free tombstones.
+- Reason: supports current-state use, historical explanation, and deletion without silent overwrite.
+- Experiment 0 signal: `W01-synapseloom-continuity` freezes a user correction followed by newer repository truth; `C01-device-maintenance-continuity` freezes a failed action followed by a verified correction; `S01-deletion-and-source-injection` freezes explicit deletion without requiring unrelated valid guidance to disappear.
+- Evidence artifact: `artifacts/experiment-0/experiment-0-v1/report.json` and `report.md` under the same run directory.
+- Evidence needed: progressive correction, conflicting sources, user reversal, archive/reactivation, and hard deletion cases.
+- Falsifier: revision identity cannot express common real corrections without duplicating or fragmenting memory unnaturally.
+- Decision gate: after update/conflict/deletion experiments.
+
+### H-006: Memory-kind taxonomy
+
+- Status: `proposed`
+- Candidate seed kinds: fact, decision, constraint, preference, progress, next action, procedure, experience, risk, identity.
+- Reason: these labels may help formation policy and context composition.
+- Evidence needed: each retained kind changes a real policy, ranking, presentation, retention, or evaluation decision.
+- Falsifier: labels are ambiguous, frequently multi-valued, require constant relabeling, or do not change behavior.
+- Decision gate: after labeling the first two evidence batches independently and measuring disagreement.
+
+The system may adopt fewer kinds, multi-label facets, structured attributes, or no fixed taxonomy.
+
+### H-007: Retention classes
+
+- Status: `testing`
+- Candidate concepts: working, continuity-durable, and global-default retention.
+- Reason: same-session usefulness, continuity reuse, and cross-context defaults have different promotion and expiry risks.
+- Experiment 0 signal: `G01-language-default-local-override` requires a local English override to expire without rewriting a stable Chinese default; `S01-deletion-and-source-injection` rejects promotion from an untrusted source into Global Defaults.
+- Evidence artifact: `artifacts/experiment-0/experiment-0-v1/report.json` and `report.md` under the same run directory.
+- Evidence needed: positive and negative promotion, expiry, and deletion cases across all three continuity lines.
+- Falsifier: retention is better expressed by policy, validity, and continuity without a separate class.
+- Decision gate: after same-session and global-default experiments.
+
+### H-008: Lifecycle state machine
+
+- Status: `testing`
+- Candidate meanings: pending, active, superseded, archived, rejected, and deleted, with conflict represented separately.
+- Reason: separates proposal, current use, historical retention, rejection, and forgetting.
+- Experiment 0 signal: `C01-device-maintenance-continuity` distinguishes failed, corrected, and verified action state; `S01-deletion-and-source-injection` requires a deleted target to remain unavailable while independent related guidance remains active.
+- Evidence artifact: `artifacts/experiment-0/experiment-0-v1/report.json` and `report.md` under the same run directory.
+- Evidence needed: every transition must correspond to a real user or source workflow; concurrent transitions must be deterministic.
+- Falsifier: common correction, merge, split, temporary validity, contested state, or deletion behavior cannot be represented without exceptions.
+- Decision gate: after lifecycle mutation tests and two real evidence batches.
+
+Exact state names and transition edges are not frozen.
+
+### H-009: Hybrid native retrieval
+
+- Status: `proposed`
+- Candidate: continuity and lifecycle filtering followed by lexical, exact structured, trigram, and pgvector candidate generation with versioned fusion and optional reranking.
+- Reason: pure vector Top-K is weak for technical identifiers and cannot itself encode source authority or lifecycle.
+- Evidence needed: compare pure vector, lexical, hybrid, and optional rerank variants on real Chinese, English, code, path, flag, date, and numeric cases.
+- Falsifier: a simpler measured strategy matches quality, task success, cost, and failure behavior; or the candidate strategy cannot meet calibrated latency.
+- Decision gate: after retrieval ablation on the first two batches.
+
+No ranking algorithm or weight is accepted before ablation.
+
+### H-010: Language-aware application analyzer
+
+- Status: `proposed`
+- Candidate: Go-side normalization and token extraction preserve Chinese terms and exact technical identifiers before PostgreSQL lexical indexing.
+- Reason: default PostgreSQL tokenization alone may not serve mixed Chinese technical text reliably.
+- Evidence needed: Chinese and mixed-language retrieval ablation with paths, flags, errors, model names, and code symbols.
+- Falsifier: database-native or another established analyzer provides better portable quality with lower maintenance.
+- Decision gate: after mixed-language retrieval experiments on ARM64 and AMD64.
+
+### H-011: Versioned semantic projection generations
+
+- Status: `proposed`
+- Candidate: embeddings are stored by model and projection generation so old and candidate models can coexist during migration.
+- Reason: avoids coupling authoritative memory to one embedding model and supports measured cutover.
+- Evidence needed: one actual embedding-model migration with quality, storage, latency, rebuild, and rollback evidence.
+- Falsifier: a simpler rebuild-and-swap mechanism is operationally sufficient for calibrated deployment profiles.
+- Decision gate: after the first embedding migration rehearsal.
+
+### H-012: PostgreSQL transactional outbox
+
+- Status: `proposed`
+- Candidate: authoritative transactions enqueue projection and provider work through PostgreSQL, with idempotent workers and no default Redis dependency.
+- Reason: aligns memory state and projection jobs without introducing a second required service.
+- Evidence needed: duplicate delivery, crash, retry, PostgreSQL restart, queue backlog, and concurrent deletion tests.
+- Falsifier: queue contention or operational requirements exceed calibrated profiles and an external queue produces a clearly safer design.
+- Decision gate: after first failure and self-hosted-team profiles.
+
+### H-013: Row-level security defense in depth
+
+- Status: `proposed`
+- Candidate: application authorization, tenant-bearing foreign keys, and PostgreSQL row-level security jointly protect tenant boundaries.
+- Reason: query filters alone are an insufficient final barrier for a multi-tenant memory platform.
+- Evidence needed: integration tests under tenant-scoped database roles, migration tests, and deliberate filter-omission attacks.
+- Falsifier: the initial supported deployment is explicitly single-tenant and RLS creates correctness or operations problems; the multi-tenant profile would still require a separate acceptance decision.
+- Decision gate: before any multi-tenant release claim.
+
+### H-014: Prepare and commit client operations
+
+- Status: `proposed`
+- Candidate: ordinary clients need one pre-task context operation and one post-task observation/write-back operation, with administrative APIs separate.
+- Reason: keeps normal client integration low-friction while preserving governance.
+- Evidence needed: one real coder, one Web Chat/API simulator, and one everyday-assistant path can integrate without custom memory semantics.
+- Falsifier: streaming, tool-loop, long-running session, or client lifecycle requires a different interaction contract.
+- Decision gate: after the first real-client experiment.
+
+Names, payloads, streaming behavior, and transport are not frozen.
+
+### H-015: Optional backend projection adapters
+
+- Status: `supported`
+- Candidate: mem0, MemOS, and Supermemory receive only eligible search projections and can be rebuilt from PostgreSQL.
+- Existing evidence: all four tested backends implement the lifecycle adapter contract and pass the current scenario set.
+- Evidence needed: formation-to-projection synchronization, deletion propagation, adapter outage, and rebuild under real trajectories.
+- Falsifier: an adapter cannot preserve constitutional deletion or isolation even when treated as disposable; that adapter is removed rather than weakening the constitution.
+- Decision gate: independently for each adapter before supported-release status.
+
+## 3. Decision Records
+
+When a hypothesis changes status, record:
+
+```text
+hypothesis id
+old and new status
+evidence batch and run ids
+public and sealed result summary
+baseline comparison
+failure and limitation summary
+decision and rationale
+schema or API compatibility effect
+rollback path
+```
+
+Accepted hypotheses remain revisable through a new versioned product or architecture decision. Existing evidence is never rewritten to match a later design.
+
+## 4. Review Rule
+
+Before implementation adds a new permanent entity, service, state, relation, provider dependency, or release metric, it must either:
+
+- map to an existing hypothesis and its evidence gate; or
+- enter this register as a new falsifiable hypothesis.
+
+This rule prevents both speculative complexity and unrecorded simplification.

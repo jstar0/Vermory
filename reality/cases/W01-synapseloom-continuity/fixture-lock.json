@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "case_id": "W01-synapseloom-continuity",
+  "manifest_sha256": "c6c0b86c5274d51be770e338c160b1cf035a4e4c80022f06e7e1324ca2a0490e",
+  "events_sha256": "4aeb59e643f8b71912987449b04dde626cc66cf1c3a33e7f6dabe6cea504699f",
+  "files": [
+    {
+      "path": "fixtures/historical-session.md",
+      "sha256": "c9d25ea4ee0abb694df34834b16efa75c7325896a2e5599e31bfea5480d1ac71",
+      "bytes": 633
+    },
+    {
+      "path": "fixtures/repository-current-state.md",
+      "sha256": "78e413780609968964183ffd8648c778a1dbd2b833a54d87b0d3ab0231599d66",
+      "bytes": 716
+    }
+  ]
+}

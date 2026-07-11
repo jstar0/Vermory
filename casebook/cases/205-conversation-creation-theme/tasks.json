@@ -1,0 +1,9 @@
+[
+  {
+    "id": "conversation-creation-theme-continuity",
+    "prompt": "继续我的长期写作主题：现在这篇围绕什么，风格保持什么，不要误转成什么方向？",
+    "must_include": ["campus bulletin board systems", "concise", "source-aware", "non-fiction"],
+    "must_not_include": ["cyberpunk stories", "retro game names"]
+  }
+]
+

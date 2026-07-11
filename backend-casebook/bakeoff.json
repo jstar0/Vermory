@@ -1,0 +1,67 @@
+{
+  "version": "1.0",
+  "models": {
+    "extraction": "qwen3:4b",
+    "embedding": "bge-m3"
+  },
+  "hard_gates": {
+    "cross_scope_leakage_max": 0,
+    "deletion_residue_max": 0,
+    "current_state_stale_leakage_max": 0,
+    "rebuild_score_delta_max": 0.01,
+    "requires_linux": true,
+    "requires_self_hosted": true
+  },
+  "scenarios": [
+    {
+      "id": "B01-workspace-isolation",
+      "source_cases": ["101-workspace-parallel-repos"],
+      "capabilities": ["scope_filter", "semantic_search", "isolation"]
+    },
+    {
+      "id": "B02-cross-tool-continuation",
+      "source_cases": ["105-workspace-multi-coder-relay"],
+      "capabilities": ["continuation", "metadata_filter"]
+    },
+    {
+      "id": "B03-conversation-isolation",
+      "source_cases": ["201-conversation-housing-search", "202-conversation-job-search"],
+      "capabilities": ["conversation_memory", "isolation"]
+    },
+    {
+      "id": "B04-supersede-history",
+      "source_cases": [],
+      "capabilities": ["update", "current_state", "history"]
+    },
+    {
+      "id": "B05-delete-erasure",
+      "source_cases": [],
+      "capabilities": ["delete", "scope_delete"]
+    },
+    {
+      "id": "B06-source-first-conflict",
+      "source_cases": [],
+      "capabilities": ["source_version", "stale_suppression"]
+    },
+    {
+      "id": "B07-bridge-noise-filtering",
+      "source_cases": ["301-bridge-chat-to-workspace"],
+      "capabilities": ["promotion", "noise_filter"]
+    },
+    {
+      "id": "B08-rebind-rebuild",
+      "source_cases": ["102-workspace-rebind-relocation", "304-bridge-workspace-rebind"],
+      "capabilities": ["rebind", "reset", "rebuild"]
+    },
+    {
+      "id": "B09-noise-growth",
+      "source_cases": [],
+      "capabilities": ["deduplication", "noise_control", "cost"]
+    },
+    {
+      "id": "B10-chinese-mixed-text",
+      "source_cases": ["101-workspace-parallel-repos", "203-conversation-device-troubleshooting"],
+      "capabilities": ["multilingual", "identifier_recall"]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+[
+  {
+    "type": "decision",
+    "content": "The report export should present workspace continuity, conversation continuity, global defaults, and bridge actions."
+  },
+  {
+    "type": "constraint",
+    "content": "Raw implementation scratch notes, provider API keys, and old MemOS dependency framing must be excluded."
+  },
+  {
+    "type": "goal",
+    "content": "The target audience is a review committee rather than a coding agent."
+  }
+]
+

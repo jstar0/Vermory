@@ -1,0 +1,34 @@
+[
+  {
+    "type": "goal",
+    "content": "Renee is using chat as an ongoing apartment search assistant for a move to Seattle."
+  },
+  {
+    "type": "constraint",
+    "content": "The active baseline search targets a move-in around September 2026 with a monthly rent ceiling of 3200 USD."
+  },
+  {
+    "type": "constraint",
+    "content": "The active baseline search prefers a one-bedroom, requires pet-friendly buildings for a medium dog, and targets a typical transit commute under 35 minutes to South Lake Union."
+  },
+  {
+    "type": "decision",
+    "content": "Fremont became the preferred area after later conversation updates because it balances dog access and commute."
+  },
+  {
+    "type": "constraint",
+    "content": "Lack of in-unit laundry is acceptable only as a fallback, not as a first-choice filter."
+  },
+  {
+    "type": "decision",
+    "content": "`Aurora 8` should be excluded from serious recommendations because it is not pet-friendly."
+  },
+  {
+    "type": "decision",
+    "content": "`Juniper Row` remains on the shortlist because it accepts dogs and is within budget."
+  },
+  {
+    "type": "constraint",
+    "content": "Adjacent threads or forwarded links should not overwrite the main housing search baseline unless Renee explicitly asks to merge them."
+  }
+]

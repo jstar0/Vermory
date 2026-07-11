@@ -1,0 +1,180 @@
+package provider
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestOpenAICompatibleProviderSendsDirectChatCompletionRequest(t *testing.T) {
+	var captured struct {
+		Model    string `json:"model"`
+		Messages []struct {
+			Role    string `json:"role"`
+			Content string `json:"content"`
+		} `json:"messages"`
+		MaxTokens int `json:"max_tokens"`
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("expected direct chat completions path, got %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer test-key" {
+			t.Fatalf("expected bearer auth, got %q", got)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&captured); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-test","model":"direct-model","choices":[{"message":{"role":"assistant","content":"direct ok"}}]}`))
+	}))
+	defer server.Close()
+
+	client := NewOpenAICompatible(Config{
+		BaseURL: server.URL + "/v1",
+		APIKey:  "test-key",
+		Client:  server.Client(),
+	})
+
+	resp, err := client.Generate(context.Background(), GenerateRequest{
+		Model:         "direct-model",
+		System:        "system instructions",
+		Prompt:        "finish the task",
+		ContextPacket: "confirmed context packet",
+		MaxTokens:     77,
+	})
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+
+	if resp.Output != "direct ok" {
+		t.Fatalf("unexpected output: %q", resp.Output)
+	}
+	if captured.Model != "direct-model" {
+		t.Fatalf("unexpected model: %q", captured.Model)
+	}
+	if captured.MaxTokens != 77 {
+		t.Fatalf("unexpected max tokens: %d", captured.MaxTokens)
+	}
+	if len(captured.Messages) != 2 {
+		t.Fatalf("expected system and user messages, got %d", len(captured.Messages))
+	}
+	if captured.Messages[0].Role != "system" || captured.Messages[0].Content != "system instructions" {
+		t.Fatalf("unexpected system message: %#v", captured.Messages[0])
+	}
+	userContent := captured.Messages[1].Content
+	if !strings.Contains(userContent, "confirmed context packet") || !strings.Contains(userContent, "finish the task") {
+		t.Fatalf("user message did not combine packet and prompt: %q", userContent)
+	}
+	if !json.Valid(resp.RawArtifact) {
+		t.Fatalf("raw artifact should be response JSON")
+	}
+}
+
+func TestOpenAICompatibleProviderFallsBackToReasoningContentWhenContentIsEmpty(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-test","model":"glm-5","choices":[{"message":{"role":"assistant","content":"","reasoning_content":"OK from reasoning"}}]}`))
+	}))
+	defer server.Close()
+
+	client := NewOpenAICompatible(Config{
+		BaseURL: server.URL + "/v1",
+		APIKey:  "test-key",
+		Client:  server.Client(),
+	})
+
+	resp, err := client.Generate(context.Background(), GenerateRequest{
+		Model:     "glm-5",
+		Prompt:    "reply",
+		MaxTokens: 16,
+	})
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+	if resp.Output != "OK from reasoning" {
+		t.Fatalf("expected reasoning fallback, got %q", resp.Output)
+	}
+}
+
+func TestOpenAICompatibleProviderSanitizesLeakedThinkTags(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-test","model":"glm-5.1","choices":[{"message":{"role":"assistant","content":"OK</think>前后文分析：\n无</think>OK"}}]}`))
+	}))
+	defer server.Close()
+
+	client := NewOpenAICompatible(Config{
+		BaseURL: server.URL + "/v1",
+		APIKey:  "test-key",
+		Client:  server.Client(),
+	})
+
+	resp, err := client.Generate(context.Background(), GenerateRequest{
+		Model:     "glm-5.1",
+		Prompt:    "reply",
+		MaxTokens: 16,
+	})
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+	if resp.Output != "OK" {
+		t.Fatalf("expected sanitized output OK, got %q", resp.Output)
+	}
+}
+
+func TestOpenAICompatibleProviderRejectsMissingRuntimeInputs(t *testing.T) {
+	_, err := NewOpenAICompatible(Config{
+		BaseURL: "https://example.invalid/v1",
+	}).Generate(context.Background(), GenerateRequest{Model: "m"})
+	if err == nil {
+		t.Fatal("expected missing API key error")
+	}
+
+	_, err = NewOpenAICompatible(Config{
+		APIKey: "test-key",
+	}).Generate(context.Background(), GenerateRequest{Model: "m"})
+	if err == nil {
+		t.Fatal("expected missing base URL error")
+	}
+}
+
+func TestOpenAICompatibleProviderRetriesBusyResponses(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.Header().Set("Content-Type", "application/json")
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"message":"System is too busy now. Please try again later."}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-test","model":"direct-model","choices":[{"message":{"role":"assistant","content":"direct ok after retry"}}]}`))
+	}))
+	defer server.Close()
+
+	client := NewOpenAICompatible(Config{
+		BaseURL: server.URL + "/v1",
+		APIKey:  "test-key",
+		Client:  server.Client(),
+	})
+
+	resp, err := client.Generate(context.Background(), GenerateRequest{
+		Model:     "direct-model",
+		Prompt:    "finish the task",
+		MaxTokens: 32,
+	})
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("expected 2 attempts, got %d", attempts)
+	}
+	if resp.Output != "direct ok after retry" {
+		t.Fatalf("unexpected output: %q", resp.Output)
+	}
+}

@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "id": "W01-synapseloom-continuity",
+  "title": "SynapseLoom historical session reconciled with repository truth",
+  "evidence_level": "public",
+  "continuity_lines": ["workspace"],
+  "pressures": ["parallel_thread_merge", "user_correction", "stale_runtime_fact", "repository_authority", "cross_session_handoff"],
+  "sources": [
+    {
+      "id": "w01-history",
+      "kind": "authorized_transcript_excerpt",
+      "fixture_path": "fixtures/historical-session.md",
+      "original_ref": "authorized-session:synapseloom-2026-03-31",
+      "original_revision": "2026-03-31T07:38:23Z/2026-03-31T16:28:25Z",
+      "sha256": "c9d25ea4ee0abb694df34834b16efa75c7325896a2e5599e31bfea5480d1ac71",
+      "authorized": true,
+      "anonymization": "Thread IDs, local paths, credentials, private data, and unrelated turns were removed; retained statements are semantic excerpts."
+    },
+    {
+      "id": "w01-repo",
+      "kind": "repository_excerpt",
+      "fixture_path": "fixtures/repository-current-state.md",
+      "original_ref": "authorized-workspace:synapseloom",
+      "original_revision": "793f4c72a20f6bdb18a0f29d1a18794445ebde62",
+      "sha256": "78e413780609968964183ffd8648c778a1dbd2b833a54d87b0d3ab0231599d66",
+      "authorized": true,
+      "anonymization": "Only public engineering facts from current overview documents were retained; private runtime configuration was excluded."
+    }
+  ],
+  "anchors": [
+    {
+      "kind": "repository_identity",
+      "value": "synapseloom",
+      "ambiguous": false
+    },
+    {
+      "kind": "repository_revision",
+      "value": "793f4c72a20f6bdb18a0f29d1a18794445ebde62",
+      "ambiguous": false
+    }
+  ],
+  "expectations": {
+    "current_facts": [
+      "The current frontend development port is 5173.",
+      "make dev-up starts only the Go API Gateway and Go LLM worker.",
+      "Current repository overview documents outrank historical session observations.",
+      "The Humanizer line must not be revived as an unfinished backlog item."
+    ],
+    "forbidden_facts": [
+      "The current frontend development port is 3000.",
+      "make dev-up starts the complete local stack.",
+      "Historical session observations override current repository truth.",
+      "The completed Humanizer line remains pending."
+    ],
+    "allowed_unknowns": ["Whether every external service required for a full document run is currently reachable."],
+    "expected_action": "Produce a repository-grounded handoff that uses current ports and startup scope while marking the March observation as historical."
+  },
+  "task": {
+    "prompt": "Prepare a concise handoff for a new AI coding session: state the current frontend port, exactly what make dev-up starts, and how the historical session should be treated.",
+    "artifact_checks": ["handoff distinguishes current repository truth from historical observations"],
+    "deterministic_checks": ["contains:5173", "contains:API Gateway", "contains:LLM worker", "not_contains:current port is 3000", "not_contains:complete local stack"]
+  }
+}

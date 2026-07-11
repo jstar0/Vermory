@@ -1,0 +1,19 @@
+[
+  {
+    "type": "progress",
+    "content": "Codex finished the ingestion schema in the `invoice-ops` workspace."
+  },
+  {
+    "type": "decision",
+    "content": "Claude Code owns the next relay for `frontend/src/pages/Reconciliation.tsx`."
+  },
+  {
+    "type": "constraint",
+    "content": "Gemini CLI is used only for SQL explanation and should not edit source files in this relay."
+  },
+  {
+    "type": "constraint",
+    "content": "The backend contract is frozen for this sprint and API names should not change."
+  }
+]
+

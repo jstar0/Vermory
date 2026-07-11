@@ -1,0 +1,19 @@
+[
+  {
+    "type": "fact",
+    "content": "The recurring device troubleshooting thread is for a `Mac mini M4`."
+  },
+  {
+    "type": "progress",
+    "content": "The latest confirmed fix was renewing captive portal authentication."
+  },
+  {
+    "type": "risk",
+    "content": "Surge rules were suspected but are not confirmed as the root cause."
+  },
+  {
+    "type": "constraint",
+    "content": "Phone hotspot billing should remain separate from the Mac mini troubleshooting line."
+  }
+]
+

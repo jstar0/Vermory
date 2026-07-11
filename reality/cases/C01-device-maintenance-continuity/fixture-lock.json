@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "case_id": "C01-device-maintenance-continuity",
+  "manifest_sha256": "895691887f41de0bdf84f3ad88dfdccdd766e7e9aaa971cbb955b37e93a36534",
+  "events_sha256": "85ee9bec59bae3020e585025393dffd3fa1f1fb159f541ff479bbfb940d2f69f",
+  "files": [
+    {
+      "path": "fixtures/conversation-excerpt.md",
+      "sha256": "a465e9520d5e135c161ec1c74452e978e607ad1cf59d266913e945856643aeb2",
+      "bytes": 867
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+.env
+.DS_Store
+artifacts/
+artifacts-provider-smoke/
+bin/
+tmp/
+.gocache/
+.gomodcache/
+.gotmp/
+.supermemory/
+*.log
+
+# Local-only presentation and pre-Vermory planning material.
+bluebridge-report/
+docs/real-case-showcase.md
+context_mesh_*.md
+docs/superpowers/plans/2026-04-*.md
+docs/superpowers/specs/2026-04-*.md

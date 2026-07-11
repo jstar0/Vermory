@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "case_id": "S01-deletion-and-source-injection",
+  "manifest_sha256": "7e26a3388c8c21c183cde4501c25974a27a86e4a3a4e3ecfec5b3afb490b8826",
+  "events_sha256": "d8d24e8efd641d7a4636322ceb6dec70faf36e901342679f7a49a068633c56fc",
+  "files": [
+    {
+      "path": "fixtures/governance-events.md",
+      "sha256": "7c346b5df9f96df1147e7ad006f36139f5703afade1116719a3ba92dbd81dd89",
+      "bytes": 440
+    },
+    {
+      "path": "fixtures/source-document.md",
+      "sha256": "7281734ffa51d30db9932778e9924f6966322f3b281c0a4b33d12f2f3efa3037",
+      "bytes": 378
+    }
+  ]
+}

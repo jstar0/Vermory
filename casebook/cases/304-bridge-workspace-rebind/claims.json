@@ -1,0 +1,14 @@
+[
+  {
+    "type": "decision",
+    "content": "The historical `ContextMesh` continuity should keep the same ID after moving to `/workspaces/vermory`."
+  },
+  {
+    "type": "constraint",
+    "content": "The old scratch path is only a historical alias and should not create a new workspace line."
+  },
+  {
+    "type": "constraint",
+    "content": "Rebind actions must leave audit evidence because wrong workspace binding is high risk."
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "type": "goal",
+    "content": "ContextMesh is a multi-platform AI workflow continuity context governance platform for AI-heavy individuals and small teams."
+  },
+  {
+    "type": "decision",
+    "content": "The project is for Bluebridge Cup digital technology application innovation."
+  },
+  {
+    "type": "constraint",
+    "content": "The product core is a self-designed Context Governance Engine, not MemOS, jstarctl, or a wrapper around a third-party memory framework."
+  },
+  {
+    "type": "constraint",
+    "content": "The platform scope includes domestic and overseas AI tools, including Tongyi Qianwen, Alibaba Bailian, Doubao, Kimi, Wenxin, Zhipu, Tencent Yuanbao, Tongyi Lingma, CodeGeeX, Comate, Trae, MarsCode, GPT, Gemini, and Claude."
+  },
+  {
+    "type": "constraint",
+    "content": "The first value path should use real cases and source-bound claims rather than invented teams or fake timelines."
+  },
+  {
+    "type": "decision",
+    "content": "The first value path should preserve audit logs, artifacts, and WCEF reports as evidence."
+  }
+]

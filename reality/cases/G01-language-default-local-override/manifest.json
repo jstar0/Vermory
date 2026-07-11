@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "id": "G01-language-default-local-override",
+  "title": "Stable Chinese default with a real local-scope English override",
+  "evidence_level": "public",
+  "continuity_lines": ["global_defaults"],
+  "pressures": ["stable_preference", "explicit_local_override", "scope_expiry", "default_pollution_rejection"],
+  "sources": [
+    {
+      "id": "g01-global",
+      "kind": "managed_rule_excerpt",
+      "fixture_path": "fixtures/global-rule.md",
+      "original_ref": "managed-rule:global-language-delivery",
+      "original_revision": "2026-07-12",
+      "sha256": "97568b109ee1ff19fdded469d90716146279e5fcaebdf8c62fc6a38d98a8c924",
+      "authorized": true,
+      "anonymization": "Only the stable language rule was retained; the rest of the managed configuration was excluded."
+    },
+    {
+      "id": "g01-task",
+      "kind": "authorized_transcript_excerpt",
+      "fixture_path": "fixtures/mcm-task.md",
+      "original_ref": "authorized-session:mcm-table-english-2026-02-01",
+      "original_revision": "2026-02-01T19:24:04Z",
+      "sha256": "fdbe7d3524de7357758dc74f5f09e43c0e96bc596018f116da992c38dcaed5ac",
+      "authorized": true,
+      "anonymization": "The project path and unrelated paper content were removed; the explicit local-scope language instruction was retained."
+    }
+  ],
+  "anchors": [
+    {
+      "kind": "global_user_profile",
+      "value": "default-language",
+      "ambiguous": false
+    },
+    {
+      "kind": "task_scope",
+      "value": "mcm-table-deliverable",
+      "ambiguous": false
+    }
+  ],
+  "expectations": {
+    "current_facts": [
+      "The stable global reply language is Chinese unless the active task explicitly overrides it.",
+      "The MCM table deliverable uses English within that task.",
+      "The English override expires with the MCM task."
+    ],
+    "forbidden_facts": [
+      "The MCM task permanently changed the global reply language to English.",
+      "The MCM table deliverable should ignore its explicit English requirement.",
+      "Every later unrelated task must be answered in English."
+    ],
+    "expected_action": "Apply English inside the MCM task, then return to Chinese for a later unrelated Chinese request without modifying the global default."
+  },
+  "task": {
+    "prompt": "The MCM task has ended. Explain in Chinese whether its English requirement changed the global default and state which language a new unrelated Chinese request should receive.",
+    "artifact_checks": ["answer separates global default from local-scope override"],
+    "deterministic_checks": ["language:zh", "contains:local-scope", "contains:Chinese", "not_contains:global default is English"]
+  }
+}

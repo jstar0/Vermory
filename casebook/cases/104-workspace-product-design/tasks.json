@@ -1,0 +1,9 @@
+[
+  {
+    "id": "workspace-product-stage-retention",
+    "prompt": "请接上 `campus-pass` 当前阶段：现在在设计什么原型，之前哪个方向被拒绝，当前离线约束是什么？",
+    "must_include": ["QR-code check-in", "facial recognition", "privacy-sensitive", "offline guard verification"],
+    "must_not_include": ["facial recognition first release", "online-only verification"]
+  }
+]
+

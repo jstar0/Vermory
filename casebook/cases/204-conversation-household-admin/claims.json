@@ -1,0 +1,19 @@
+[
+  {
+    "type": "goal",
+    "content": "Lina's active household admin matter is lease renewal plus utility reimbursement."
+  },
+  {
+    "type": "constraint",
+    "content": "The lease renewal deadline is May 20."
+  },
+  {
+    "type": "decision",
+    "content": "Utility receipts should be grouped by electricity, water, and internet."
+  },
+  {
+    "type": "constraint",
+    "content": "A cousin's moving truck conversation should not overwrite Lina's household admin baseline."
+  }
+]
+

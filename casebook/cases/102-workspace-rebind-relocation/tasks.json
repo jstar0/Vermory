@@ -1,0 +1,15 @@
+[
+  {
+    "id": "workspace-rebind-current-anchor",
+    "prompt": "我从旧路径切到了新路径。请按当前 workspace 接上文：这个工作区现在的真实身份、当前任务和 owner channel 是什么？",
+    "must_include": ["atlas-notes", "Zotero", "#atlas-research", "zotero-import-v1"],
+    "must_not_include": ["second continuity line", "stale checkout"]
+  },
+  {
+    "id": "workspace-rebind-avoid-duplicate",
+    "prompt": "如果系统看到旧路径和新路径都存在，默认应该怎么处理这条 continuity？",
+    "must_include": ["same research-note workspace", "rebind", "not a second continuity"],
+    "must_not_include": ["new unrelated project", "duplicate track"]
+  }
+]
+

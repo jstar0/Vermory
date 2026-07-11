@@ -1,0 +1,15 @@
+[
+  {
+    "type": "decision",
+    "content": "OpenClaw and phone chat should be linked as the same Seattle housing search."
+  },
+  {
+    "type": "constraint",
+    "content": "The email-forward thread is a one-off listing and should not overwrite the baseline."
+  },
+  {
+    "type": "decision",
+    "content": "The rollback path is to unlink the phone chat if the user later says it was a different search."
+  }
+]
+

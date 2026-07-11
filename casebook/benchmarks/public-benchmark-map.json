@@ -1,0 +1,101 @@
+[
+  {
+    "benchmark": "LoCoMo",
+    "line": "conversation",
+    "capability": "multi_session_continuation",
+    "evaluation_level": "executable_evaluation",
+    "execution_mode": "casebook_translated_proxy",
+    "case_ids": ["201-conversation-housing-search", "202-conversation-job-search", "203-conversation-device-troubleshooting"],
+    "notes": "Maps long multi-session memory pressure to conversation-backed continuity cases with branch/noise controls."
+  },
+  {
+    "benchmark": "LongMemEval",
+    "line": "workspace",
+    "capability": "state_update_override",
+    "evaluation_level": "executable_evaluation",
+    "execution_mode": "casebook_translated_proxy",
+    "case_ids": ["001-contextmesh-bluebridge-preparation", "102-workspace-rebind-relocation"],
+    "notes": "Maps update-over-stale-context pressure to workspace continuity and rebind cases."
+  },
+  {
+    "benchmark": "MemBench",
+    "line": "global_defaults",
+    "capability": "state_type_retention",
+    "evaluation_level": "translated_task",
+    "execution_mode": "design_mapping",
+    "case_ids": ["001-contextmesh-bluebridge-preparation"],
+    "notes": "Global defaults are represented as thin preference/constraint retention checks in V1, not a standalone main line."
+  },
+  {
+    "benchmark": "EverMemBench",
+    "line": "bridge",
+    "capability": "team_handoff",
+    "evaluation_level": "executable_evaluation",
+    "execution_mode": "casebook_translated_proxy",
+    "case_ids": ["303-bridge-multichannel-link", "305-bridge-human-handoff"],
+    "notes": "Maps multi-person, multi-topic collaboration pressure to link and handoff bridge cases."
+  },
+  {
+    "benchmark": "BEAM",
+    "line": "workspace",
+    "capability": "compression_pressure",
+    "evaluation_level": "executable_evaluation",
+    "execution_mode": "casebook_translated_proxy",
+    "case_ids": ["103-workspace-research-notebook", "302-bridge-workspace-to-report"],
+    "notes": "Maps compression under long-context pressure to current-view packet/export cases."
+  },
+  {
+    "benchmark": "ARES",
+    "line": "workspace",
+    "capability": "groundedness",
+    "evaluation_level": "executable_evaluation",
+    "execution_mode": "casebook_translated_proxy",
+    "case_ids": ["001-contextmesh-bluebridge-preparation", "101-workspace-parallel-repos", "302-bridge-workspace-to-report"],
+    "notes": "Maps groundedness/relevance to must-not-include contamination checks and source-supported continuity packets."
+  },
+  {
+    "benchmark": "RAGBench",
+    "line": "bridge",
+    "capability": "evidence_use",
+    "evaluation_level": "executable_evaluation",
+    "execution_mode": "casebook_translated_proxy",
+    "case_ids": ["301-bridge-chat-to-workspace", "302-bridge-workspace-to-report"],
+    "notes": "Maps evidence-use quality to bridge export and promoted-claim filtering."
+  },
+  {
+    "benchmark": "CORAL",
+    "line": "conversation",
+    "capability": "multi_turn_retrieval",
+    "evaluation_level": "executable_evaluation",
+    "execution_mode": "casebook_translated_proxy",
+    "case_ids": ["201-conversation-housing-search", "303-bridge-multichannel-link"],
+    "notes": "Maps multi-turn retrieval to thread/topic continuity and multichannel link boundaries."
+  },
+  {
+    "benchmark": "BRIGHT",
+    "line": "workspace",
+    "capability": "complex_context_reasoning",
+    "evaluation_level": "executable_evaluation",
+    "execution_mode": "casebook_translated_proxy",
+    "case_ids": ["103-workspace-research-notebook", "104-workspace-product-design"],
+    "notes": "Maps complex retrieval/reasoning to research notebook and product design workspace cases."
+  },
+  {
+    "benchmark": "HaluEval",
+    "line": "global_defaults",
+    "capability": "unsupported_generation_control",
+    "evaluation_level": "translated_task",
+    "execution_mode": "design_mapping",
+    "case_ids": ["101-workspace-parallel-repos", "201-conversation-housing-search", "302-bridge-workspace-to-report"],
+    "notes": "Maps hallucination control to unsupported-context and forbidden-contamination checks across lines."
+  },
+  {
+    "benchmark": "Mu-SHROOM",
+    "line": "global_defaults",
+    "capability": "unsupported_generation_control",
+    "evaluation_level": "translated_task",
+    "execution_mode": "design_mapping",
+    "case_ids": ["201-conversation-housing-search", "204-conversation-household-admin"],
+    "notes": "Maps multilingual/unsupported generation control to conversation groundedness and no-overreach checks."
+  }
+]

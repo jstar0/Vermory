@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vermory.dev/schema/reality-attestation-v1.json",
+  "title": "Vermory External Sealed Evaluation Attestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "evaluator_id",
+    "suite_version",
+    "implementation_digest",
+    "run_at",
+    "hard_gates_pass",
+    "counts",
+    "signature"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "evaluator_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "suite_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "implementation_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "run_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "hard_gates_pass": {
+      "type": "boolean"
+    },
+    "counts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "propertyNames": {
+        "minLength": 1
+      }
+    },
+    "failure_categories": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "type": "goal",
+    "content": "`vendor-scorecard` is a weekly vendor scorecard tool for procurement managers, not a general analytics platform."
+  },
+  {
+    "type": "decision",
+    "content": "The launch path starts with CSV import first."
+  },
+  {
+    "type": "decision",
+    "content": "Vendor reliability is computed from on-time delivery rate and return rate."
+  },
+  {
+    "type": "constraint",
+    "content": "The first release is read-only and should not assume a manual editing UI."
+  },
+  {
+    "type": "decision",
+    "content": "Once the `vendor-scorecard` workspace exists, ongoing implementation should follow the repository brief and live workspace files."
+  },
+  {
+    "type": "constraint",
+    "content": "Earlier chat should contribute stable baseline decisions into the workspace, but disposable brainstorm ideas should not become default project requirements."
+  }
+]

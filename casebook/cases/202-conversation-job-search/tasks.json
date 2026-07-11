@@ -1,0 +1,9 @@
+[
+  {
+    "id": "conversation-job-active-state",
+    "prompt": "接着我的求职线，帮我说清楚当前目标岗位、还在推进的公司、已经排除的公司和原因。",
+    "must_include": ["backend platform engineer", "Northstar Labs", "Harbor AI", "frontend role"],
+    "must_not_include": ["friend's resume", "frontend engineer target"]
+  }
+]
+

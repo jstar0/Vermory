@@ -1,0 +1,8 @@
+[
+  {
+    "id": "bridge-workspace-rebind-preserve",
+    "prompt": "项目路径迁移后，continuity 应该怎么处理？请说明新 anchor、旧路径角色和为什么要留审计。",
+    "must_include": ["/workspaces/vermory", "same continuity ID", "historical alias", "audit"],
+    "must_not_include": ["new workspace line", "ignore wrong binding risk"]
+  }
+]

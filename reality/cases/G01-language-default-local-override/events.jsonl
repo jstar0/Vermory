@@ -1,0 +1,4 @@
+{"id":"g01-event-1","sequence":1,"actor":"global_policy","channel":"managed_rules","source_id":"g01-global","content":"Default user-facing replies to Chinese unless the active task explicitly requests another language."}
+{"id":"g01-event-2","sequence":2,"actor":"user","channel":"mcm_task","source_id":"g01-task","content":"For this MCM paper task, improve the fifteen tables and make the table-facing deliverable English."}
+{"id":"g01-event-3","sequence":3,"actor":"assistant","channel":"mcm_task","source_id":"g01-task","content":"Apply English within the MCM table deliverable."}
+{"id":"g01-event-4","sequence":4,"actor":"evaluation_probe","channel":"new_unrelated_task","source_id":"g01-global","content":"The MCM task has ended. Answer a new unrelated Chinese request under the unchanged global default."}

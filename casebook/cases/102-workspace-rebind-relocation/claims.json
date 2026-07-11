@@ -1,0 +1,19 @@
+[
+  {
+    "type": "decision",
+    "content": "`atlas-notes` was rebound from the old temporary path to `/Volumes/Work/Research/atlas-notes`."
+  },
+  {
+    "type": "constraint",
+    "content": "The old path is a stale checkout and must not create a duplicate continuity line."
+  },
+  {
+    "type": "goal",
+    "content": "The workspace is focused on Zotero export import stabilization for research-note synthesis."
+  },
+  {
+    "type": "decision",
+    "content": "The owner channel is `#atlas-research` and the next milestone is `zotero-import-v1`."
+  }
+]
+

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "conversation-search-summary",
+    "prompt": "接着我们之前的租房搜索，帮我用两三句话总结一下现在的硬条件和偏好，不用展开列所有看过的房源。",
+    "must_include": ["Seattle", "3200", "one-bedroom", "pet-friendly", "Fremont"],
+    "must_not_include": ["repository", "workspace", "Aurora 8 is a top choice"]
+  },
+  {
+    "id": "conversation-candidate-filtering",
+    "prompt": "如果我现在只问一句：`Aurora 8` 还值得继续看吗？直接回答结论并给一个最关键的原因。",
+    "must_include": ["exclude", "not pet-friendly"],
+    "must_not_include": ["keep it as a serious option", "good match", "repository"]
+  },
+  {
+    "id": "conversation-later-preference-update",
+    "prompt": "我记不清后来我们把哪个片区放在更优先了。现在默认优先看哪里，为什么？",
+    "must_include": ["Fremont", "dog", "commute"],
+    "must_not_include": ["Capitol Hill is the current preferred area", "Lower Queen Anne is the current preferred area"]
+  },
+  {
+    "id": "conversation-stable-candidate",
+    "prompt": "别重新做全量搜索。就根据我们已经聊过的内容，告诉我 `Juniper Row` 为什么还留在 shortlist 里。",
+    "must_include": ["dogs", "within budget"],
+    "must_not_include": ["removed because of pet policy", "outside budget"]
+  },
+  {
+    "id": "conversation-branch-thread-pollution",
+    "prompt": "这一轮我顺手贴了一个 Bellevue 两居室的邮件转发，说是朋友代我发来的，但我并没有说要改主搜索。你现在回复时，还是按我们原来的主线帮我重申 baseline，不要因为这条旁支线索就自动切轨。",
+    "must_include": ["Seattle", "one-bedroom", "Fremont", "pet-friendly"],
+    "must_not_include": ["Bellevue", "two-bedroom", "family house search"]
+  },
+  {
+    "id": "conversation-constraint-priority",
+    "prompt": "如果接下来有房源满足预算和区域，但没有室内洗衣，同时通勤也还可以，我们之前是把这条当直接淘汰，还是当可以接受的次选？顺便提醒我通勤大致卡在什么量级。",
+    "must_include": ["fallback", "35 minutes"],
+    "must_not_include": ["hard reject", "ignore commute", "unlimited commute"]
+  }
+]

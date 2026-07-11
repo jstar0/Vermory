@@ -1,0 +1,19 @@
+[
+  {
+    "type": "goal",
+    "content": "Noah writes short non-fiction essays about local computing history."
+  },
+  {
+    "type": "preference",
+    "content": "The stable style is concise, concrete, and source-aware."
+  },
+  {
+    "type": "progress",
+    "content": "The current essay line is about early campus bulletin board systems."
+  },
+  {
+    "type": "rejected_option",
+    "content": "The essay line should not become fictional cyberpunk stories."
+  }
+]
+

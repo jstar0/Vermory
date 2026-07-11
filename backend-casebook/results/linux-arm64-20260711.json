@@ -1,0 +1,58 @@
+{
+  "run_id": "linux-arm64-20260711",
+  "environment": {
+    "os": "Ubuntu Linux",
+    "architecture": "arm64",
+    "cpu_count": 6,
+    "memory_gib": 12,
+    "runtime": "containerd",
+    "embedding_model": "bge-m3",
+    "embedding_dimensions": 1024,
+    "common_model_runtime": "Ollama"
+  },
+  "source_revisions": {
+    "mem0": "17836748d7afe0521516c6a73c6a256680f05527",
+    "memos": "13fbd43743b3b04b8c105a485f6c97729d26f776",
+    "supermemory": "2cebe81512a56272a453afe08d8c00b6888d2b7b",
+    "supermemory_server": "server-v0.0.5"
+  },
+  "hard_gates": {
+    "native": "pass",
+    "mem0": "pass",
+    "memos": "pass",
+    "supermemory": "pass"
+  },
+  "b01_b10": {
+    "native": {"assertions": 56, "passed": 56, "forbidden_leakage": 0},
+    "mem0": {"assertions": 56, "passed": 56, "forbidden_leakage": 0},
+    "memos": {"assertions": 56, "passed": 56, "forbidden_leakage": 0},
+    "supermemory": {"assertions": 56, "passed": 56, "forbidden_leakage": 0}
+  },
+  "load_200": {
+    "native": {"writes": 200, "ingest_seconds": 23.684945333, "identifier_recall": 1.0, "search_p50_ms": 125.8995, "search_p95_ms": 141.435958},
+    "mem0": {"writes": 200, "ingest_seconds": 24.086880833, "identifier_recall": 1.0, "search_p50_ms": 135.406333, "search_p95_ms": 139.661958},
+    "memos": {"writes": 200, "ingest_seconds": 35.310426125, "identifier_recall": 1.0, "search_p50_ms": 251.585375, "search_p95_ms": 284.467584},
+    "supermemory": {"writes": 200, "ingest_seconds": 26.16504725, "identifier_recall": 1.0, "search_p50_ms": 141.352333, "search_p95_ms": 151.68775}
+  },
+  "load_1000_finalists": {
+    "native": {"writes": 1000, "ingest_seconds": 122.100315167, "identifier_queries": 50, "identifier_recall": 1.0, "search_p50_ms": 131.672334, "search_p95_ms": 141.603208, "scope_erase_ms": 23.340084},
+    "mem0": {"writes": 1000, "ingest_seconds": 134.830333666, "identifier_queries": 50, "identifier_recall": 1.0, "search_p50_ms": 137.796583, "search_p95_ms": 151.683667, "scope_erase_ms": 228.996625}
+  },
+  "operations": {
+    "native": {"additional_services": 0, "measured_index_bytes_after_mixed_runs": 16842752, "cold_start": "shares the platform PostgreSQL lifecycle"},
+    "mem0": {"additional_services": 1, "required_services": ["mem0-api", "postgresql-pgvector"], "steady_rss_mib_after_load": 347.0, "cold_start_ms": 6112},
+    "memos": {"additional_services": 3, "required_services": ["memos-api", "neo4j", "qdrant"], "steady_rss_mib_after_load": 1249.3, "cold_start_ms": 9989},
+    "supermemory": {"additional_services": 1, "required_services": ["supermemory-server"], "steady_rss_mib_after_load": 1124.4, "cold_start_ms": 3167}
+  },
+  "linux_amd64": {
+    "native": "static x86-64 Go binary built",
+    "mem0": "amd64 image built and Uvicorn executed under x86_64 emulation",
+    "memos": "official amd64 base image built and Uvicorn executed under x86_64 emulation",
+    "supermemory": "official linux-x64 binary checksum verified and process started under x86_64 emulation"
+  },
+  "decision": {
+    "default_backend": "native-postgresql-pgvector",
+    "optional_adapters": ["mem0", "memos", "supermemory"],
+    "reason": "All candidates met the target correctness gates, but the native backend matched recall and lifecycle correctness while adding no service beyond ContextMesh's authoritative PostgreSQL and retaining the simplest rebuild, deletion, deployment, and audit boundary."
+  }
+}

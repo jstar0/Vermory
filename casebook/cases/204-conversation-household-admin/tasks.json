@@ -1,0 +1,9 @@
+[
+  {
+    "id": "conversation-household-admin-baseline",
+    "prompt": "接着 household admin 这条线，提醒我当前两个主要事项、截止时间和收据怎么分组。",
+    "must_include": ["lease renewal", "May 20", "electricity", "water", "internet"],
+    "must_not_include": ["cousin's moving truck", "moving baseline"]
+  }
+]
+

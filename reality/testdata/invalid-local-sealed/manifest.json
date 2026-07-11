@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "id": "invalid-local-sealed",
+  "title": "Invalid local sealed claim",
+  "evidence_level": "sealed",
+  "continuity_lines": ["security"],
+  "pressures": ["false_sealing"],
+  "sources": [
+    {
+      "id": "source-1",
+      "kind": "synthetic_fixture",
+      "fixture_path": "fixtures/source.md",
+      "sha256": "4b92115c7d3f39b747a5f4dffbb4b86addb2f1ea27cf773dbcd4b1ab2b02731c",
+      "authorized": true,
+      "anonymization": "The fixture is entirely synthetic."
+    }
+  ],
+  "anchors": [
+    {
+      "kind": "case_id",
+      "value": "invalid-local-sealed",
+      "ambiguous": false
+    }
+  ],
+  "expectations": {
+    "current_facts": ["The case is readable locally."],
+    "forbidden_facts": ["The case is sealed from the implementation."],
+    "expected_action": "Reject the sealed evidence claim."
+  },
+  "task": {
+    "prompt": "Validate the evidence level.",
+    "deterministic_checks": ["reject:sealed"]
+  }
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "workspace-back-from-other-window",
+    "prompt": "我刚刚另一个窗口还在看 `ops-console` 里一个 `ShipmentPanel` 的旧数据问题，现在回到 `acorn-retail/web-checkout` 继续处理 checkout 里那个一直转圈的问题。你先帮我把注意力拉回当前仓库：这边正在盯哪类体验，相关开关和该找的 owner 在哪？",
+    "must_include": ["web-checkout", "checkout_eta_v2", "#checkout-ops"],
+    "must_not_include": ["ops_exception_queue_refresh", "#ops-console", "3-attempt retry"]
+  },
+  {
+    "id": "workspace-ops-console-handoff",
+    "prompt": "现在我切回 `acorn-retail/ops-console` 了。上个工具窗口里还在聊 checkout 的 loading 问题，你别串过去，直接帮我接上这个仓库当前在看的内部发货问题，并提醒我默认实验开关和 owner channel。",
+    "must_include": ["ops-console", "ops_exception_queue_refresh", "#ops-console"],
+    "must_not_include": ["checkout_eta_v2", "#checkout-ops", "800 ms timeout"]
+  },
+  {
+    "id": "workspace-same-repo-cross-tool-continuation",
+    "prompt": "还是同一个 `web-checkout` 仓库，只是我换了个聊天入口。刚才另一个工具窗口里已经说过这边调用 carrier estimate 的实验设置和等待上限，现在不用重述背景，直接把那两个关键配置捞回来。",
+    "must_include": ["checkout_eta_v2", "800 ms"],
+    "must_not_include": ["ops_exception_queue_refresh", "3-attempt retry"]
+  },
+  {
+    "id": "workspace-similar-surface-isolation",
+    "prompt": "我脑子有点串了：刚才另一个窗口也在聊一个 `ShipmentPanel`。如果我现在人就在 `web-checkout`，并且手头 bug 是结账时 delivery estimate 一直 loading，你应该把我带回哪条业务流，而不是把我继续往另一个仓库的内部工具问题上引？",
+    "must_include": ["web-checkout", "checkout", "delivery estimate"],
+    "must_not_include": ["ops-console", "warehouse support", "exception review"]
+  },
+  {
+    "id": "workspace-no-cross-repo-default-merge",
+    "prompt": "两个仓库技术栈差不多，我刚刚还连续切了几个工具窗口。只按我当前停在 `web-checkout` 这个 workspace 来说，接下来排这个 checkout loading 问题时默认要盯哪个开关、去哪个协作 channel，不要把另一个仓库的默认处理方式带进来。",
+    "must_include": ["checkout_eta_v2", "#checkout-ops"],
+    "must_not_include": ["ops_exception_queue_refresh", "#ops-console", "retry budget"]
+  }
+]

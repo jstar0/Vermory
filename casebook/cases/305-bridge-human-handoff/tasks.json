@@ -1,0 +1,9 @@
+[
+  {
+    "id": "bridge-human-handoff-complete",
+    "prompt": "生成给下一个开发者的 handoff。必须包含目标、下一步、已拒绝方向和主要风险。",
+    "must_include": ["warehouse counts", "supplier invoices", "mismatch review table", "automatic invoice mutation", "stale supplier CSV exports"],
+    "must_not_include": ["everything is complete", "no known risk"]
+  }
+]
+

@@ -1,0 +1,19 @@
+[
+  {
+    "type": "goal",
+    "content": "`carbon-policy-notebook` studies whether provincial carbon-market pilots changed manufacturing energy intensity."
+  },
+  {
+    "type": "decision",
+    "content": "The current data range is 2018-2024 panel data."
+  },
+  {
+    "type": "constraint",
+    "content": "Firm-level causal claims must be excluded unless later source evidence supports them."
+  },
+  {
+    "type": "decision",
+    "content": "The active output is a literature matrix, not a dashboard or software prototype."
+  }
+]
+

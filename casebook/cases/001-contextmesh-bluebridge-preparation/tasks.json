@@ -1,0 +1,32 @@
+[
+  {
+    "id": "self-case-stale-context",
+    "prompt": "旧摘要说本项目是基于 MemOS 的 RepoMind AI Coder 记忆系统。请生成当前项目简介。",
+    "must_include": ["ContextMesh", "Bluebridge Cup", "Context Governance Engine", "multi-platform AI workflow"],
+    "must_not_include": ["based on MemOS", "jstarctl", "AI Coder only"]
+  },
+  {
+    "id": "self-case-domestic-scope",
+    "prompt": "请说明当前项目覆盖的平台范围，尤其要体现国内平台，不要把它说成只服务 GPT/Gemini/Claude。",
+    "must_include": ["Tongyi Qianwen", "Doubao", "Zhipu", "multi-platform AI workflow"],
+    "must_not_include": ["GPT only", "Claude only", "Gemini only"]
+  },
+  {
+    "id": "self-case-architecture-core",
+    "prompt": "请用一句到两句说明当前系统的技术核心，不要把它描述成对第三方记忆框架的简单封装。",
+    "must_include": ["Context Governance Engine", "ContextMesh"],
+    "must_not_include": ["wrapper around a third-party memory framework", "MemOS"]
+  },
+  {
+    "id": "self-case-real-case-policy",
+    "prompt": "请说明这个项目为什么强调真实案例和有来源的上下文，而不是编造场景。",
+    "must_include": ["real cases", "source-bound", "WCEF"],
+    "must_not_include": ["invented teams", "fake timelines"]
+  },
+  {
+    "id": "self-case-artifact-evidence",
+    "prompt": "请说明当前系统要求保留哪些工作证据，至少提到报告或 artifacts，不要只给抽象概念。",
+    "must_include": ["audit logs", "WCEF reports", "artifacts"],
+    "must_not_include": ["memory only", "chat history only"]
+  }
+]

@@ -1,0 +1,5 @@
+{"id":"w01-event-1","sequence":1,"actor":"user","channel":"codex","source_id":"w01-history","content":"Merge four work threads into one implementation session and preserve their real boundaries."}
+{"id":"w01-event-2","sequence":2,"actor":"user","channel":"codex","source_id":"w01-history","content":"Correction: the Humanizer rewrite and AI-reduction line is already complete, so remove it from the pending backlog."}
+{"id":"w01-event-3","sequence":3,"actor":"assistant","channel":"codex","source_id":"w01-history","content":"Historical observation: the local frontend was then seen on port 3000 while the startup path was being expanded."}
+{"id":"w01-event-4","sequence":4,"actor":"repository","channel":"git","source_id":"w01-repo","content":"Current repository truth now declares frontend port 5173 and a partial make dev-up scope."}
+{"id":"w01-event-5","sequence":5,"actor":"evaluation_probe","channel":"coder_handoff","source_id":"w01-repo","content":"A new coder must prepare a current local-development handoff without reviving historical facts as current."}

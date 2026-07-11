@@ -1,0 +1,19 @@
+[
+  {
+    "type": "goal",
+    "content": "Maya's active job-search target is backend platform engineer."
+  },
+  {
+    "type": "decision",
+    "content": "`Northstar Labs` remains active after a system design interview."
+  },
+  {
+    "type": "decision",
+    "content": "`Harbor AI` was rejected because it was clarified as mostly frontend work."
+  },
+  {
+    "type": "constraint",
+    "content": "A friend's resume thread should not merge into Maya's active job search."
+  }
+]
+

@@ -1,0 +1,9 @@
+[
+  {
+    "id": "bridge-multichannel-link-boundary",
+    "prompt": "现在要 link 多个聊天入口。哪些应该连成同一条住房搜索，哪个只保留为旁支？如果后面发现连错了怎么办？",
+    "must_include": ["OpenClaw", "phone chat", "same Seattle housing search", "email-forward", "unlink"],
+    "must_not_include": ["merge every channel", "email thread overwrites baseline"]
+  }
+]
+

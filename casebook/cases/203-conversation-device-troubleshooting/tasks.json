@@ -1,0 +1,9 @@
+[
+  {
+    "id": "conversation-device-current-diagnosis",
+    "prompt": "继续 Mac mini 网络问题这条线：目前确认过的修复是什么，哪个怀疑还不能当成根因？",
+    "must_include": ["Mac mini M4", "captive portal authentication", "Surge", "not confirmed"],
+    "must_not_include": ["phone hotspot billing", "confirmed Surge root cause"]
+  }
+]
+

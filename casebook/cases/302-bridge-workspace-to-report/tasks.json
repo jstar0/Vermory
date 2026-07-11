@@ -1,0 +1,9 @@
+[
+  {
+    "id": "bridge-workspace-export-report",
+    "prompt": "把当前 workspace 导出成评审报告能用的项目简介。保留核心模型，去掉实现噪音和旧依赖说法。",
+    "must_include": ["workspace continuity", "conversation continuity", "global defaults", "bridge actions", "review committee"],
+    "must_not_include": ["API keys", "raw implementation scratch notes", "MemOS dependency"]
+  }
+]
+

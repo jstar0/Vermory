@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "id": "valid-public",
+  "title": "Valid public evidence contract fixture",
+  "evidence_level": "public",
+  "continuity_lines": ["workspace"],
+  "pressures": ["stale_fact_rejection"],
+  "sources": [
+    {
+      "id": "source-1",
+      "kind": "anonymized_fixture",
+      "fixture_path": "fixtures/source.md",
+      "sha256": "4a81bed4d515c5c363ced88ba81f78858523e0262645374859df437666d32b21",
+      "authorized": true,
+      "anonymization": "Synthetic release identifiers replace the original values."
+    }
+  ],
+  "anchors": [
+    {
+      "kind": "workspace_id",
+      "value": "workspace-alpha",
+      "ambiguous": false
+    }
+  ],
+  "expectations": {
+    "current_facts": ["The active release target is 2.0."],
+    "forbidden_facts": ["The active release target is 1.5."],
+    "expected_action": "Use only release target 2.0."
+  },
+  "task": {
+    "prompt": "State the active release target.",
+    "deterministic_checks": ["contains:2.0", "not_contains:1.5"]
+  }
+}

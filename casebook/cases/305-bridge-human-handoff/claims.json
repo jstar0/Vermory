@@ -1,0 +1,18 @@
+[
+  {
+    "type": "goal",
+    "content": "The `inventory-audit` workspace reconciles warehouse counts against supplier invoices."
+  },
+  {
+    "type": "next_step",
+    "content": "The next step is to add a mismatch review table."
+  },
+  {
+    "type": "rejected_option",
+    "content": "Automatic invoice mutation was rejected."
+  },
+  {
+    "type": "risk",
+    "content": "The main risk is stale supplier CSV exports."
+  }
+]

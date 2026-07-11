@@ -1,0 +1,124 @@
+{
+  "version": "1.0",
+  "scenarios": [
+    {
+      "id": "B01-workspace-isolation",
+      "description": "Two React repositories share component vocabulary but must retain different flags, owners, and timeouts.",
+      "steps": [
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:web-checkout","continuity_line":"workspace"}},
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:ops-console","continuity_line":"workspace"}},
+        {"op":"put","record":{"id":"web-goal","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:web-checkout","continuity_line":"workspace"},"source_id":"case:101","source_version":1,"status":"active","content":"The acorn-retail/web-checkout workspace is focused on checkout delivery estimates and uses an 800 ms carrier timeout."}},
+        {"op":"put","record":{"id":"web-decision","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:web-checkout","continuity_line":"workspace"},"source_id":"case:101","source_version":1,"status":"active","content":"For acorn-retail/web-checkout, the experiment flag is checkout_eta_v2 and the owner channel is #checkout-ops."}},
+        {"op":"put","record":{"id":"ops-decision","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:ops-console","continuity_line":"workspace"},"source_id":"case:101","source_version":1,"status":"active","content":"For acorn-retail/ops-console, the experiment flag is ops_exception_queue_refresh and the owner channel is #ops-console."}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:web-checkout","continuity_line":"workspace"},"text":"ShipmentPanel feature flag owner and carrier timeout","limit":10,"required":["checkout_eta_v2","#checkout-ops","800 ms"],"forbidden":["ops_exception_queue_refresh","#ops-console"]}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:ops-console","continuity_line":"workspace"},"text":"ShipmentPanel feature flag and owner","limit":10,"required":["ops_exception_queue_refresh","#ops-console"],"forbidden":["checkout_eta_v2","#checkout-ops"]}}
+      ]
+    },
+    {
+      "id": "B02-cross-tool-continuation",
+      "description": "Codex, Claude Code, and Gemini CLI relay work in one workspace without changing the backend contract.",
+      "steps": [
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:invoice-ops","continuity_line":"workspace"}},
+        {"op":"put","record":{"id":"relay-progress","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:invoice-ops","continuity_line":"workspace"},"source_id":"case:105","source_version":1,"status":"active","content":"Codex finished the ingestion schema in the invoice-ops workspace."}},
+        {"op":"put","record":{"id":"relay-owner","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:invoice-ops","continuity_line":"workspace"},"source_id":"case:105","source_version":1,"status":"active","content":"Claude Code owns the next relay for frontend/src/pages/Reconciliation.tsx."}},
+        {"op":"put","record":{"id":"relay-constraint","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:invoice-ops","continuity_line":"workspace"},"source_id":"case:105","source_version":1,"status":"active","content":"The backend contract is frozen for this sprint. Gemini CLI may explain SQL but must not edit source files."}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:invoice-ops","continuity_line":"workspace"},"text":"I am taking over this workspace. What is done, who owns the next file, and what must not change?","limit":10,"required":["ingestion schema","Claude Code","frontend/src/pages/Reconciliation.tsx","backend contract is frozen","must not edit source files"],"forbidden":[]}}
+      ]
+    },
+    {
+      "id": "B03-conversation-isolation",
+      "description": "An apartment search and a job search remain separate even when both contain shortlist decisions.",
+      "steps": [
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:housing-renee","continuity_line":"conversation"}},
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:jobs-maya","continuity_line":"conversation"}},
+        {"op":"put","record":{"id":"housing-baseline","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:housing-renee","continuity_line":"conversation"},"source_id":"case:201","source_version":1,"status":"active","content":"Renee's Seattle apartment search targets September 2026, at most 3200 USD, one bedroom, a medium-dog-friendly building, and under 35 minutes to South Lake Union."}},
+        {"op":"put","record":{"id":"housing-shortlist","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:housing-renee","continuity_line":"conversation"},"source_id":"case:201","source_version":1,"status":"active","content":"Fremont is preferred. Juniper Row remains shortlisted. Aurora 8 is excluded because it is not pet-friendly."}},
+        {"op":"put","record":{"id":"job-target","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:jobs-maya","continuity_line":"conversation"},"source_id":"case:202","source_version":1,"status":"active","content":"Maya targets backend platform engineer roles. Northstar Labs remains active; Harbor AI was rejected as mostly frontend work."}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:housing-renee","continuity_line":"conversation"},"text":"What are my current filters and shortlist?","limit":10,"required":["3200 USD","medium-dog-friendly","Fremont","Juniper Row"],"forbidden":["Northstar Labs","backend platform engineer"]}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:jobs-maya","continuity_line":"conversation"},"text":"Which role and companies are still active?","limit":10,"required":["backend platform engineer","Northstar Labs"],"forbidden":["Juniper Row","3200 USD"]}}
+      ]
+    },
+    {
+      "id": "B04-supersede-current-state",
+      "description": "A database decision changes without allowing the obsolete decision to appear as current.",
+      "steps": [
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:billing-api","continuity_line":"workspace"}},
+        {"op":"put","record":{"id":"database-old","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:billing-api","continuity_line":"workspace"},"source_id":"decision:database","source_version":1,"status":"active","content":"MongoDB is the current database for billing-api."}},
+        {"op":"update","record":{"id":"database-old","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:billing-api","continuity_line":"workspace"},"source_id":"decision:database","source_version":1,"status":"superseded","content":"MongoDB is the current database for billing-api."}},
+        {"op":"put","record":{"id":"database-current","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:billing-api","continuity_line":"workspace"},"source_id":"decision:database","source_version":2,"status":"active","content":"PostgreSQL is the current database for billing-api."}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:billing-api","continuity_line":"workspace"},"text":"What is the current billing database?","limit":10,"required":["PostgreSQL"],"forbidden":["MongoDB"]}}
+      ]
+    },
+    {
+      "id": "B05-delete-erasure",
+      "description": "Deleting a sensitive conversation fact removes exact and paraphrased semantic recall.",
+      "steps": [
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:travel-private","continuity_line":"conversation"}},
+        {"op":"put","record":{"id":"passport-note","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:travel-private","continuity_line":"conversation"},"source_id":"chat:travel","source_version":1,"status":"active","content":"The emergency travel document appointment is at Harbor Center on Tuesday at 09:40."}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:travel-private","continuity_line":"conversation"},"text":"Where and when is the emergency document appointment?","limit":10,"required":["Harbor Center","09:40"],"forbidden":[]}},
+        {"op":"delete","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:travel-private","continuity_line":"conversation"},"record_id":"passport-note"},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:travel-private","continuity_line":"conversation"},"text":"Harbor Center Tuesday 09:40","limit":10,"required":[],"forbidden":["Harbor Center","09:40"]}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:travel-private","continuity_line":"conversation"},"text":"Remind me about the urgent replacement paperwork meeting","limit":10,"required":[],"forbidden":["emergency travel document appointment"]}}
+      ]
+    },
+    {
+      "id": "B06-source-first-conflict",
+      "description": "A newer repository source supersedes an older remembered endpoint.",
+      "steps": [
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:orders-sdk","continuity_line":"workspace"}},
+        {"op":"put","record":{"id":"endpoint-v1","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:orders-sdk","continuity_line":"workspace"},"source_id":"repo:api-spec","source_version":1,"status":"active","content":"The current create-order endpoint is POST /v1/orders."}},
+        {"op":"update","record":{"id":"endpoint-v1","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:orders-sdk","continuity_line":"workspace"},"source_id":"repo:api-spec","source_version":1,"status":"superseded","content":"The current create-order endpoint is POST /v1/orders."}},
+        {"op":"put","record":{"id":"endpoint-v2","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:orders-sdk","continuity_line":"workspace"},"source_id":"repo:api-spec","source_version":2,"status":"active","content":"The current create-order endpoint from the live repository is POST /v2/orders."}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:orders-sdk","continuity_line":"workspace"},"text":"Which endpoint should new code call to create an order?","limit":10,"required":["POST /v2/orders"],"forbidden":["POST /v1/orders"]}}
+      ]
+    },
+    {
+      "id": "B07-bridge-noise-filtering",
+      "description": "Only stable chat decisions promoted into a workspace become active project context.",
+      "steps": [
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:vendor-scorecard","continuity_line":"workspace"}},
+        {"op":"put","record":{"id":"bridge-goal","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:vendor-scorecard","continuity_line":"workspace"},"source_id":"case:301","source_version":1,"status":"active","content":"vendor-scorecard is a weekly procurement scorecard. The launch path starts with CSV import."}},
+        {"op":"put","record":{"id":"bridge-metric","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:vendor-scorecard","continuity_line":"workspace"},"source_id":"case:301","source_version":1,"status":"active","content":"Vendor reliability is computed from on-time delivery rate and return rate. The first release is read-only."}},
+        {"op":"put","record":{"id":"noise-mascot","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:vendor-scorecard","continuity_line":"workspace"},"source_id":"chat:brainstorm","source_version":1,"status":"archived","content":"Use a raccoon mascot named Vendy on every dashboard."}},
+        {"op":"put","record":{"id":"noise-slack","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:vendor-scorecard","continuity_line":"workspace"},"source_id":"chat:brainstorm","source_version":1,"status":"superseded","content":"Build a Slack bot before CSV import and make the app a general analytics platform."}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:vendor-scorecard","continuity_line":"workspace"},"text":"Summarize the product scope, first import path, reliability formula, and release constraint.","limit":10,"required":["weekly procurement scorecard","CSV import","on-time delivery rate","return rate","read-only"],"forbidden":["raccoon mascot","Slack bot","general analytics platform"]}}
+      ]
+    },
+    {
+      "id": "B08-rebind-rebuild",
+      "description": "A moved workspace keeps one continuity ID and can rebuild its disposable index from active records.",
+      "steps": [
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:atlas-notes","continuity_line":"workspace"}},
+        {"op":"put","record":{"id":"atlas-rebind","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:atlas-notes","continuity_line":"workspace"},"source_id":"case:102","source_version":1,"status":"active","content":"atlas-notes is rebound to /Volumes/Work/Research/atlas-notes; the old temporary checkout is only a stale alias."}},
+        {"op":"put","record":{"id":"atlas-milestone","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:atlas-notes","continuity_line":"workspace"},"source_id":"case:102","source_version":1,"status":"active","content":"The owner is #atlas-research and the next milestone is zotero-import-v1."}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:atlas-notes","continuity_line":"workspace"},"text":"Where is this workspace and what is next?","limit":10,"required":["/Volumes/Work/Research/atlas-notes","zotero-import-v1"],"forbidden":[]}},
+        {"op":"rebuild","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:atlas-notes","continuity_line":"workspace"},"records":[{"id":"atlas-rebind","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:atlas-notes","continuity_line":"workspace"},"source_id":"case:102","source_version":1,"status":"active","content":"atlas-notes is rebound to /Volumes/Work/Research/atlas-notes; the old temporary checkout is only a stale alias."},{"id":"atlas-milestone","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:atlas-notes","continuity_line":"workspace"},"source_id":"case:102","source_version":1,"status":"active","content":"The owner is #atlas-research and the next milestone is zotero-import-v1."}]},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:atlas-notes","continuity_line":"workspace"},"text":"After index recovery, identify the owner and milestone.","limit":10,"required":["#atlas-research","zotero-import-v1"],"forbidden":[]}}
+      ]
+    },
+    {
+      "id": "B09-noise-growth",
+      "description": "Temporary guesses and failed debugging paths remain non-current around durable device facts.",
+      "steps": [
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:mac-mini-network","continuity_line":"conversation"}},
+        {"op":"put","record":{"id":"device","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:mac-mini-network","continuity_line":"conversation"},"source_id":"case:203","source_version":1,"status":"active","content":"The recurring device troubleshooting thread is for a Mac mini M4."}},
+        {"op":"put","record":{"id":"confirmed-fix","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:mac-mini-network","continuity_line":"conversation"},"source_id":"case:203","source_version":1,"status":"active","content":"The latest confirmed fix was renewing captive portal authentication."}},
+        {"op":"put","record":{"id":"guess-surge","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:mac-mini-network","continuity_line":"conversation"},"source_id":"chat:debug","source_version":1,"status":"superseded","content":"Surge rules are definitely the root cause."}},
+        {"op":"put","record":{"id":"guess-dns","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:mac-mini-network","continuity_line":"conversation"},"source_id":"chat:debug","source_version":1,"status":"archived","content":"Replace every DNS server with 8.8.8.8 permanently."}},
+        {"op":"put","record":{"id":"noise-hotspot","scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:mac-mini-network","continuity_line":"conversation"},"source_id":"chat:adjacent","source_version":1,"status":"archived","content":"Phone hotspot billing is part of the same root cause."}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"conversation:mac-mini-network","continuity_line":"conversation"},"text":"Which device is this and what fix was actually confirmed?","limit":10,"required":["Mac mini M4","renewing captive portal authentication"],"forbidden":["definitely the root cause","8.8.8.8","hotspot billing"]}}
+      ]
+    },
+    {
+      "id": "B10-chinese-mixed-technical-text",
+      "description": "Chinese queries must recover English paths, flags, model names, and exact identifiers.",
+      "steps": [
+        {"op":"reset","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:context-router","continuity_line":"workspace"}},
+        {"op":"put","record":{"id":"mixed-path","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:context-router","continuity_line":"workspace"},"source_id":"repo:router","source_version":3,"status":"active","content":"当前 workspace resolver 的入口文件是 internal/resolver/resolver.go，灰度开关为 workspace_route_v3。"}},
+        {"op":"put","record":{"id":"mixed-model","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:context-router","continuity_line":"workspace"},"source_id":"decision:embedding","source_version":2,"status":"active","content":"中文与英文技术文本统一使用 bge-m3 生成 1024 维 embedding；抽取模型为 qwen3:4b。"}},
+        {"op":"put","record":{"id":"mixed-risk","scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:context-router","continuity_line":"workspace"},"source_id":"repo:router","source_version":3,"status":"active","content":"当 cwd 与 repo root 冲突时必须 require_confirmation，不能自动绑定到 fallback workspace。"}},
+        {"op":"search","query":{"scope":{"tenant_id":"bakeoff-quality","continuity_id":"workspace:context-router","continuity_line":"workspace"},"text":"中文告诉我 resolver 入口、灰度 flag、embedding 模型与维度，以及 cwd 冲突时的处理。","limit":10,"required":["internal/resolver/resolver.go","workspace_route_v3","bge-m3","1024","require_confirmation","不能自动绑定到 fallback workspace"],"forbidden":[]}}
+      ]
+    }
+  ]
+}

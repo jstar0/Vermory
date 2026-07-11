@@ -1,0 +1,19 @@
+[
+  {
+    "type": "goal",
+    "content": "`campus-pass` is a campus visitor pass product design workspace."
+  },
+  {
+    "type": "progress",
+    "content": "The current stage is prototype planning for QR-code check-in."
+  },
+  {
+    "type": "rejected_option",
+    "content": "Facial recognition was rejected for the first release because it is too privacy-sensitive."
+  },
+  {
+    "type": "constraint",
+    "content": "The prototype must support offline guard verification using cached pass records."
+  }
+]
+

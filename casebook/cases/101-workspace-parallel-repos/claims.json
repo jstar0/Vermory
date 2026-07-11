@@ -1,0 +1,26 @@
+[
+  {
+    "type": "goal",
+    "content": "The `acorn-retail/web-checkout` workspace is currently focused on the checkout delivery estimate experience, including a loading spinner while carrier estimates are fetched."
+  },
+  {
+    "type": "constraint",
+    "content": "For `acorn-retail/web-checkout`, the carrier estimate call uses an 800 ms timeout."
+  },
+  {
+    "type": "decision",
+    "content": "For `acorn-retail/web-checkout`, the preferred experiment flag is `checkout_eta_v2` and the owner channel is `#checkout-ops`."
+  },
+  {
+    "type": "goal",
+    "content": "The `acorn-retail/ops-console` workspace is currently focused on the internal shipment exception review flow for warehouse support."
+  },
+  {
+    "type": "decision",
+    "content": "For `acorn-retail/ops-console`, the preferred experiment flag is `ops_exception_queue_refresh` and the owner channel is `#ops-console`."
+  },
+  {
+    "type": "constraint",
+    "content": "Both repositories use TypeScript, React, feature flags, and a `ShipmentPanel` name, but continuity should stay isolated by workspace even if Mira recently discussed the other repository in another tool window."
+  }
+]

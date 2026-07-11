@@ -1,0 +1,9 @@
+[
+  {
+    "id": "workspace-research-current-state",
+    "prompt": "我回到这个研究工作区了。请帮我接上当前研究问题、数据范围和不要越界的结论边界。",
+    "must_include": ["carbon-market pilots", "manufacturing energy intensity", "2018-2024", "firm-level causal claims"],
+    "must_not_include": ["dashboard", "software prototype"]
+  }
+]
+

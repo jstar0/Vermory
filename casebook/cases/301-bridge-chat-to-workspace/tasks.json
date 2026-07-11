@@ -1,0 +1,32 @@
+[
+  {
+    "id": "bridge-workspace-brief",
+    "prompt": "我们现在已经进到 `vendor-scorecard` 这个 repo 里，要开 implementation kickoff 了。先别回放整段聊天，直接按现在项目里应该继承下来的内容，给我一个很短的启动说明。",
+    "must_include": ["vendor-scorecard", "weekly vendor scorecard", "procurement managers", "CSV import", "read-only"],
+    "must_not_include": ["mascot", "Slack bot", "general analytics platform"]
+  },
+  {
+    "id": "bridge-promoted-metrics",
+    "prompt": "只说已经从聊天阶段沉淀下来的评分核心，不要扩展新功能：这个工具第一版用什么指标算 vendor reliability？",
+    "must_include": ["on-time delivery rate", "return rate"],
+    "must_not_include": ["employee sentiment", "Slack reactions", "inventory forecasting"]
+  },
+  {
+    "id": "bridge-noise-filtering",
+    "prompt": "准备写项目启动说明时，我不想把前面聊天里那些顺口提过的点子全带进来。给我举两个不该默认进入当前项目基线的例子。",
+    "must_include": ["candidate product names", "Slack bot"],
+    "must_not_include": ["CSV import", "read-only", "on-time delivery rate"]
+  },
+  {
+    "id": "bridge-chat-to-workspace-boundary",
+    "prompt": "既然仓库已经建好了，我现在继续推进实现时，应该优先依赖哪里来对齐当前项目状态？之前那段聊天此时主要还起什么作用？",
+    "must_include": ["repository", "baseline decisions"],
+    "must_not_include": ["full transcript", "replay every chat message", "chat is the primary implementation surface"]
+  },
+  {
+    "id": "bridge-exportable-stable-facts",
+    "prompt": "如果我要把聊天里已经确定的内容导成项目启动说明，默认应该保留哪些稳定事实？别把闲聊都带进去。",
+    "must_include": ["weekly vendor scorecard", "procurement managers", "CSV import", "read-only", "on-time delivery rate", "return rate"],
+    "must_not_include": ["mascot", "candidate product names", "general analytics platform"]
+  }
+]
