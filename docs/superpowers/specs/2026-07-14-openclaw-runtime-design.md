@@ -3,7 +3,7 @@
 **Status:** Approved for autonomous implementation under the active Vermory goal  
 **Date:** 2026-07-14  
 **Official OpenClaw source reviewed:** `openclaw/openclaw` at `3c417f791cc5c2ff96282cf145ad04152b831722`  
-**Installable compatibility target:** `openclaw@2026.7.1-beta.6`
+**Installable compatibility target:** `openclaw@2026.6.11` (latest stable verified on 2026-07-14)
 
 ## 1. Purpose
 
