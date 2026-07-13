@@ -23,6 +23,9 @@ type BenchmarkCoverageArtifact struct {
 	Total                  int                          `json:"total"`
 	TranslatedOrBetter     int                          `json:"translated_or_better"`
 	ExecutableCount        int                          `json:"executable_count"`
+	TranslatedProxyCount   int                          `json:"translated_proxy_count"`
+	DesignMappingCount     int                          `json:"design_mapping_count"`
+	OriginalExecutionCount int                          `json:"original_execution_count"`
 	MissingTranslatedTask  []string                     `json:"missing_translated_task,omitempty"`
 	ExecutableWithoutCases []string                     `json:"executable_without_cases,omitempty"`
 	ByLine                 map[string]int               `json:"by_line"`
@@ -43,6 +46,7 @@ func BenchmarkCoverage(ctx context.Context, opts BenchmarkCoverageOptions) (Benc
 		return BenchmarkCoverageArtifact{}, err
 	}
 	coverage := casebook.ValidateBenchmarkCoverage(entries)
+	translatedProxyCount, designMappingCount := benchmarkEvidenceCounts(entries)
 	runID := chooseRunID(opts.RunID, "benchmark-coverage")
 	store := artifact.NewLocalStore(opts.ArtifactRoot)
 
@@ -52,6 +56,9 @@ func BenchmarkCoverage(ctx context.Context, opts BenchmarkCoverageOptions) (Benc
 		Total:                  coverage.Total,
 		TranslatedOrBetter:     coverage.TranslatedOrBetter,
 		ExecutableCount:        coverage.ExecutableCount,
+		TranslatedProxyCount:   translatedProxyCount,
+		DesignMappingCount:     designMappingCount,
+		OriginalExecutionCount: 0,
 		MissingTranslatedTask:  coverage.MissingTranslatedTask,
 		ExecutableWithoutCases: coverage.ExecutableWithoutCases,
 		ByLine:                 coverage.ByLine,
@@ -95,6 +102,9 @@ func markdownBenchmarkCoverage(report BenchmarkCoverageArtifact) string {
 	b.WriteString(fmt.Sprintf("- Total benchmarks: `%d`\n", report.Total))
 	b.WriteString(fmt.Sprintf("- Translated task or better: `%d`\n", report.TranslatedOrBetter))
 	b.WriteString(fmt.Sprintf("- Executable evaluation: `%d`\n\n", report.ExecutableCount))
+	b.WriteString(fmt.Sprintf("- Translated proxy: `%d`\n", report.TranslatedProxyCount))
+	b.WriteString(fmt.Sprintf("- Design mapping: `%d`\n", report.DesignMappingCount))
+	b.WriteString(fmt.Sprintf("- Original execution: `%d`\n\n", report.OriginalExecutionCount))
 
 	if len(report.MissingTranslatedTask) > 0 {
 		b.WriteString(fmt.Sprintf("- Missing translated task: `%s`\n", strings.Join(report.MissingTranslatedTask, ", ")))
@@ -114,4 +124,16 @@ func markdownBenchmarkCoverage(report BenchmarkCoverageArtifact) string {
 		))
 	}
 	return b.String()
+}
+
+func benchmarkEvidenceCounts(entries []casebook.BenchmarkMapEntry) (translatedProxy, designMapping int) {
+	for _, entry := range entries {
+		switch entry.ExecutionMode {
+		case "casebook_translated_proxy":
+			translatedProxy++
+		case "design_mapping":
+			designMapping++
+		}
+	}
+	return translatedProxy, designMapping
 }

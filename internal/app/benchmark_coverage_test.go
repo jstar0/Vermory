@@ -26,6 +26,15 @@ func TestBenchmarkCoverageWritesInternalReadyArtifacts(t *testing.T) {
 	if report.ExecutableCount < 4 {
 		t.Fatalf("expected at least 4 executable benchmark mappings, got %d", report.ExecutableCount)
 	}
+	if report.TranslatedProxyCount != 8 {
+		t.Fatalf("expected 8 translated proxies, got %d", report.TranslatedProxyCount)
+	}
+	if report.DesignMappingCount != 3 {
+		t.Fatalf("expected 3 design mappings, got %d", report.DesignMappingCount)
+	}
+	if report.OriginalExecutionCount != 0 {
+		t.Fatalf("coverage map must not invent original executions, got %d", report.OriginalExecutionCount)
+	}
 	if len(report.MissingTranslatedTask) != 0 {
 		t.Fatalf("expected no missing translated benchmark mappings, got %v", report.MissingTranslatedTask)
 	}

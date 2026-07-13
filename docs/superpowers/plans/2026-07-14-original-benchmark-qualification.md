@@ -36,11 +36,11 @@
 - Produces: `benchmark.ValidateExecution(qualification Qualification, execution ExecutionManifest) error`
 - Produces: independent official-source and translated-proxy counts in the coverage artifact.
 
-- [ ] **Step 1: Write failing manifest validation tests**
+- [x] **Step 1: Write failing manifest validation tests**
 
 Add table-driven tests that reject missing source revision/license/dataset hash/scorer provenance, invalid SHA-256, sampled benchmark-wide claims, full runs with incomplete counts, factual runs without deterministic scorers, and dataset-digest mismatch.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -50,15 +50,15 @@ go test ./internal/benchmark ./internal/app -run 'Test(Qualification|Execution|B
 
 Expected: FAIL because the manifest package and separate evidence counters do not exist.
 
-- [ ] **Step 3: Implement minimal contracts**
+- [x] **Step 3: Implement minimal contracts**
 
 Implement typed enums, JSON loaders, normalization, validation, and coverage reporting that never adds original executions to translated proxy counts.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run the same focused test command and require exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/benchmark internal/app/benchmark_coverage.go internal/app/benchmark_coverage_test.go casebook/benchmarks/qualifications/longmemeval-cleaned-oracle.json docs/superpowers/specs/2026-07-14-original-benchmark-qualification-design.md docs/superpowers/plans/2026-07-14-original-benchmark-qualification.md
@@ -193,4 +193,3 @@ git diff --check
 - [ ] **Step 5: Document, commit, push, and update Draft PR**
 
 Record the exact source revisions, hashes, record IDs, conditions, deterministic metrics, failures, database evidence, and non-claims. Keep PR 1 in Draft state and retain the overall platform goal as active.
-
