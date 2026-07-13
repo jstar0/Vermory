@@ -87,7 +87,7 @@ vermory_auth.authenticate_token(public_id text, digest bytea)
 
 plus RLS policies and tenant-aware foreign keys for the 12 served tables.
 
-- [ ] **Step 1: Write failing migration tests**
+- [x] **Step 1: Write failing migration tests**
 
 After migration, assert:
 
@@ -99,7 +99,7 @@ After migration, assert:
 - every served relationship has a tenant-aware composite foreign key;
 - default/`PUBLIC` privileges expose neither auth rows nor legacy `projects`, `sources`, `claims`, `capsules`, `packets`, or `wcef_runs` tables.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
@@ -108,19 +108,19 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 
 Expected: FAIL because migration 00009 is absent.
 
-- [ ] **Step 3: Implement token schema and lookup function**
+- [x] **Step 3: Implement token schema and lookup function**
 
 Include `issue_operation_id`, request fingerprint, public token ID, digest, tenant, subject, role, status, expiry, created/revoked timestamps, and idempotency uniqueness. Revoke all schema/table/function privileges from `PUBLIC`.
 
-- [ ] **Step 4: Add tenant-aware keys and RLS**
+- [x] **Step 4: Add tenant-aware keys and RLS**
 
 Add composite unique constraints and foreign keys, validate existing rows, enable RLS, and add `USING`/`WITH CHECK` policies comparing `tenant_id` with `nullif(current_setting('vermory.tenant_id', true), '')`.
 
-- [ ] **Step 5: Extend test reset**
+- [x] **Step 5: Extend test reset**
 
 `ResetForTest` truncates auth tokens only when running through an admin-capable local test store. It must not grant runtime access to auth rows.
 
-- [ ] **Step 6: Verify migration and commit**
+- [x] **Step 6: Verify migration and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \

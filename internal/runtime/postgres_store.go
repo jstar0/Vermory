@@ -98,7 +98,8 @@ func (s *Store) Migrate(ctx context.Context) error {
 
 func (s *Store) ResetForTest(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
-TRUNCATE conversation_links, bridge_memory_effects, bridge_events, bridge_operations,
+TRUNCATE vermory_auth.api_tokens,
+  conversation_links, bridge_memory_effects, bridge_events, bridge_operations,
   memory_search_documents, memory_deliveries, governed_memories,
   conversation_turns, observations, conversation_bindings, continuity_bindings, continuity_spaces CASCADE`)
 	if err != nil {
