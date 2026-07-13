@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -47,16 +48,37 @@ func (p *GrokCLI) Generate(ctx context.Context, req GenerateRequest) (GenerateRe
 	}
 	args = append(args, "--single", buildGrokCLIPrompt(req))
 
-	cmd := exec.CommandContext(ctx, p.command, args...)
+	stdout, err := os.CreateTemp("", "vermory-grok-*.json")
+	if err != nil {
+		return GenerateResponse{}, fmt.Errorf("provider: create Grok CLI output file: %w", err)
+	}
+	stdoutPath := stdout.Name()
+	defer os.Remove(stdoutPath)
+	if err := stdout.Close(); err != nil {
+		return GenerateResponse{}, fmt.Errorf("provider: close empty Grok CLI output file: %w", err)
+	}
+	shellArgs := []string{
+		"-c",
+		"output=$1\nshift\n\"$@\" > \"$output\"\nstatus=$?\nexit \"$status\"",
+		"vermory-grok",
+		stdoutPath,
+		p.command,
+	}
+	shellArgs = append(shellArgs, args...)
+	cmd := exec.CommandContext(ctx, "/bin/sh", shellArgs...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	raw, err := cmd.Output()
+	err = cmd.Run()
 	if err != nil {
 		message := strings.TrimSpace(stderr.String())
 		if message == "" {
 			return GenerateResponse{}, fmt.Errorf("provider: Grok CLI failed: %w", err)
 		}
 		return GenerateResponse{}, fmt.Errorf("provider: Grok CLI failed: %w: %s", err, message)
+	}
+	raw, err := os.ReadFile(stdoutPath)
+	if err != nil {
+		return GenerateResponse{}, fmt.Errorf("provider: read Grok CLI output file: %w", err)
 	}
 
 	var decoded grokCLIResponse

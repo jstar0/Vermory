@@ -66,3 +66,57 @@ func TestGrokCLIProviderRunsIsolatedSingleTurnAndCapturesJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestGrokCLIProviderCapturesStdoutThroughARegularFile(t *testing.T) {
+	dir := t.TempDir()
+	commandPath := filepath.Join(dir, "grok")
+	script := `#!/bin/sh
+if [ -f /dev/stdout ]; then
+  printf '%s\n' '{"text":"stable file-backed response","modelUsage":{"grok-4.5":{}}}'
+else
+  printf '%s\n' '{"text":"","modelUsage":{"grok-4.5":{}}}'
+fi
+`
+	if err := os.WriteFile(commandPath, []byte(script), 0o700); err != nil {
+		t.Fatalf("write fake grok command: %v", err)
+	}
+
+	client := NewGrokCLI(GrokCLIConfig{Command: commandPath})
+	response, err := client.Generate(context.Background(), GenerateRequest{
+		Model:  "grok-4.5",
+		Prompt: "test stable stdout capture",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Output != "stable file-backed response" {
+		t.Fatalf("unexpected output: %#v", response)
+	}
+}
+
+func TestGrokCLIProviderUsesShellParentForCLIStability(t *testing.T) {
+	dir := t.TempDir()
+	commandPath := filepath.Join(dir, "grok")
+	script := `#!/bin/sh
+parent=$(ps -p "$PPID" -o comm=)
+case "$parent" in
+  *sh) printf '%s\n' '{"text":"shell-parent response","modelUsage":{"grok-4.5":{}}}' ;;
+  *) printf '%s\n' '{"text":"","stopReason":"Cancelled","modelUsage":{"grok-4.5":{}}}' ;;
+esac
+`
+	if err := os.WriteFile(commandPath, []byte(script), 0o700); err != nil {
+		t.Fatalf("write fake grok command: %v", err)
+	}
+
+	client := NewGrokCLI(GrokCLIConfig{Command: commandPath})
+	response, err := client.Generate(context.Background(), GenerateRequest{
+		Model:  "grok-4.5",
+		Prompt: "test shell parent",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Output != "shell-parent response" {
+		t.Fatalf("unexpected output: %#v", response)
+	}
+}
