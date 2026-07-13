@@ -30,8 +30,8 @@ type WorkspaceResolution struct {
 }
 
 type ObservationReceipt struct {
-	ObservationID string
-	Replayed      bool
+	ObservationID string `json:"observation_id"`
+	Replayed      bool   `json:"replayed"`
 }
 
 type Memory struct {
@@ -47,20 +47,20 @@ type GovernedMemory struct {
 }
 
 type DeliveryReceipt struct {
-	DeliveryID string
-	Context    string
-	Replayed   bool
+	DeliveryID string `json:"delivery_id"`
+	Context    string `json:"context"`
+	Replayed   bool   `json:"replayed"`
 }
 
 type MemoryReceipt struct {
-	MemoryID string
-	Status   string
-	Replayed bool
+	MemoryID string `json:"memory_id"`
+	Status   string `json:"status"`
+	Replayed bool   `json:"replayed"`
 }
 
 type GovernedObservationReceipt struct {
-	Observation ObservationReceipt
-	Memory      MemoryReceipt
+	Observation ObservationReceipt `json:"observation"`
+	Memory      MemoryReceipt      `json:"memory"`
 }
 
 type Store struct {

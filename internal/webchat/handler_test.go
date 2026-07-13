@@ -93,6 +93,14 @@ func TestMemoryGovernanceAndInspectionUseExactConversation(t *testing.T) {
 	}
 	var confirmed runtime.MemoryReceipt
 	decodeResponse(t, confirmResponse, &confirmed)
+	var confirmationJSON map[string]any
+	decodeResponse(t, confirmResponse, &confirmationJSON)
+	if _, ok := confirmationJSON["memory_id"]; !ok {
+		t.Fatalf("confirmation receipt does not use stable JSON fields: %s", confirmResponse.Body.String())
+	}
+	if _, ok := confirmationJSON["MemoryID"]; ok {
+		t.Fatalf("confirmation receipt exposed Go field names: %s", confirmResponse.Body.String())
+	}
 
 	inspectA := httptest.NewRecorder()
 	handler.ServeHTTP(inspectA, httptest.NewRequest(http.MethodGet, "/v1/conversations/inspect?channel=web_chat&thread_id=matter-a", nil))
