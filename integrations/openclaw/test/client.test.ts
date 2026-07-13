@@ -5,12 +5,16 @@ import { describe, expect, it } from "vitest";
 
 import { VermoryClient } from "../src/client.js";
 
+const TEST_API_TOKEN =
+  "vmt_0123456789abcdef01234567_MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY";
+
 describe("VermoryClient", () => {
   it("posts an exact prepare request and validates the receipt", async () => {
     await withServer(async (request, response) => {
       expect(request.method).toBe("POST");
       expect(request.url).toBe("/v1/integrations/openclaw/turns/prepare");
       expect(request.headers["content-type"]).toBe("application/json");
+      expect(request.headers.authorization).toBeUndefined();
       expect(JSON.parse(await readRequest(request))).toEqual({
         operation_id: "openclaw:run-1",
         session_key: "agent:main:a",
@@ -28,6 +32,35 @@ describe("VermoryClient", () => {
       expect(receipt.context).toBe("Use Saturday at 10:00.");
       expect(receipt.status).toBe("in_progress");
     });
+  });
+
+  it("adds one exact bearer header without exposing it elsewhere", async () => {
+    await withServer(async (request, response) => {
+      expect(request.headers.authorization).toBe(`Bearer ${TEST_API_TOKEN}`);
+      writeJSON(response, prepareReceipt("openclaw:authenticated", "governed context"));
+    }, async (baseUrl) => {
+      const client = new VermoryClient({ baseUrl, timeoutMs: 1000, apiToken: `  ${TEST_API_TOKEN}\n` });
+      await client.prepare({
+        operationId: "openclaw:authenticated",
+        sessionKey: "agent:main:a",
+        message: "hello",
+      });
+    });
+  });
+
+  it.each([
+    `vmt_0123456789abcdef01234567_bad secret`,
+    `vmt_0123456789abcdef01234567_bad\u0000secret`,
+    "not-a-vermory-token",
+  ])("rejects malformed bearer material without echoing it", (apiToken) => {
+    let message = "";
+    try {
+      new VermoryClient({ baseUrl: "http://127.0.0.1:8787", timeoutMs: 1000, apiToken });
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toContain("Vermory API token is invalid");
+    expect(message).not.toContain(apiToken);
   });
 
   it("posts exact complete and fail requests", async () => {

@@ -4,7 +4,13 @@ import plugin from "../src/index.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
+
+const TEST_API_TOKEN =
+  "vmt_0123456789abcdef01234567_MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY";
+const OTHER_API_TOKEN =
+  "vmt_89abcdef0123456701234567_YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODk";
 
 describe("Vermory OpenClaw plugin", () => {
   it("registers official lifecycle hooks without claiming a memory slot", () => {
@@ -54,6 +60,37 @@ describe("Vermory OpenClaw plugin", () => {
     expect(result?.prependContext).not.toContain("turn-1");
     expect(result?.prependContext).not.toContain("continuity-1");
     expect(result?.prependContext).not.toContain("openclaw:run-prepare");
+  });
+
+  it("reads the bearer token once during registration", async () => {
+    vi.stubEnv("VERMORY_API_TOKEN", `  ${TEST_API_TOKEN}\n`);
+    const fetchMock = vi.fn(async (_input: unknown, init: RequestInit) => {
+      expect(new Headers(init.headers).get("authorization")).toBe(`Bearer ${TEST_API_TOKEN}`);
+      return jsonResponse(prepareReceipt("openclaw:run-authenticated", "context"));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const harness = registerPlugin();
+    vi.stubEnv("VERMORY_API_TOKEN", OTHER_API_TOKEN);
+
+    await harness.beforePrompt(
+      { prompt: "hello", messages: [] },
+      { sessionKey: "agent:main:a", runId: "run-authenticated" },
+    );
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("rejects malformed token environment without exposing its value", () => {
+    const malformed = "vmt_bad token_with_private_material";
+    vi.stubEnv("VERMORY_API_TOKEN", malformed);
+    let message = "";
+    try {
+      registerPlugin();
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toContain("Vermory API token is invalid");
+    expect(message).not.toContain(malformed);
   });
 
   it("does not mutate the prompt for empty context", async () => {

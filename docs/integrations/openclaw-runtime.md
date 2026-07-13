@@ -66,6 +66,49 @@ The OpenClaw integration does not ask Vermory to invoke a model. Start the conve
 
 The server rejects non-loopback listen addresses. The current routes have no remote-user authentication and must not be exposed to a LAN, public interface, reverse proxy, or tunnel.
 
+For an authenticated multi-tenant deployment, use the separate `serve` profile. It does not run migrations and it refuses an admin/table-owner PostgreSQL role. Prepare the database once with admin credentials, create a restricted login role, and grant only the runtime boundary:
+
+```bash
+./bin/vermory database migrate \
+  --database-url "$VERMORY_ADMIN_DATABASE_URL"
+
+psql "$VERMORY_ADMIN_DATABASE_URL" \
+  -c "CREATE ROLE vermory_runtime LOGIN PASSWORD '<runtime-password>' NOSUPERUSER NOBYPASSRLS"
+
+./bin/vermory database grant-runtime \
+  --database-url "$VERMORY_ADMIN_DATABASE_URL" \
+  --role vermory_runtime
+```
+
+Issue an OpenClaw client token from the admin path. The secret is printed only by this command invocation; inspect and revoke never print it:
+
+```bash
+./bin/vermory identity token issue \
+  --database-url "$VERMORY_ADMIN_DATABASE_URL" \
+  --operation-id openclaw-token-issue-1 \
+  --tenant-id my-tenant \
+  --subject-id openclaw-client \
+  --role client \
+  --expires-at 2026-08-14T00:00:00Z
+```
+
+Run `serve` with the restricted runtime connection, not the admin connection. Loopback can use HTTP for a local deployment; any non-loopback address requires both TLS files:
+
+```bash
+./bin/vermory serve \
+  --database-url "$VERMORY_RUNTIME_DATABASE_URL" \
+  --listen 127.0.0.1:8788 \
+  --provider external
+```
+
+Pass the issued token to the OpenClaw process environment, not to plugin config. The plugin reads it once when it is registered and sends it only as `Authorization: Bearer ...`:
+
+```bash
+export VERMORY_API_TOKEN='<token printed by identity token issue>'
+```
+
+If `VERMORY_API_TOKEN` is absent, the plugin keeps the local unauthenticated compatibility behavior. If it is malformed, plugin registration fails without echoing the value.
+
 ## Install The Plugin
 
 Build before linking because the package extension points to `dist/index.js`:

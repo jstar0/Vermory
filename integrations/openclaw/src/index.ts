@@ -16,7 +16,10 @@ const plugin: ReturnType<typeof definePluginEntry> = definePluginEntry({
   description: "Adds governed Vermory continuity to OpenClaw agent turns.",
   register(api) {
     const config = normalizePluginConfig(api.pluginConfig);
-    const client = new VermoryClient(config);
+    const client = new VermoryClient({
+      ...config,
+      apiToken: process.env.VERMORY_API_TOKEN,
+    });
 
     api.on(
       "before_prompt_build",

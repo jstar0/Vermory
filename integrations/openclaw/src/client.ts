@@ -5,6 +5,7 @@ type TurnStatus = "in_progress" | "completed" | "failed";
 export interface ClientConfig {
   baseUrl: string;
   timeoutMs: number;
+  apiToken?: string | undefined;
 }
 
 export interface TurnIdentityInput {
@@ -45,7 +46,11 @@ export interface PreparedTurnReceipt extends TurnReceipt {
 }
 
 export class VermoryClient {
-  constructor(private readonly config: ClientConfig) {}
+  private readonly config: ClientConfig;
+
+  constructor(config: ClientConfig) {
+    this.config = { ...config, apiToken: normalizeApiToken(config.apiToken) };
+  }
 
   async prepare(request: PreparedTurnRequest): Promise<PreparedTurnReceipt> {
     const body = await this.post("prepare", {
@@ -84,9 +89,13 @@ export class VermoryClient {
     try {
       let response: Response;
       try {
+        const headers: Record<string, string> = { "content-type": "application/json" };
+        if (this.config.apiToken) {
+          headers.authorization = `Bearer ${this.config.apiToken}`;
+        }
         response = await fetch(url, {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers,
           body: JSON.stringify(body),
           signal: controller.signal,
         });
@@ -116,6 +125,20 @@ export class VermoryClient {
       clearTimeout(timeout);
     }
   }
+}
+
+export function normalizeApiToken(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const normalized = value.trim();
+  if (normalized === "") {
+    return undefined;
+  }
+  if (!/^vmt_[A-Za-z0-9-]{8,64}_[A-Za-z0-9_-]{32,64}$/.test(normalized)) {
+    throw new Error("Vermory API token is invalid");
+  }
+  return normalized;
 }
 
 async function readBoundedResponse(response: Response, phase: string): Promise<string> {

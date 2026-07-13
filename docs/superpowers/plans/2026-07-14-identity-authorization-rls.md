@@ -354,22 +354,22 @@ git commit -m "feat: add authenticated multi-tenant server"
 - Consumes: environment variable `VERMORY_API_TOKEN`.
 - Produces: optional `Authorization: Bearer ...` on Vermory requests without adding token fields to plugin configuration.
 
-- [ ] **Step 1: Write failing client/plugin tests**
+- [x] **Step 1: Write failing client/plugin tests**
 
 Assert token env is trimmed, malformed whitespace/control characters are rejected, valid token produces the exact header, local no-token requests omit the header, and errors/logs never contain the token.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 PATH=/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:/usr/bin:/bin \
   pnpm -C integrations/openclaw test -- client.test.ts plugin.test.ts
 ```
 
-- [ ] **Step 3: Implement minimal bearer support**
+- [x] **Step 3: Implement minimal bearer support**
 
 Read the environment once during plugin registration, pass an optional token to the client, and set only the Authorization header. Do not add config schema fields or model-facing text.
 
-- [ ] **Step 4: Update runbook and verify**
+- [x] **Step 4: Update runbook and verify**
 
 ```bash
 PATH=/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:/usr/bin:/bin \
