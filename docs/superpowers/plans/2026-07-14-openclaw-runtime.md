@@ -182,11 +182,11 @@ POST /v1/integrations/openclaw/turns/fail
 
 All routes map `session_key` to `ConversationAnchor{Channel: "openclaw", ThreadID: sessionKey}` inside the server.
 
-- [ ] **Step 1: Write failing HTTP tests**
+- [x] **Step 1: Write failing HTTP tests**
 
 Test valid prepare/complete/fail, replay, conflicting reuse, missing/oversized fields, unknown JSON fields, body-size limit, and absence of accepted `tenant_id`, `continuity_id`, `channel`, `status`, or lifecycle override fields.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
@@ -195,15 +195,15 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 
 Expected: FAIL with route not found or missing provider mode.
 
-- [ ] **Step 3: Implement strict route decoding**
+- [x] **Step 3: Implement strict route decoding**
 
-Use the existing bounded decoder and service error mapper. Keep failure text at 512 bytes. Return `200` for successful/replayed prepare and complete, `502` only when a stored turn result is failed, and `400` for invalid/conflicting requests.
+Use the existing bounded decoder and service error mapper. Keep failure text at 512 bytes internally and never serialize it in a turn receipt. Return `200` when prepare/complete/fail state was persisted, including a `status=failed` receipt from the fail route; use non-2xx only for invalid/conflicting requests or Vermory service failure.
 
-- [ ] **Step 4: Add `external` provider mode**
+- [x] **Step 4: Add `external` provider mode**
 
 `vermory web-chat --provider external` starts the same loopback API with no in-process model provider. `/v1/chat/turn` returns a safe configuration error, while OpenClaw external-turn and governance routes remain available. Existing provider modes and defaults remain unchanged.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \

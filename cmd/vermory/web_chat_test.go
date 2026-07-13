@@ -56,3 +56,13 @@ func TestBuildWebChatProviderRejectsMissingOpenAICompatibleInputs(t *testing.T) 
 		t.Fatal("openai-compatible provider without model/base URL/key was accepted")
 	}
 }
+
+func TestBuildWebChatProviderSupportsExternalHarnessMode(t *testing.T) {
+	llm, model, err := buildWebChatProvider(webChatProviderOptions{Name: "external"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if llm != nil || model != "" {
+		t.Fatalf("external mode configured an in-process provider: provider=%T model=%q", llm, model)
+	}
+}

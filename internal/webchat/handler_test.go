@@ -71,6 +71,116 @@ func TestChatTurnRejectsTrailingJSONAndOversizedBody(t *testing.T) {
 	}
 }
 
+func TestOpenClawTurnEndpointsUseServerOwnedAnchorAndLifecycle(t *testing.T) {
+	handler, store := testHandler(t, nil)
+	prepareBody := `{
+  "operation_id":"openclaw:http-run-1",
+  "session_key":"agent:main:home-maintenance-a",
+  "message":"What is the current maintenance arrangement?"
+}`
+	preparedResponse := performJSON(t, handler, http.MethodPost, "/v1/integrations/openclaw/turns/prepare", prepareBody)
+	if preparedResponse.Code != http.StatusOK {
+		t.Fatalf("prepare returned %d: %s", preparedResponse.Code, preparedResponse.Body.String())
+	}
+	var prepared runtime.PreparedConversationTurn
+	decodeResponse(t, preparedResponse, &prepared)
+	if prepared.Status != runtime.ChatTurnInProgress || prepared.ID == "" || prepared.DeliveryID == "" {
+		t.Fatalf("unexpected prepare receipt: %#v", prepared)
+	}
+
+	resolution, err := store.ResolveConversation(context.Background(), "local", runtime.ConversationAnchor{
+		Channel:  "openclaw",
+		ThreadID: "agent:main:home-maintenance-a",
+	})
+	if err != nil || resolution.Status != runtime.ResolutionResolved {
+		t.Fatalf("server-owned OpenClaw anchor was not persisted: resolution=%#v err=%v", resolution, err)
+	}
+
+	replayedResponse := performJSON(t, handler, http.MethodPost, "/v1/integrations/openclaw/turns/prepare", prepareBody)
+	if replayedResponse.Code != http.StatusOK {
+		t.Fatalf("prepare replay returned %d: %s", replayedResponse.Code, replayedResponse.Body.String())
+	}
+	var replayed runtime.PreparedConversationTurn
+	decodeResponse(t, replayedResponse, &replayed)
+	if !replayed.Replayed || replayed.ID != prepared.ID || replayed.DeliveryID != prepared.DeliveryID {
+		t.Fatalf("unexpected prepare replay: first=%#v replay=%#v", prepared, replayed)
+	}
+
+	completedResponse := performJSON(t, handler, http.MethodPost, "/v1/integrations/openclaw/turns/complete", `{
+  "operation_id":"openclaw:http-run-1",
+  "session_key":"agent:main:home-maintenance-a",
+  "answer":"The current appointment is Saturday at 10:00.",
+  "model":"grok-cli/grok-4.5"
+}`)
+	if completedResponse.Code != http.StatusOK {
+		t.Fatalf("complete returned %d: %s", completedResponse.Code, completedResponse.Body.String())
+	}
+	var completed runtime.ChatTurnReceipt
+	decodeResponse(t, completedResponse, &completed)
+	if completed.Status != runtime.ChatTurnCompleted || completed.AssistantObservationID == "" {
+		t.Fatalf("unexpected completion receipt: %#v", completed)
+	}
+
+	failedPrepare := performJSON(t, handler, http.MethodPost, "/v1/integrations/openclaw/turns/prepare", `{
+  "operation_id":"openclaw:http-run-2",
+  "session_key":"agent:main:home-maintenance-a",
+  "message":"This run will fail."
+}`)
+	if failedPrepare.Code != http.StatusOK {
+		t.Fatalf("failed-turn prepare returned %d: %s", failedPrepare.Code, failedPrepare.Body.String())
+	}
+	failedResponse := performJSON(t, handler, http.MethodPost, "/v1/integrations/openclaw/turns/fail", `{
+  "operation_id":"openclaw:http-run-2",
+  "session_key":"agent:main:home-maintenance-a",
+  "failure_code":"openclaw_agent_error",
+  "failure_message":"provider failed before a visible answer"
+}`)
+	if failedResponse.Code != http.StatusOK {
+		t.Fatalf("fail returned %d: %s", failedResponse.Code, failedResponse.Body.String())
+	}
+	var failed runtime.ChatTurnReceipt
+	decodeResponse(t, failedResponse, &failed)
+	if failed.Status != runtime.ChatTurnFailed || failed.FailureCode != "openclaw_agent_error" || failed.AssistantObservationID != "" {
+		t.Fatalf("unexpected failure receipt: %#v", failed)
+	}
+}
+
+func TestOpenClawTurnEndpointsRejectClientAuthorityAndConflictingReplay(t *testing.T) {
+	handler, _ := testHandler(t, nil)
+	for name, body := range map[string]string{
+		"tenant":     `{"operation_id":"openclaw:forbidden-tenant","session_key":"agent:main:a","message":"hello","tenant_id":"attacker"}`,
+		"continuity": `{"operation_id":"openclaw:forbidden-continuity","session_key":"agent:main:a","message":"hello","continuity_id":"attacker"}`,
+		"channel":    `{"operation_id":"openclaw:forbidden-channel","session_key":"agent:main:a","message":"hello","channel":"attacker"}`,
+		"status":     `{"operation_id":"openclaw:forbidden-status","session_key":"agent:main:a","message":"hello","status":"completed"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			response := performJSON(t, handler, http.MethodPost, "/v1/integrations/openclaw/turns/prepare", body)
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("authority field was accepted: %d %s", response.Code, response.Body.String())
+			}
+		})
+	}
+
+	path := "/v1/integrations/openclaw/turns/prepare"
+	first := performJSON(t, handler, http.MethodPost, path, `{"operation_id":"openclaw:conflict","session_key":"agent:main:a","message":"first"}`)
+	if first.Code != http.StatusOK {
+		t.Fatalf("initial prepare failed: %d %s", first.Code, first.Body.String())
+	}
+	conflict := performJSON(t, handler, http.MethodPost, path, `{"operation_id":"openclaw:conflict","session_key":"agent:main:a","message":"different"}`)
+	if conflict.Code != http.StatusBadRequest {
+		t.Fatalf("conflicting replay returned %d: %s", conflict.Code, conflict.Body.String())
+	}
+	missingIdentity := performJSON(t, handler, http.MethodPost, path, `{"operation_id":"openclaw:missing","message":"hello"}`)
+	if missingIdentity.Code != http.StatusBadRequest {
+		t.Fatalf("missing session key returned %d: %s", missingIdentity.Code, missingIdentity.Body.String())
+	}
+	large := `{"operation_id":"openclaw:large","session_key":"agent:main:a","message":"` + strings.Repeat("x", int(maxRequestBodyBytes)) + `"}`
+	oversized := performJSON(t, handler, http.MethodPost, path, large)
+	if oversized.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized body returned %d: %s", oversized.Code, oversized.Body.String())
+	}
+}
+
 func TestGlobalDefaultsEndpointsUseServerOwnedTenantAndDurableState(t *testing.T) {
 	handler, store := testHandler(t, provider.Mock{Output: "unused"})
 	setResponse := performJSON(t, handler, http.MethodPost, "/v1/defaults/set", `{

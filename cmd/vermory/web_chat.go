@@ -102,7 +102,7 @@ func newWebChatCommand() *cobra.Command {
 	command.Flags().StringVar(&options.DatabaseURL, "database-url", "", "PostgreSQL connection URL")
 	command.Flags().StringVar(&options.TenantID, "tenant-id", "", "server-owned tenant identifier")
 	command.Flags().StringVar(&options.Listen, "listen", "127.0.0.1:8787", "loopback listen address")
-	command.Flags().StringVar(&options.Provider.Name, "provider", "mock", "provider: mock, grok-cli, openai-compatible, siliconflow, or duojie")
+	command.Flags().StringVar(&options.Provider.Name, "provider", "mock", "provider: external, mock, grok-cli, openai-compatible, siliconflow, or duojie")
 	command.Flags().StringVar(&options.Provider.Model, "model", "", "server-owned provider model")
 	command.Flags().StringVar(&options.Provider.BaseURL, "base-url", "", "direct provider base URL")
 	command.Flags().StringVar(&options.Provider.APIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
@@ -117,6 +117,8 @@ func buildWebChatProvider(options webChatProviderOptions) (provider.Provider, st
 	}
 	model := strings.TrimSpace(options.Model)
 	switch name {
+	case "external":
+		return nil, "", nil
 	case "mock":
 		if model == "" {
 			model = "mock-model"

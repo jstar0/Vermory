@@ -96,7 +96,7 @@ type ChatTurnReceipt struct {
 	Answer                 string         `json:"answer,omitempty"`
 	Model                  string         `json:"model,omitempty"`
 	FailureCode            string         `json:"failure_code,omitempty"`
-	FailureMessage         string         `json:"failure_message,omitempty"`
+	FailureMessage         string         `json:"-"`
 	Replayed               bool           `json:"replayed"`
 }
 

@@ -35,6 +35,9 @@ func NewHandlerWithGovernance(service *runtime.ConversationService, defaults *ru
 func newHandler(service *runtime.ConversationService, defaults *runtime.GlobalDefaultsService, bridges *runtime.BridgeService) http.Handler {
 	handler := &Handler{service: service, defaults: defaults, bridges: bridges, mux: http.NewServeMux()}
 	handler.mux.HandleFunc("POST /v1/chat/turn", handler.chatTurn)
+	handler.mux.HandleFunc("POST /v1/integrations/openclaw/turns/prepare", handler.prepareOpenClawTurn)
+	handler.mux.HandleFunc("POST /v1/integrations/openclaw/turns/complete", handler.completeOpenClawTurn)
+	handler.mux.HandleFunc("POST /v1/integrations/openclaw/turns/fail", handler.failOpenClawTurn)
 	handler.mux.HandleFunc("POST /v1/memories/confirm", handler.confirmMemory)
 	handler.mux.HandleFunc("POST /v1/memories/correct", handler.correctMemory)
 	handler.mux.HandleFunc("POST /v1/memories/forget", handler.forgetMemory)
@@ -66,6 +69,28 @@ type conversationInput struct {
 type chatTurnInput struct {
 	conversationInput
 	Message string `json:"message"`
+}
+
+type openClawTurnInput struct {
+	OperationID string `json:"operation_id"`
+	SessionKey  string `json:"session_key"`
+}
+
+type prepareOpenClawTurnInput struct {
+	openClawTurnInput
+	Message string `json:"message"`
+}
+
+type completeOpenClawTurnInput struct {
+	openClawTurnInput
+	Answer string `json:"answer"`
+	Model  string `json:"model"`
+}
+
+type failOpenClawTurnInput struct {
+	openClawTurnInput
+	FailureCode    string `json:"failure_code"`
+	FailureMessage string `json:"failure_message"`
 }
 
 type confirmMemoryInput struct {
@@ -161,6 +186,63 @@ func (h *Handler) chatTurn(response http.ResponseWriter, request *http.Request) 
 		status = http.StatusBadGateway
 	}
 	writeJSON(response, status, receipt)
+}
+
+func (h *Handler) prepareOpenClawTurn(response http.ResponseWriter, request *http.Request) {
+	var input prepareOpenClawTurnInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.service.PrepareExternalTurn(request.Context(), runtime.ExternalConversationTurnRequest{
+		OperationID: input.OperationID,
+		Anchor:      runtime.ConversationAnchor{Channel: "openclaw", ThreadID: input.SessionKey},
+		Message:     input.Message,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	status := http.StatusOK
+	if receipt.Status == runtime.ChatTurnFailed {
+		status = http.StatusBadGateway
+	}
+	writeJSON(response, status, receipt)
+}
+
+func (h *Handler) completeOpenClawTurn(response http.ResponseWriter, request *http.Request) {
+	var input completeOpenClawTurnInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.service.CompleteExternalTurn(request.Context(), runtime.CompleteExternalConversationTurnRequest{
+		OperationID: input.OperationID,
+		Anchor:      runtime.ConversationAnchor{Channel: "openclaw", ThreadID: input.SessionKey},
+		Answer:      input.Answer,
+		Model:       input.Model,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) failOpenClawTurn(response http.ResponseWriter, request *http.Request) {
+	var input failOpenClawTurnInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.service.FailExternalTurn(request.Context(), runtime.FailExternalConversationTurnRequest{
+		OperationID:    input.OperationID,
+		Anchor:         runtime.ConversationAnchor{Channel: "openclaw", ThreadID: input.SessionKey},
+		FailureCode:    input.FailureCode,
+		FailureMessage: input.FailureMessage,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
 }
 
 func (h *Handler) confirmMemory(response http.ResponseWriter, request *http.Request) {
@@ -505,7 +587,10 @@ func isSafeClientError(message string) bool {
 		"key must use",
 		"requires confirmation",
 		"already confirmed",
+		"already completed",
+		"already failed",
 		"already linked",
+		"has no prepared delivery",
 		"must be active",
 		"must be different",
 		"duplicate item",
