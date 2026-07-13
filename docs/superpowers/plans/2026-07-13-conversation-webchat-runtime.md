@@ -546,7 +546,7 @@ git diff --check
 
 Expected: every command exits zero and the worktree contains only intended evidence/doc changes before commit.
 
-- [ ] **Step 5: Commit and push**
+- [x] **Step 5: Commit and push**
 
 ```bash
 git add docs/integrations/local-web-chat-conversation-slice.md docs/evidence/2026-07-13-grok-webchat-runtime.md docs/superpowers/plans/2026-07-13-conversation-webchat-runtime.md
@@ -554,7 +554,7 @@ git commit -m "docs: add real conversation web chat replay"
 git push origin agent/grok-cli-runtime
 ```
 
-- [ ] **Step 6: Update Draft PR evidence**
+- [x] **Step 6: Update Draft PR evidence**
 
 Keep PR 1 in Draft state. Add the new conversation runtime scope, C01/S01 results, real Grok replay, exact verification commands, and remaining platform boundaries to the PR description.
 
