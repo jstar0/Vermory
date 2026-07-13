@@ -57,6 +57,7 @@ func TestBenchmarkLongMemEvalCommandIsRegistered(t *testing.T) {
 			"api-key-env",
 			"model",
 			"run-id",
+			"implementation-revision",
 		} {
 			if command.Flags().Lookup(flagName) == nil {
 				t.Fatalf("benchmark-longmemeval must expose --%s", flagName)

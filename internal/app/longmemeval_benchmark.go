@@ -30,19 +30,20 @@ const (
 )
 
 type LongMemEvalOptions struct {
-	QualificationPath string
-	ExecutionPath     string
-	SourceDatasetPath string
-	DatabaseURL       string
-	ArtifactRoot      string
-	Provider          string
-	BaseURL           string
-	APIKeyEnv         string
-	Model             string
-	RunID             string
-	ProviderOverride  provider.Provider
-	ProviderName      string
-	ProviderMode      string
+	QualificationPath      string
+	ExecutionPath          string
+	SourceDatasetPath      string
+	DatabaseURL            string
+	ArtifactRoot           string
+	Provider               string
+	BaseURL                string
+	APIKeyEnv              string
+	Model                  string
+	RunID                  string
+	ImplementationRevision string
+	ProviderOverride       provider.Provider
+	ProviderName           string
+	ProviderMode           string
 }
 
 type LongMemEvalReport struct {
@@ -275,7 +276,10 @@ func RunLongMemEvalSample(ctx context.Context, opts LongMemEvalOptions) (LongMem
 
 	finalExecution := execution
 	finalExecution.RunID = runID
-	finalExecution.ImplementationRev = buildVCSRevision()
+	finalExecution.ImplementationRev = strings.TrimSpace(opts.ImplementationRevision)
+	if finalExecution.ImplementationRev == "" {
+		finalExecution.ImplementationRev = buildVCSRevision()
+	}
 	finalExecution.Conditions = LongMemEvalConditions()
 	finalExecution.Artifacts = copyStringMap(report.Artifacts)
 	manifestURI, err := localArtifactURI(opts.ArtifactRoot, filepath.ToSlash(filepath.Join(artifactPrefix, "execution-manifest.json")))

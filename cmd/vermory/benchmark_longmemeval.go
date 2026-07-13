@@ -40,5 +40,6 @@ func newBenchmarkLongMemEvalCommand() *cobra.Command {
 	command.Flags().StringVar(&options.APIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	command.Flags().StringVar(&options.Model, "model", "", "provider model name")
 	command.Flags().StringVar(&options.RunID, "run-id", "", "stable original-dataset sample run id")
+	command.Flags().StringVar(&options.ImplementationRevision, "implementation-revision", "", "exact source revision used for this run")
 	return command
 }

@@ -29,16 +29,17 @@ func TestLongMemEvalRunnerUsesFourComparableConditionsAndProductionVermoryPath(t
 	artifactRoot := t.TempDir()
 
 	report, err := RunLongMemEvalSample(context.Background(), LongMemEvalOptions{
-		QualificationPath: paths.qualification,
-		ExecutionPath:     paths.execution,
-		SourceDatasetPath: paths.source,
-		DatabaseURL:       databaseURL,
-		ArtifactRoot:      artifactRoot,
-		ProviderOverride:  llm,
-		ProviderName:      "test-provider",
-		ProviderMode:      "test",
-		Model:             "test-model",
-		RunID:             "longmemeval-test-run",
+		QualificationPath:      paths.qualification,
+		ExecutionPath:          paths.execution,
+		SourceDatasetPath:      paths.source,
+		DatabaseURL:            databaseURL,
+		ArtifactRoot:           artifactRoot,
+		ProviderOverride:       llm,
+		ProviderName:           "test-provider",
+		ProviderMode:           "test",
+		Model:                  "test-model",
+		RunID:                  "longmemeval-test-run",
+		ImplementationRevision: "test-revision",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -84,6 +85,17 @@ func TestLongMemEvalRunnerUsesFourComparableConditionsAndProductionVermoryPath(t
 			t.Fatalf("expected artifact %s: %v", path, err)
 		}
 	}
+	manifestData, err := os.ReadFile(filepath.Join(artifactRoot, "benchmarks", "longmemeval-test-run", "execution-manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var finalManifest benchmark.ExecutionManifest
+	if err := json.Unmarshal(manifestData, &finalManifest); err != nil {
+		t.Fatal(err)
+	}
+	if finalManifest.ImplementationRev != "test-revision" {
+		t.Fatalf("expected explicit implementation revision, got %q", finalManifest.ImplementationRev)
+	}
 }
 
 func TestLongMemEvalRunnerRetainsProviderFailures(t *testing.T) {
@@ -97,16 +109,17 @@ func TestLongMemEvalRunnerRetainsProviderFailures(t *testing.T) {
 	llm := &recordingBenchmarkProvider{answers: answers, failAt: 3, failureMessage: longFailure}
 
 	report, err := RunLongMemEvalSample(context.Background(), LongMemEvalOptions{
-		QualificationPath: paths.qualification,
-		ExecutionPath:     paths.execution,
-		SourceDatasetPath: paths.source,
-		DatabaseURL:       databaseURL,
-		ArtifactRoot:      t.TempDir(),
-		ProviderOverride:  llm,
-		ProviderName:      "test-provider",
-		ProviderMode:      "test",
-		Model:             "test-model",
-		RunID:             "longmemeval-failure-run",
+		QualificationPath:      paths.qualification,
+		ExecutionPath:          paths.execution,
+		SourceDatasetPath:      paths.source,
+		DatabaseURL:            databaseURL,
+		ArtifactRoot:           t.TempDir(),
+		ProviderOverride:       llm,
+		ProviderName:           "test-provider",
+		ProviderMode:           "test",
+		Model:                  "test-model",
+		RunID:                  "longmemeval-failure-run",
+		ImplementationRevision: "test-revision",
 	})
 	if err != nil {
 		t.Fatal(err)
