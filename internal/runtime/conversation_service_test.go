@@ -60,6 +60,63 @@ func TestConversationServiceIncludesPriorTurnsOnTheSameThread(t *testing.T) {
 	}
 }
 
+func TestConversationConsumerAppliesGlobalDefaultWithoutPersistingLocalOverride(t *testing.T) {
+	ctx := context.Background()
+	store := openTestStore(t)
+	defaults := NewGlobalDefaultsService(store, "local")
+	created, err := defaults.Set(ctx, SetGlobalDefaultRequest{
+		OperationID: "conversation-global-language-set",
+		Key:         "reply_language",
+		Content:     "Default user-facing replies to Chinese unless the active task explicitly requests another language.",
+	})
+	requireNoError(t, err)
+	llm := &recordingProvider{output: "English table deliverable"}
+	service := NewConversationService(store, "local", llm, "test-model", ConversationServiceConfig{})
+
+	_, err = service.Chat(ctx, ChatTurnRequest{
+		OperationID: "conversation-local-english-override",
+		Anchor:      ConversationAnchor{Channel: "web_chat", ThreadID: "mcm-table-task"},
+		Message:     "For this task only, produce the table-facing deliverable in English.",
+	})
+	requireNoError(t, err)
+	if len(llm.calls) != 1 {
+		t.Fatalf("expected one provider call, got %d", len(llm.calls))
+	}
+	requireContains(t, llm.calls[0].ContextPacket, "Global defaults:\nDefault user-facing replies to Chinese")
+	requireContains(t, llm.calls[0].Prompt, "For this task only")
+
+	inspection, err := defaults.Inspect(ctx)
+	requireNoError(t, err)
+	if len(inspection.Defaults) != 1 || inspection.Defaults[0].ID != created.MemoryID || inspection.Defaults[0].LifecycleStatus != "active" {
+		t.Fatalf("local override mutated the global default: %#v", inspection)
+	}
+	requireContains(t, inspection.Defaults[0].Content, "Chinese")
+	requireNotContains(t, inspection.Defaults[0].Content, "English")
+
+	llm.output = "新的中文回答"
+	_, err = service.Chat(ctx, ChatTurnRequest{
+		OperationID: "conversation-new-chinese-task",
+		Anchor:      ConversationAnchor{Channel: "web_chat", ThreadID: "unrelated-chinese-task"},
+		Message:     "请解释一个新的无关问题。",
+	})
+	requireNoError(t, err)
+	requireContains(t, llm.calls[1].ContextPacket, "Default user-facing replies to Chinese")
+	requireNotContains(t, llm.calls[1].ContextPacket, "table-facing deliverable in English")
+
+	_, err = defaults.Forget(ctx, ForgetGlobalDefaultRequest{
+		OperationID: "conversation-global-language-forget",
+		MemoryID:    created.MemoryID,
+	})
+	requireNoError(t, err)
+	_, err = service.Chat(ctx, ChatTurnRequest{
+		OperationID: "conversation-after-global-forget",
+		Anchor:      ConversationAnchor{Channel: "web_chat", ThreadID: "after-default-delete"},
+		Message:     "继续一个新的任务。",
+	})
+	requireNoError(t, err)
+	requireNotContains(t, llm.calls[2].ContextPacket, "Default user-facing replies to Chinese")
+}
+
 func TestConversationServiceDoesNotCrossThreadBoundary(t *testing.T) {
 	store := openTestStore(t)
 	llm := &recordingProvider{output: "answer"}

@@ -50,6 +50,48 @@ func TestPrepareContextFindsCurrentFactWhenTaskHasPartialTermOverlap(t *testing.
 	requireContains(t, got.Context, "checkout_eta_v2")
 }
 
+func TestWorkspaceConsumerReceivesGlobalDefaultsWithoutChangingDeliveryScope(t *testing.T) {
+	ctx := context.Background()
+	service, store, workspaceContinuityID, _ := seededService(t)
+	defaults := NewGlobalDefaultsService(store, "local")
+	created, err := defaults.Set(ctx, SetGlobalDefaultRequest{
+		OperationID: "workspace-global-language-set",
+		Key:         "reply_language",
+		Content:     "Default user-facing replies to Chinese unless the active task explicitly requests another language.",
+	})
+	requireNoError(t, err)
+	seedMemory(t, store, workspaceContinuityID, "active", "Use checkout_eta_v2 for the staged checkout release.")
+	requireNoError(t, store.RebuildProjection(ctx, "local", workspaceContinuityID))
+
+	prepared, err := service.PrepareContext(ctx, PrepareContextRequest{
+		OperationID: "workspace-global-language-prepare",
+		Workspace:   WorkspaceAnchor{RepoRoot: "/repo/web-checkout"},
+		Task:        "Explain the current checkout flag.",
+	})
+	requireNoError(t, err)
+	requireContains(t, prepared.Context, "Global defaults:\nDefault user-facing replies to Chinese")
+	requireContains(t, prepared.Context, "Governed memory:\nUse checkout_eta_v2")
+	deliveryContinuityID, err := store.DeliveryContinuity(ctx, "local", prepared.DeliveryID)
+	requireNoError(t, err)
+	if deliveryContinuityID != workspaceContinuityID || deliveryContinuityID == created.ContinuityID {
+		t.Fatalf("workspace delivery attached to the wrong continuity: delivery=%s workspace=%s global=%s", deliveryContinuityID, workspaceContinuityID, created.ContinuityID)
+	}
+
+	_, err = defaults.Forget(ctx, ForgetGlobalDefaultRequest{
+		OperationID: "workspace-global-language-forget",
+		MemoryID:    created.MemoryID,
+	})
+	requireNoError(t, err)
+	prepared, err = service.PrepareContext(ctx, PrepareContextRequest{
+		OperationID: "workspace-global-language-after-forget",
+		Workspace:   WorkspaceAnchor{RepoRoot: "/repo/web-checkout"},
+		Task:        "Explain the current checkout flag again.",
+	})
+	requireNoError(t, err)
+	requireNotContains(t, prepared.Context, "Default user-facing replies to Chinese")
+	requireContains(t, prepared.Context, "checkout_eta_v2")
+}
+
 func TestDeletedMemoryDoesNotReturnAfterRebuild(t *testing.T) {
 	_, store, webCheckout, _ := seededService(t)
 	memoryID := seedMemory(t, store, webCheckout, "active", "The Orchard recovery code is ORCHID-7419.")

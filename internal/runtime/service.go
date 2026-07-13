@@ -42,15 +42,15 @@ func (s *Service) PrepareContext(ctx context.Context, request PrepareContextRequ
 	if resolution.Status == ResolutionNeedsConfirmation {
 		return PrepareContextResponse{Status: resolution.Status}, nil
 	}
+	defaults, err := s.store.ListActiveGlobalDefaults(ctx, s.tenantID)
+	if err != nil {
+		return PrepareContextResponse{}, err
+	}
 	memories, err := s.store.SearchActiveMemory(ctx, s.tenantID, resolution.ContinuityID, request.Task, request.MaxItems)
 	if err != nil {
 		return PrepareContextResponse{}, err
 	}
-	content := make([]string, 0, len(memories))
-	for _, memory := range memories {
-		content = append(content, memory.Content)
-	}
-	delivery, err := s.store.RecordDelivery(ctx, s.tenantID, resolution.ContinuityID, request.OperationID, request.Task, strings.Join(content, "\n"))
+	delivery, err := s.store.RecordDelivery(ctx, s.tenantID, resolution.ContinuityID, request.OperationID, request.Task, BuildWorkspaceContext(defaults, memories))
 	if err != nil {
 		return PrepareContextResponse{}, err
 	}
@@ -59,6 +59,27 @@ func (s *Service) PrepareContext(ctx context.Context, request PrepareContextRequ
 		DeliveryID: delivery.DeliveryID,
 		Context:    delivery.Context,
 	}, nil
+}
+
+func BuildWorkspaceContext(defaults, memories []Memory) string {
+	sections := make([]string, 0, 2)
+	if lines := semanticMemoryLines(defaults); len(lines) > 0 {
+		sections = append(sections, "Global defaults:\n"+strings.Join(lines, "\n"))
+	}
+	if lines := semanticMemoryLines(memories); len(lines) > 0 {
+		sections = append(sections, "Governed memory:\n"+strings.Join(lines, "\n"))
+	}
+	return strings.Join(sections, "\n\n")
+}
+
+func semanticMemoryLines(memories []Memory) []string {
+	lines := make([]string, 0, len(memories))
+	for _, memory := range memories {
+		if content := strings.TrimSpace(memory.Content); content != "" && content != "[redacted]" {
+			lines = append(lines, content)
+		}
+	}
+	return lines
 }
 
 func (s *Service) CommitObservation(ctx context.Context, request CommitObservationRequest) (CommitObservationResponse, error) {

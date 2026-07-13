@@ -128,27 +128,27 @@ git commit -m "feat: add explicit global defaults service"
 - Consumes: `ListActiveGlobalDefaults`.
 - Produces: `BuildWorkspaceContext` and an extended `BuildConversationContext` that render semantic defaults before scoped context.
 
-- [ ] **Step 1: Write failing consumer tests**
+- [x] **Step 1: Write failing consumer tests**
 
 Prove both paths receive the same active default, scoped memory remains isolated, the task instruction appears only as the current prompt, and deletion removes the default from replayed consumers.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime -run 'Test.*GlobalDefault|TestG01'
 ```
 
-- [ ] **Step 3: Implement semantic context composition**
+- [x] **Step 3: Implement semantic context composition**
 
 Render only non-empty, non-redacted semantic content under `Global defaults:`. Keep workspace deliveries attached to workspace continuities and conversation deliveries attached to conversation continuities.
 
-- [ ] **Step 4: Run all runtime tests and verify GREEN**
+- [x] **Step 4: Run all runtime tests and verify GREEN**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime
 ```
 
-- [ ] **Step 5: Commit the consumer slice**
+- [x] **Step 5: Commit the consumer slice**
 
 ```bash
 git add internal/runtime/service.go internal/runtime/service_test.go internal/runtime/conversation_service.go internal/runtime/conversation_service_test.go internal/runtime/acceptance_test.go
