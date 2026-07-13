@@ -42,7 +42,7 @@ caller or another model-facing transport.
 | `memory inspect` | `--database-url`, `--tenant-id`, `--repo-root` | Lists scoped governed memories with ID, lifecycle, content, and revision relation so an operator can choose an explicit target. |
 | `memory add-source` | `--database-url`, `--tenant-id`, `--repo-root`, `--operation-id`, `--content`, `--source-ref` | Records a trusted source observation and creates one active fact. It does not infer or replace another fact. |
 | `memory correct` | `--database-url`, `--tenant-id`, `--repo-root`, `--operation-id`, `--memory-id`, `--content` | Records a trusted user correction and requires the named active fact to be superseded atomically. |
-| `memory forget` | `--database-url`, `--tenant-id`, `--repo-root`, `--operation-id`, `--memory-id`, `--reason` | Records an explicit forget request and redacts the named fact and its origin content atomically. |
+| `memory forget` | `--database-url`, `--tenant-id`, `--repo-root`, `--operation-id`, `--memory-id` | Records an explicit forget request and redacts the named fact and its origin content atomically. |
 
 `--operation-id` is required for mutating memory commands. It is the durable
 idempotency key: a retry with the same ID returns the original receipt, and a
@@ -65,6 +65,9 @@ action, but context delivery remains semantic-only for MCP consumers.
 - `memory add-source` produces active authority but never silently
   supersedes another fact. `memory correct` must name an active fact to
   supersede. `memory forget` must name the fact to redact.
+- `memory forget` has no free-text reason. It writes a bounded operator-action
+  observation rather than storing a new operator sentence that could repeat
+  the deleted fact in audit history.
 - All writes use the existing single PostgreSQL transaction that stores the
   observation, performs the lifecycle transition or redaction, and updates
   the lexical projection. The CLI does not edit tables directly.
