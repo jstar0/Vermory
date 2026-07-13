@@ -452,10 +452,10 @@ PATH=/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:/usr/bin:/bin \
 git diff --check
 ```
 
-- [ ] **Step 2: Commit checked plan**
+- [x] **Step 2: Commit checked plan**
 
 Mark all completed items only after fresh verification.
 
-- [ ] **Step 3: Push and update Draft PR 1**
+- [x] **Step 3: Push and update Draft PR 1**
 
 Push `agent/grok-cli-runtime`. Update the Draft PR with the token boundary, role matrix, non-owner runtime role, RLS/filter-omission evidence, authenticated OpenClaw replay, and the next operations slice. Keep the overall goal active.
