@@ -72,25 +72,25 @@ git commit -m "feat: add durable bridge ledger"
 - Create: `internal/runtime/bridge_service.go`
 - Create: `internal/runtime/bridge_service_test.go`
 
-- [ ] **Step 1: Write failing promote/export tests**
+- [x] **Step 1: Write failing promote/export tests**
 
 Prove selected active conversation memory is copied to one workspace, noise/proposed/deleted/cross-tenant memory is rejected, source remains unchanged, export includes only selected semantic content, and replay is stable.
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime -run 'TestBridge.*Promote|TestBridge.*Export'
 ```
 
-- [ ] **Step 3: Implement minimal transactional effects**
+- [x] **Step 3: Implement minimal transactional effects**
 
 Promotion creates target observations, `bridge_promoted` active memories, projections, and effect rows. Export stores a bounded title/body/profile view without creating a target continuity.
 
-- [ ] **Step 4: Implement promote/export reversal**
+- [x] **Step 4: Implement promote/export reversal**
 
 Promotion reversal deletes generated target memories while preserving source. Export reversal sets status `revoked` and redacts the internal body.
 
-- [ ] **Step 5: Run runtime tests and commit**
+- [x] **Step 5: Run runtime tests and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime

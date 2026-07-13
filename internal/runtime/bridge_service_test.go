@@ -1,0 +1,166 @@
+package runtime
+
+import (
+	"context"
+	"strings"
+	"testing"
+)
+
+func TestBridgePromoteCopiesOnlySelectedActiveConversationMemoryAndReverses(t *testing.T) {
+	ctx := context.Background()
+	store := openTestStore(t)
+	service := NewBridgeService(store, "local")
+	sourceAnchor := ConversationAnchor{Channel: "web_chat", ThreadID: "release-planning"}
+	sourceResolution, selectedMemoryID := confirmConversationMemoryForBridge(t, store, "local", sourceAnchor, "promote-selected", "Use checkout_eta_v2 for the staged checkout release.")
+	_, _ = confirmConversationMemoryForBridge(t, store, "local", sourceAnchor, "promote-noise", "Run the checkout smoke suite before increasing rollout percentage.")
+	proposed, err := store.CommitGovernedObservation(ctx, "local", sourceResolution.ContinuityID, CommitObservationRequest{
+		OperationID: "promote-proposed",
+		Kind:        ObservationKindAgentResult,
+		Content:     "Rename the internal mascot before launch.",
+	})
+	requireNoError(t, err)
+	workspaceContinuityID, err := store.ConfirmWorkspaceBinding(ctx, "local", "/fixtures/checkout-workspace")
+	requireNoError(t, err)
+
+	promoted, err := service.PromoteConversationToWorkspace(ctx, PromoteConversationToWorkspaceRequest{
+		OperationID:    "bridge-promote-release-flag",
+		Source:         sourceAnchor,
+		TargetRepoRoot: "/fixtures/checkout-workspace",
+		MemoryIDs:      []string{selectedMemoryID},
+	})
+	requireNoError(t, err)
+	if promoted.Action != BridgeActionPromote || promoted.Status != BridgeStatusActive || len(promoted.MemoryEffects) != 1 || promoted.MemoryEffects[0].SourceMemoryID != selectedMemoryID || promoted.MemoryEffects[0].TargetMemoryID == "" {
+		t.Fatalf("unexpected promote receipt: %#v", promoted)
+	}
+
+	workspace := NewService(store, "local")
+	prepared, err := workspace.PrepareContext(ctx, PrepareContextRequest{
+		OperationID: "bridge-promote-workspace-consume",
+		Workspace:   WorkspaceAnchor{RepoRoot: "/fixtures/checkout-workspace"},
+		Task:        "Which checkout flag should the staged release use?",
+	})
+	requireNoError(t, err)
+	requireContains(t, prepared.Context, "checkout_eta_v2")
+	requireNotContains(t, prepared.Context, "smoke suite")
+	requireNotContains(t, prepared.Context, "mascot")
+	if deliveryContinuityID, err := store.DeliveryContinuity(ctx, "local", prepared.DeliveryID); err != nil || deliveryContinuityID != workspaceContinuityID {
+		t.Fatalf("promoted delivery escaped target workspace: continuity=%s err=%v", deliveryContinuityID, err)
+	}
+
+	replay, err := service.PromoteConversationToWorkspace(ctx, PromoteConversationToWorkspaceRequest{
+		OperationID:    "bridge-promote-release-flag",
+		Source:         sourceAnchor,
+		TargetRepoRoot: "/fixtures/checkout-workspace",
+		MemoryIDs:      []string{selectedMemoryID},
+	})
+	requireNoError(t, err)
+	if !replay.Replayed || replay.ID != promoted.ID || replay.MemoryEffects[0].TargetMemoryID != promoted.MemoryEffects[0].TargetMemoryID {
+		t.Fatalf("promote replay changed effects: first=%#v replay=%#v", promoted, replay)
+	}
+
+	_, err = service.PromoteConversationToWorkspace(ctx, PromoteConversationToWorkspaceRequest{
+		OperationID:    "bridge-promote-reject-proposed",
+		Source:         sourceAnchor,
+		TargetRepoRoot: "/fixtures/checkout-workspace",
+		MemoryIDs:      []string{proposed.Memory.MemoryID},
+	})
+	if err == nil || !strings.Contains(err.Error(), "active") {
+		t.Fatalf("non-active memory %s was promoted: %v", proposed.Memory.MemoryID, err)
+	}
+
+	reversed, err := service.Reverse(ctx, ReverseBridgeRequest{OperationID: "bridge-promote-reverse", BridgeID: promoted.ID})
+	requireNoError(t, err)
+	if reversed.Status != BridgeStatusReversed {
+		t.Fatalf("promotion was not reversed: %#v", reversed)
+	}
+	requireNoError(t, store.RebuildProjection(ctx, "local", workspaceContinuityID))
+	prepared, err = workspace.PrepareContext(ctx, PrepareContextRequest{
+		OperationID: "bridge-promote-workspace-after-reverse",
+		Workspace:   WorkspaceAnchor{RepoRoot: "/fixtures/checkout-workspace"},
+		Task:        "Which checkout flag should the staged release use now?",
+	})
+	requireNoError(t, err)
+	requireNotContains(t, prepared.Context, "checkout_eta_v2")
+	if sourceMatches, err := store.SearchActiveMemory(ctx, "local", sourceResolution.ContinuityID, "checkout_eta_v2", 5); err != nil || len(sourceMatches) != 1 || sourceMatches[0].ID != selectedMemoryID {
+		t.Fatalf("promotion reversal altered source memory: matches=%#v err=%v", sourceMatches, err)
+	}
+}
+
+func TestBridgeExportIsBoundedDurableAndRevocable(t *testing.T) {
+	ctx := context.Background()
+	store := openTestStore(t)
+	governance := NewGovernanceService(store, "local")
+	_, err := governance.ConfirmWorkspace(ctx, "/fixtures/export-workspace")
+	requireNoError(t, err)
+	flag, err := governance.AddSource(ctx, "/fixtures/export-workspace", GovernanceWriteRequest{
+		OperationID: "export-source-flag",
+		Content:     "Use checkout_eta_v2 for the staged checkout release.",
+		SourceRef:   "fixture:B01:flag",
+	})
+	requireNoError(t, err)
+	smoke, err := governance.AddSource(ctx, "/fixtures/export-workspace", GovernanceWriteRequest{
+		OperationID: "export-source-smoke",
+		Content:     "Run the checkout smoke suite before increasing rollout percentage.",
+		SourceRef:   "fixture:B01:smoke",
+	})
+	requireNoError(t, err)
+	_, err = governance.AddSource(ctx, "/fixtures/export-workspace", GovernanceWriteRequest{
+		OperationID: "export-source-noise",
+		Content:     "Rename the internal mascot before launch.",
+		SourceRef:   "fixture:B01:noise",
+	})
+	requireNoError(t, err)
+
+	service := NewBridgeService(store, "local")
+	exported, err := service.ExportWorkspace(ctx, ExportWorkspaceRequest{
+		OperationID:   "bridge-export-release-handoff",
+		RepoRoot:      "/fixtures/export-workspace",
+		MemoryIDs:     []string{flag.Memory.MemoryID, smoke.Memory.MemoryID},
+		Title:         "Release handoff",
+		TargetProfile: "team_handoff",
+	})
+	requireNoError(t, err)
+	if exported.Action != BridgeActionExport || exported.TargetProfile != "team_handoff" || len(exported.MemoryEffects) != 2 {
+		t.Fatalf("unexpected export receipt: %#v", exported)
+	}
+	for _, expected := range []string{"Release handoff", "checkout_eta_v2", "smoke suite"} {
+		requireContains(t, exported.ExportBody, expected)
+	}
+	requireNotContains(t, exported.ExportBody, "mascot")
+	requireNotContains(t, exported.ExportBody, flag.Memory.MemoryID)
+
+	replay, err := service.ExportWorkspace(ctx, ExportWorkspaceRequest{
+		OperationID:   "bridge-export-release-handoff",
+		RepoRoot:      "/fixtures/export-workspace",
+		MemoryIDs:     []string{flag.Memory.MemoryID, smoke.Memory.MemoryID},
+		Title:         "Release handoff",
+		TargetProfile: "team_handoff",
+	})
+	requireNoError(t, err)
+	if !replay.Replayed || replay.ID != exported.ID || replay.ExportBody != exported.ExportBody {
+		t.Fatalf("export replay changed artifact: first=%#v replay=%#v", exported, replay)
+	}
+
+	revoked, err := service.Reverse(ctx, ReverseBridgeRequest{OperationID: "bridge-export-revoke", BridgeID: exported.ID})
+	requireNoError(t, err)
+	if revoked.Status != BridgeStatusRevoked || revoked.ExportBody != "[revoked]" {
+		t.Fatalf("export was not revoked and redacted: %#v", revoked)
+	}
+}
+
+func confirmConversationMemoryForBridge(t *testing.T, store *Store, tenantID string, anchor ConversationAnchor, operationPrefix, content string) (ConversationResolution, string) {
+	t.Helper()
+	ctx := context.Background()
+	resolution, err := store.ResolveOrCreateConversation(ctx, tenantID, anchor)
+	requireNoError(t, err)
+	observation, err := store.CommitObservation(ctx, tenantID, resolution.ContinuityID, CommitObservationRequest{
+		OperationID: operationPrefix + ":message",
+		Kind:        ObservationKindUserMessage,
+		Content:     content,
+		SourceRef:   conversationUserSourceRef,
+	})
+	requireNoError(t, err)
+	memory, err := store.ConfirmConversationObservation(ctx, tenantID, resolution.ContinuityID, observation.ObservationID, operationPrefix+":confirm")
+	requireNoError(t, err)
+	return resolution, memory.MemoryID
+}

@@ -74,6 +74,85 @@ type BridgeReceipt struct {
 	MemoryEffects      []BridgeMemoryEffect `json:"memory_effects"`
 }
 
+type PromoteConversationToWorkspaceRequest struct {
+	OperationID    string             `json:"operation_id"`
+	Source         ConversationAnchor `json:"source"`
+	TargetRepoRoot string             `json:"target_repo_root"`
+	MemoryIDs      []string           `json:"memory_ids"`
+}
+
+func (r *PromoteConversationToWorkspaceRequest) Validate() error {
+	if err := normalizeBridgeOperationID(&r.OperationID); err != nil {
+		return err
+	}
+	anchor, err := r.Source.Normalized()
+	if err != nil {
+		return err
+	}
+	r.Source = anchor
+	target, err := normalizeAbsolutePath(r.TargetRepoRoot)
+	if err != nil {
+		return fmt.Errorf("target_repo_root: %w", err)
+	}
+	r.TargetRepoRoot = target
+	r.MemoryIDs, err = normalizeBridgeMemoryIDs(r.MemoryIDs)
+	return err
+}
+
+type ExportWorkspaceRequest struct {
+	OperationID   string   `json:"operation_id"`
+	RepoRoot      string   `json:"repo_root"`
+	MemoryIDs     []string `json:"memory_ids"`
+	Title         string   `json:"title"`
+	TargetProfile string   `json:"target_profile"`
+}
+
+func (r *ExportWorkspaceRequest) Validate() error {
+	if err := normalizeBridgeOperationID(&r.OperationID); err != nil {
+		return err
+	}
+	repoRoot, err := normalizeAbsolutePath(r.RepoRoot)
+	if err != nil {
+		return fmt.Errorf("repo_root: %w", err)
+	}
+	r.RepoRoot = repoRoot
+	r.MemoryIDs, err = normalizeBridgeMemoryIDs(r.MemoryIDs)
+	if err != nil {
+		return err
+	}
+	r.Title = strings.TrimSpace(r.Title)
+	r.TargetProfile = strings.TrimSpace(r.TargetProfile)
+	if r.Title == "" {
+		return fmt.Errorf("title is required")
+	}
+	if len(r.Title) > 256 {
+		return fmt.Errorf("title is too long")
+	}
+	if r.TargetProfile == "" {
+		return fmt.Errorf("target_profile is required")
+	}
+	if len(r.TargetProfile) > 128 {
+		return fmt.Errorf("target_profile is too long")
+	}
+	return nil
+}
+
+type ReverseBridgeRequest struct {
+	OperationID string `json:"operation_id"`
+	BridgeID    string `json:"bridge_id"`
+}
+
+func (r *ReverseBridgeRequest) Validate() error {
+	if err := normalizeBridgeOperationID(&r.OperationID); err != nil {
+		return err
+	}
+	r.BridgeID = strings.TrimSpace(r.BridgeID)
+	if r.BridgeID == "" {
+		return fmt.Errorf("bridge_id is required")
+	}
+	return nil
+}
+
 type bridgeLedgerInput struct {
 	TenantID           string
 	OperationID        string
@@ -124,4 +203,38 @@ func bridgeRequestFingerprint(parts ...string) string {
 		_, _ = fmt.Fprintf(hash, "%d:%s|", len(value), value)
 	}
 	return hex.EncodeToString(hash.Sum(nil))
+}
+
+func normalizeBridgeOperationID(operationID *string) error {
+	*operationID = strings.TrimSpace(*operationID)
+	if *operationID == "" {
+		return fmt.Errorf("operation_id is required")
+	}
+	if len(*operationID) > 384 {
+		return fmt.Errorf("operation_id is too long")
+	}
+	return nil
+}
+
+func normalizeBridgeMemoryIDs(memoryIDs []string) ([]string, error) {
+	if len(memoryIDs) == 0 {
+		return nil, fmt.Errorf("memory_ids is required")
+	}
+	if len(memoryIDs) > 50 {
+		return nil, fmt.Errorf("memory_ids has too many items")
+	}
+	seen := make(map[string]struct{}, len(memoryIDs))
+	normalized := make([]string, 0, len(memoryIDs))
+	for _, memoryID := range memoryIDs {
+		memoryID = strings.TrimSpace(memoryID)
+		if memoryID == "" {
+			return nil, fmt.Errorf("memory_ids contains an empty item")
+		}
+		if _, exists := seen[memoryID]; exists {
+			return nil, fmt.Errorf("memory_ids contains a duplicate item")
+		}
+		seen[memoryID] = struct{}{}
+		normalized = append(normalized, memoryID)
+	}
+	return normalized, nil
 }

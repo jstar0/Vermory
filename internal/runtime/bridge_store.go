@@ -9,6 +9,224 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type selectedBridgeMemory struct {
+	ID      string
+	Content string
+}
+
+func (s *Store) PromoteConversationMemory(ctx context.Context, tenantID, operationID, sourceContinuityID, targetContinuityID, sourceAnchor, targetAnchor string, memoryIDs []string) (BridgeReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return BridgeReceipt{}, fmt.Errorf("begin bridge promotion: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	fingerprint := bridgeRequestFingerprint(sourceAnchor, targetAnchor, strings.Join(memoryIDs, ","))
+	operation, replayed, err := createBridgeOperationTx(ctx, tx, bridgeLedgerInput{
+		TenantID:           tenantID,
+		OperationID:        operationID,
+		Action:             BridgeActionPromote,
+		RequestFingerprint: fingerprint,
+		SourceContinuityID: sourceContinuityID,
+		TargetContinuityID: targetContinuityID,
+		SourceAnchor:       sourceAnchor,
+		TargetAnchor:       targetAnchor,
+	})
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
+	if !replayed {
+		memories, err := loadSelectedActiveMemoriesTx(ctx, tx, tenantID, sourceContinuityID, memoryIDs)
+		if err != nil {
+			return BridgeReceipt{}, err
+		}
+		for index, memory := range memories {
+			observation, err := commitObservationTx(ctx, tx, tenantID, targetContinuityID, CommitObservationRequest{
+				OperationID: operationID + ":promote:" + fmt.Sprint(index),
+				Kind:        ObservationKindBridgePromote,
+				Content:     memory.Content,
+				SourceRef:   "bridge:" + operation.ID + ":memory:" + memory.ID,
+			})
+			if err != nil {
+				return BridgeReceipt{}, err
+			}
+			var targetMemoryID string
+			err = tx.QueryRow(ctx, `
+INSERT INTO governed_memories (
+  tenant_id, continuity_id, origin_observation_id, memory_kind, lifecycle_status, content
+)
+VALUES ($1, $2::uuid, $3::uuid, 'bridge_promoted', 'active', $4)
+RETURNING id::text`, tenantID, targetContinuityID, observation.ObservationID, memory.Content).Scan(&targetMemoryID)
+			if err != nil {
+				return BridgeReceipt{}, fmt.Errorf("create promoted memory: %w", err)
+			}
+			if _, err := tx.Exec(ctx, `
+INSERT INTO memory_search_documents (memory_id, tenant_id, continuity_id, content, search_document)
+VALUES ($1::uuid, $2, $3::uuid, $4, to_tsvector('simple', $4))`, targetMemoryID, tenantID, targetContinuityID, memory.Content); err != nil {
+				return BridgeReceipt{}, fmt.Errorf("project promoted memory: %w", err)
+			}
+			if _, err := tx.Exec(ctx, `
+INSERT INTO bridge_memory_effects (
+  bridge_id, tenant_id, effect_kind, source_memory_id, target_memory_id, order_index
+)
+VALUES ($1::uuid, $2, 'promote', $3::uuid, $4::uuid, $5)`, operation.ID, tenantID, memory.ID, targetMemoryID, index); err != nil {
+				return BridgeReceipt{}, fmt.Errorf("record promoted memory effect: %w", err)
+			}
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return BridgeReceipt{}, fmt.Errorf("commit bridge promotion: %w", err)
+	}
+	receipt, err := s.InspectBridge(ctx, tenantID, operation.ID)
+	receipt.Replayed = replayed
+	return receipt, err
+}
+
+func (s *Store) ExportWorkspaceMemory(ctx context.Context, tenantID, operationID, sourceContinuityID, sourceAnchor string, memoryIDs []string, title, targetProfile string) (BridgeReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return BridgeReceipt{}, fmt.Errorf("begin bridge export: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	memories, err := loadSelectedActiveMemoriesTx(ctx, tx, tenantID, sourceContinuityID, memoryIDs)
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
+	lines := make([]string, 0, len(memories))
+	for _, memory := range memories {
+		lines = append(lines, "- "+memory.Content)
+	}
+	body := strings.TrimSpace(title) + "\n\n" + strings.Join(lines, "\n")
+	operation, replayed, err := createBridgeOperationTx(ctx, tx, bridgeLedgerInput{
+		TenantID:           tenantID,
+		OperationID:        operationID,
+		Action:             BridgeActionExport,
+		RequestFingerprint: bridgeRequestFingerprint(sourceAnchor, strings.Join(memoryIDs, ","), title, targetProfile),
+		SourceContinuityID: sourceContinuityID,
+		SourceAnchor:       sourceAnchor,
+		TargetProfile:      targetProfile,
+		Title:              title,
+		ExportBody:         body,
+	})
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
+	if !replayed {
+		for index, memory := range memories {
+			if _, err := tx.Exec(ctx, `
+INSERT INTO bridge_memory_effects (
+  bridge_id, tenant_id, effect_kind, source_memory_id, order_index
+)
+VALUES ($1::uuid, $2, 'export', $3::uuid, $4)`, operation.ID, tenantID, memory.ID, index); err != nil {
+				return BridgeReceipt{}, fmt.Errorf("record exported memory effect: %w", err)
+			}
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return BridgeReceipt{}, fmt.Errorf("commit bridge export: %w", err)
+	}
+	receipt, err := s.InspectBridge(ctx, tenantID, operation.ID)
+	receipt.Replayed = replayed
+	return receipt, err
+}
+
+func (s *Store) ReverseBridge(ctx context.Context, tenantID, operationID, bridgeID string) (BridgeReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return BridgeReceipt{}, fmt.Errorf("begin bridge reversal: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	var action BridgeAction
+	var status BridgeStatus
+	var targetContinuityID string
+	err = tx.QueryRow(ctx, `
+SELECT action, status, COALESCE(target_continuity_id::text, '')
+FROM bridge_operations
+WHERE id = $1::uuid AND tenant_id = $2
+FOR UPDATE`, bridgeID, tenantID).Scan(&action, &status, &targetContinuityID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return BridgeReceipt{}, fmt.Errorf("bridge does not exist")
+	}
+	if err != nil {
+		return BridgeReceipt{}, fmt.Errorf("lock bridge for reversal: %w", err)
+	}
+	targetStatus := BridgeStatusReversed
+	if action == BridgeActionExport {
+		targetStatus = BridgeStatusRevoked
+	}
+	if status == BridgeStatusActive {
+		switch action {
+		case BridgeActionPromote:
+			rows, err := tx.Query(ctx, `
+SELECT target_memory_id::text
+FROM bridge_memory_effects
+WHERE bridge_id = $1::uuid AND tenant_id = $2 AND target_memory_id IS NOT NULL
+ORDER BY order_index ASC`, bridgeID, tenantID)
+			if err != nil {
+				return BridgeReceipt{}, fmt.Errorf("list promoted memories for reversal: %w", err)
+			}
+			targetMemoryIDs := make([]string, 0)
+			for rows.Next() {
+				var targetMemoryID string
+				if err := rows.Scan(&targetMemoryID); err != nil {
+					rows.Close()
+					return BridgeReceipt{}, fmt.Errorf("scan promoted memory for reversal: %w", err)
+				}
+				targetMemoryIDs = append(targetMemoryIDs, targetMemoryID)
+			}
+			if err := rows.Err(); err != nil {
+				rows.Close()
+				return BridgeReceipt{}, fmt.Errorf("iterate promoted memories for reversal: %w", err)
+			}
+			rows.Close()
+			for _, targetMemoryID := range targetMemoryIDs {
+				if err := deleteMemoryTx(ctx, tx, tenantID, targetContinuityID, targetMemoryID); err != nil {
+					return BridgeReceipt{}, err
+				}
+			}
+		case BridgeActionExport:
+			if _, err := tx.Exec(ctx, `UPDATE bridge_operations SET export_body = '[revoked]' WHERE id = $1::uuid`, bridgeID); err != nil {
+				return BridgeReceipt{}, fmt.Errorf("redact revoked export: %w", err)
+			}
+		default:
+			return BridgeReceipt{}, fmt.Errorf("bridge action %q reversal is not implemented", action)
+		}
+	}
+	marked, err := markBridgeOperationReversedTx(ctx, tx, tenantID, bridgeID, operationID, targetStatus)
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return BridgeReceipt{}, fmt.Errorf("commit bridge reversal: %w", err)
+	}
+	receipt, err := s.InspectBridge(ctx, tenantID, bridgeID)
+	receipt.Replayed = marked.Replayed
+	return receipt, err
+}
+
+func loadSelectedActiveMemoriesTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID string, memoryIDs []string) ([]selectedBridgeMemory, error) {
+	memories := make([]selectedBridgeMemory, 0, len(memoryIDs))
+	for _, memoryID := range memoryIDs {
+		var memory selectedBridgeMemory
+		err := tx.QueryRow(ctx, `
+SELECT id::text, content
+FROM governed_memories
+WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid
+  AND lifecycle_status = 'active'
+FOR SHARE`, memoryID, tenantID, continuityID).Scan(&memory.ID, &memory.Content)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("memory %s must be active in the selected source continuity", memoryID)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("load selected bridge memory: %w", err)
+		}
+		if memory.Content == "" || memory.Content == "[redacted]" {
+			return nil, fmt.Errorf("memory %s must contain active semantic content", memoryID)
+		}
+		memories = append(memories, memory)
+	}
+	return memories, nil
+}
+
 func createBridgeOperationTx(ctx context.Context, tx pgx.Tx, input bridgeLedgerInput) (BridgeReceipt, bool, error) {
 	if err := input.normalize(); err != nil {
 		return BridgeReceipt{}, false, err

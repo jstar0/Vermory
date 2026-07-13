@@ -22,6 +22,7 @@ const (
 	ObservationKindAssistantMessage ObservationKind = "assistant_message"
 	ObservationKindUserConfirmation ObservationKind = "user_confirmation"
 	ObservationKindGlobalDefaultSet ObservationKind = "global_default_set"
+	ObservationKindBridgePromote    ObservationKind = "bridge_promote"
 )
 
 type WorkspaceAnchor struct {
@@ -128,7 +129,8 @@ func (k ObservationKind) Valid() bool {
 		ObservationKindUserMessage,
 		ObservationKindAssistantMessage,
 		ObservationKindUserConfirmation,
-		ObservationKindGlobalDefaultSet:
+		ObservationKindGlobalDefaultSet,
+		ObservationKindBridgePromote:
 		return true
 	default:
 		return false
