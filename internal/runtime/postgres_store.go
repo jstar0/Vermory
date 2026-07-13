@@ -41,6 +41,7 @@ type Memory struct {
 
 type GovernedMemory struct {
 	ID                 string `json:"id"`
+	MemoryKey          string `json:"memory_key,omitempty"`
 	LifecycleStatus    string `json:"lifecycle_status"`
 	Content            string `json:"content"`
 	SupersedesMemoryID string `json:"supersedes_memory_id,omitempty"`
@@ -241,7 +242,7 @@ func commitObservationTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID 
 SELECT EXISTS (
   SELECT 1 FROM continuity_spaces
   WHERE id = $1::uuid AND tenant_id = $2
-    AND continuity_line IN ('workspace', 'conversation') AND state = 'active'
+    AND continuity_line IN ('workspace', 'conversation', 'global_defaults') AND state = 'active'
 )`, continuityID, tenantID).Scan(&validContinuity); err != nil {
 		return ObservationReceipt{}, fmt.Errorf("check observation continuity: %w", err)
 	}
@@ -433,13 +434,14 @@ func (s *Store) DeleteMemory(ctx context.Context, tenantID, continuityID, memory
 }
 
 func deleteMemoryTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, memoryID string) error {
-	var lifecycleStatus string
+	var lifecycleStatus, continuityLine string
 	var originObservationID *string
 	var memoryContent string
 	err := tx.QueryRow(ctx, `
-SELECT lifecycle_status, origin_observation_id::text, content
-FROM governed_memories
-WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid`, memoryID, tenantID, continuityID).Scan(&lifecycleStatus, &originObservationID, &memoryContent)
+SELECT memory.lifecycle_status, memory.origin_observation_id::text, memory.content, continuity.continuity_line
+FROM governed_memories memory
+JOIN continuity_spaces continuity ON continuity.id = memory.continuity_id
+WHERE memory.id = $1::uuid AND memory.tenant_id = $2 AND memory.continuity_id = $3::uuid`, memoryID, tenantID, continuityID).Scan(&lifecycleStatus, &originObservationID, &memoryContent, &continuityLine)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return fmt.Errorf("memory does not belong to this continuity")
 	}
@@ -471,11 +473,19 @@ WHERE tenant_id = $1 AND continuity_id = $2::uuid AND assistant_observation_id =
 		}
 	}
 	if memoryContent != "" && memoryContent != "[redacted]" {
-		if _, err := tx.Exec(ctx, `
+		query := `
 UPDATE memory_deliveries
 SET context_body = replace(context_body, $3, '[redacted]')
 WHERE tenant_id = $1 AND continuity_id = $2::uuid
-  AND position($3 IN context_body) > 0`, tenantID, continuityID, memoryContent); err != nil {
+	  AND position($3 IN context_body) > 0`
+		if continuityLine == "global_defaults" {
+			query = `
+UPDATE memory_deliveries
+SET context_body = replace(context_body, $3, '[redacted]')
+WHERE tenant_id = $1
+  AND position($3 IN context_body) > 0`
+		}
+		if _, err := tx.Exec(ctx, query, tenantID, continuityID, memoryContent); err != nil {
 			return fmt.Errorf("redact memory from delivery history: %w", err)
 		}
 	}
@@ -508,7 +518,7 @@ WHERE tenant_id = $1 AND continuity_id = $2::uuid AND lifecycle_status = 'active
 
 func (s *Store) ListGovernedMemories(ctx context.Context, tenantID, continuityID string) ([]GovernedMemory, error) {
 	rows, err := s.pool.Query(ctx, `
-SELECT id::text, lifecycle_status, content, COALESCE(supersedes_memory_id::text, '')
+SELECT id::text, memory_key, lifecycle_status, content, COALESCE(supersedes_memory_id::text, '')
 FROM governed_memories
 WHERE tenant_id = $1 AND continuity_id = $2::uuid
 ORDER BY created_at ASC, id ASC`, tenantID, continuityID)
@@ -520,7 +530,7 @@ ORDER BY created_at ASC, id ASC`, tenantID, continuityID)
 	memories := make([]GovernedMemory, 0)
 	for rows.Next() {
 		var memory GovernedMemory
-		if err := rows.Scan(&memory.ID, &memory.LifecycleStatus, &memory.Content, &memory.SupersedesMemoryID); err != nil {
+		if err := rows.Scan(&memory.ID, &memory.MemoryKey, &memory.LifecycleStatus, &memory.Content, &memory.SupersedesMemoryID); err != nil {
 			return nil, fmt.Errorf("scan governed memory: %w", err)
 		}
 		memories = append(memories, memory)

@@ -33,11 +33,11 @@
 - Produces: `EnsureGlobalDefaultsContinuity`, `ListActiveGlobalDefaults`, `ListGlobalDefaults`, `SetGlobalDefault`, `CorrectGlobalDefault`, and `ForgetGlobalDefault` store methods.
 - Produces: `ObservationKindGlobalDefaultSet` and keyed `GovernedMemory` inspection data.
 
-- [ ] **Step 1: Write failing migration/store tests**
+- [x] **Step 1: Write failing migration/store tests**
 
 Cover one active continuity per tenant, unique active key, set replay, conflicting replay rejection, correction preserving key, deletion redaction, projection rebuild, and cross-tenant target rejection.
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -47,7 +47,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -c
 
 Expected: compile failure or missing migration/runtime methods.
 
-- [ ] **Step 3: Add migration and minimal store implementation**
+- [x] **Step 3: Add migration and minimal store implementation**
 
 Migration requirements:
 
@@ -60,7 +60,7 @@ CREATE UNIQUE INDEX ... WHERE lifecycle_status = 'active' AND memory_key <> '';
 
 Store transactions must validate tenant, continuity line, target lifecycle, preserved key, operation idempotency, and projection writes.
 
-- [ ] **Step 4: Run focused and existing runtime tests and verify GREEN**
+- [x] **Step 4: Run focused and existing runtime tests and verify GREEN**
 
 Run:
 
@@ -70,7 +70,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -c
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the store slice**
+- [x] **Step 5: Commit the store slice**
 
 ```bash
 git add internal/store/postgres/migrations/00006_global_defaults.sql internal/runtime/global_defaults_store.go internal/runtime/global_defaults_store_test.go internal/runtime/postgres_store.go internal/runtime/types.go
