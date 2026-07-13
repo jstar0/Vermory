@@ -208,27 +208,27 @@ git commit -m "feat: expose global defaults management"
 - Consumes: complete service, HTTP, CLI, workspace, and conversation paths.
 - Produces: executable G01/S01 evidence and operator documentation.
 
-- [ ] **Step 1: Add failing end-to-end acceptance tests**
+- [x] **Step 1: Add failing end-to-end acceptance tests**
 
 G01 must set Chinese, consume in workspace/chat, apply an English task-local prompt, inspect unchanged state, replay a later Chinese task, then correct/delete and replay both consumers. S01 must prove source/chat paths cannot promote and deleted content is absent after rebuild.
 
-- [ ] **Step 2: Run acceptance tests and verify RED when any gate is absent**
+- [x] **Step 2: Run acceptance tests and verify RED when any gate is absent**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime ./internal/webchat -run 'TestG01|TestS01'
 ```
 
-- [ ] **Step 3: Complete minimal behavior and documentation**
+- [x] **Step 3: Complete minimal behavior and documentation**
 
 Document commands, endpoint contracts, precedence, explicit authority, replay semantics, and deletion behavior without exposing implementation fields in normal user-facing examples.
 
-- [ ] **Step 4: Run acceptance and full serial suites**
+- [x] **Step 4: Run acceptance and full serial suites**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
 ```
 
-- [ ] **Step 5: Commit acceptance assets**
+- [x] **Step 5: Commit acceptance assets**
 
 ```bash
 git add internal/runtime/acceptance_test.go internal/webchat/acceptance_test.go docs/integrations/global-defaults-runtime.md
