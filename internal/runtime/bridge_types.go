@@ -113,6 +113,58 @@ type LinkConversationsRequest struct {
 	Linked      ConversationAnchor `json:"linked"`
 }
 
+type AdoptWorkspaceAnchorRequest struct {
+	OperationID      string `json:"operation_id"`
+	ExistingRepoRoot string `json:"existing_repo_root"`
+	NewRepoRoot      string `json:"new_repo_root"`
+}
+
+func (r *AdoptWorkspaceAnchorRequest) Validate() error {
+	if err := normalizeBridgeOperationID(&r.OperationID); err != nil {
+		return err
+	}
+	existing, err := normalizeAbsolutePath(r.ExistingRepoRoot)
+	if err != nil {
+		return fmt.Errorf("existing_repo_root: %w", err)
+	}
+	newRoot, err := normalizeAbsolutePath(r.NewRepoRoot)
+	if err != nil {
+		return fmt.Errorf("new_repo_root: %w", err)
+	}
+	if existing == newRoot {
+		return fmt.Errorf("existing_repo_root and new_repo_root must be different")
+	}
+	r.ExistingRepoRoot = existing
+	r.NewRepoRoot = newRoot
+	return nil
+}
+
+type RebindWorkspaceRequest struct {
+	OperationID string `json:"operation_id"`
+	OldRepoRoot string `json:"old_repo_root"`
+	NewRepoRoot string `json:"new_repo_root"`
+}
+
+func (r *RebindWorkspaceRequest) Validate() error {
+	if err := normalizeBridgeOperationID(&r.OperationID); err != nil {
+		return err
+	}
+	oldRoot, err := normalizeAbsolutePath(r.OldRepoRoot)
+	if err != nil {
+		return fmt.Errorf("old_repo_root: %w", err)
+	}
+	newRoot, err := normalizeAbsolutePath(r.NewRepoRoot)
+	if err != nil {
+		return fmt.Errorf("new_repo_root: %w", err)
+	}
+	if oldRoot == newRoot {
+		return fmt.Errorf("old_repo_root and new_repo_root must be different")
+	}
+	r.OldRepoRoot = oldRoot
+	r.NewRepoRoot = newRoot
+	return nil
+}
+
 func (r *LinkConversationsRequest) Validate() error {
 	if err := normalizeBridgeOperationID(&r.OperationID); err != nil {
 		return err

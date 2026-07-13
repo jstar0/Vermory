@@ -14,6 +14,31 @@ type selectedBridgeMemory struct {
 	Content string
 }
 
+func (s *Store) ReplayBridgeOperation(ctx context.Context, tenantID, operationID string, action BridgeAction, fingerprint string) (BridgeReceipt, bool, error) {
+	var bridgeID string
+	var existingAction BridgeAction
+	var existingFingerprint string
+	err := s.pool.QueryRow(ctx, `
+SELECT id::text, action, request_fingerprint
+FROM bridge_operations
+WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(&bridgeID, &existingAction, &existingFingerprint)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return BridgeReceipt{}, false, nil
+	}
+	if err != nil {
+		return BridgeReceipt{}, false, fmt.Errorf("lookup bridge operation replay: %w", err)
+	}
+	if existingAction != action || existingFingerprint != fingerprint {
+		return BridgeReceipt{}, false, fmt.Errorf("operation_id is already bound to another bridge request")
+	}
+	receipt, err := s.InspectBridge(ctx, tenantID, bridgeID)
+	if err != nil {
+		return BridgeReceipt{}, false, err
+	}
+	receipt.Replayed = true
+	return receipt, true, nil
+}
+
 func (s *Store) PromoteConversationMemory(ctx context.Context, tenantID, operationID, sourceContinuityID, targetContinuityID, sourceAnchor, targetAnchor string, memoryIDs []string) (BridgeReceipt, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -194,6 +219,91 @@ VALUES ($1::uuid, $2, $3::uuid, $4::uuid, 'active')`, operation.ID, tenantID, pr
 	return receipt, err
 }
 
+func (s *Store) AdoptWorkspaceBinding(ctx context.Context, tenantID, operationID, continuityID, existingRoot, newRoot string) (BridgeReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return BridgeReceipt{}, fmt.Errorf("begin workspace adopt: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	operation, replayed, err := createBridgeOperationTx(ctx, tx, bridgeLedgerInput{
+		TenantID:           tenantID,
+		OperationID:        operationID,
+		Action:             BridgeActionAdopt,
+		RequestFingerprint: bridgeRequestFingerprint(existingRoot, newRoot),
+		SourceContinuityID: continuityID,
+		TargetContinuityID: continuityID,
+		SourceAnchor:       existingRoot,
+		TargetAnchor:       newRoot,
+	})
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
+	if !replayed {
+		if err := requireConfirmedWorkspaceBindingTx(ctx, tx, tenantID, continuityID, existingRoot); err != nil {
+			return BridgeReceipt{}, err
+		}
+		if err := requireUnboundWorkspaceRootTx(ctx, tx, tenantID, newRoot); err != nil {
+			return BridgeReceipt{}, err
+		}
+		if _, err := tx.Exec(ctx, `
+INSERT INTO continuity_bindings (continuity_id, tenant_id, repo_root, binding_state)
+VALUES ($1::uuid, $2, $3, 'confirmed')`, continuityID, tenantID, newRoot); err != nil {
+			return BridgeReceipt{}, fmt.Errorf("create adopted workspace binding: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return BridgeReceipt{}, fmt.Errorf("commit workspace adopt: %w", err)
+	}
+	receipt, err := s.InspectBridge(ctx, tenantID, operation.ID)
+	receipt.Replayed = replayed
+	return receipt, err
+}
+
+func (s *Store) RebindWorkspaceBinding(ctx context.Context, tenantID, operationID, continuityID, oldRoot, newRoot string) (BridgeReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return BridgeReceipt{}, fmt.Errorf("begin workspace rebind: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	operation, replayed, err := createBridgeOperationTx(ctx, tx, bridgeLedgerInput{
+		TenantID:           tenantID,
+		OperationID:        operationID,
+		Action:             BridgeActionRebind,
+		RequestFingerprint: bridgeRequestFingerprint(oldRoot, newRoot),
+		SourceContinuityID: continuityID,
+		TargetContinuityID: continuityID,
+		SourceAnchor:       oldRoot,
+		TargetAnchor:       newRoot,
+	})
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
+	if !replayed {
+		bindingID, err := confirmedWorkspaceBindingIDTx(ctx, tx, tenantID, continuityID, oldRoot)
+		if err != nil {
+			return BridgeReceipt{}, err
+		}
+		if err := requireUnboundWorkspaceRootTx(ctx, tx, tenantID, newRoot); err != nil {
+			return BridgeReceipt{}, err
+		}
+		if _, err := tx.Exec(ctx, `
+UPDATE continuity_bindings SET binding_state = 'retired' WHERE id = $1::uuid`, bindingID); err != nil {
+			return BridgeReceipt{}, fmt.Errorf("retire old workspace binding: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `
+INSERT INTO continuity_bindings (continuity_id, tenant_id, repo_root, binding_state)
+VALUES ($1::uuid, $2, $3, 'confirmed')`, continuityID, tenantID, newRoot); err != nil {
+			return BridgeReceipt{}, fmt.Errorf("create rebound workspace binding: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return BridgeReceipt{}, fmt.Errorf("commit workspace rebind: %w", err)
+	}
+	receipt, err := s.InspectBridge(ctx, tenantID, operation.ID)
+	receipt.Replayed = replayed
+	return receipt, err
+}
+
 func (s *Store) ReverseBridge(ctx context.Context, tenantID, operationID, bridgeID string) (BridgeReceipt, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -263,6 +373,53 @@ WHERE bridge_id = $1::uuid AND tenant_id = $2 AND link_state = 'active'`, bridge
 			if command.RowsAffected() != 1 {
 				return BridgeReceipt{}, fmt.Errorf("active conversation link effect is missing")
 			}
+		case BridgeActionAdopt:
+			command, err := tx.Exec(ctx, `
+UPDATE continuity_bindings
+SET binding_state = 'retired'
+WHERE tenant_id = $1 AND continuity_id = $2::uuid AND repo_root = (
+  SELECT target_anchor FROM bridge_operations WHERE id = $3::uuid
+) AND binding_state = 'confirmed'`, tenantID, targetContinuityID, bridgeID)
+			if err != nil {
+				return BridgeReceipt{}, fmt.Errorf("reverse adopted workspace binding: %w", err)
+			}
+			if command.RowsAffected() != 1 {
+				return BridgeReceipt{}, fmt.Errorf("active adopted workspace binding is missing")
+			}
+		case BridgeActionRebind:
+			var sourceAnchor, targetAnchor string
+			if err := tx.QueryRow(ctx, `
+SELECT source_anchor, target_anchor FROM bridge_operations WHERE id = $1::uuid`, bridgeID).Scan(&sourceAnchor, &targetAnchor); err != nil {
+				return BridgeReceipt{}, fmt.Errorf("load rebind anchors for reversal: %w", err)
+			}
+			command, err := tx.Exec(ctx, `
+UPDATE continuity_bindings
+SET binding_state = 'retired'
+WHERE tenant_id = $1 AND continuity_id = $2::uuid AND repo_root = $3 AND binding_state = 'confirmed'`, tenantID, targetContinuityID, targetAnchor)
+			if err != nil {
+				return BridgeReceipt{}, fmt.Errorf("retire rebound workspace target: %w", err)
+			}
+			if command.RowsAffected() != 1 {
+				return BridgeReceipt{}, fmt.Errorf("active rebound workspace target is missing")
+			}
+			command, err = tx.Exec(ctx, `
+WITH candidate AS (
+  SELECT id
+  FROM continuity_bindings
+  WHERE tenant_id = $1 AND continuity_id = $2::uuid AND repo_root = $3 AND binding_state = 'retired'
+  ORDER BY created_at DESC, id DESC
+  LIMIT 1
+  FOR UPDATE
+)
+UPDATE continuity_bindings
+SET binding_state = 'confirmed'
+WHERE id = (SELECT id FROM candidate)`, tenantID, targetContinuityID, sourceAnchor)
+			if err != nil {
+				return BridgeReceipt{}, fmt.Errorf("restore original workspace binding: %w", err)
+			}
+			if command.RowsAffected() != 1 {
+				return BridgeReceipt{}, fmt.Errorf("retired original workspace binding is missing")
+			}
 		default:
 			return BridgeReceipt{}, fmt.Errorf("bridge action %q reversal is not implemented", action)
 		}
@@ -277,6 +434,42 @@ WHERE bridge_id = $1::uuid AND tenant_id = $2 AND link_state = 'active'`, bridge
 	receipt, err := s.InspectBridge(ctx, tenantID, bridgeID)
 	receipt.Replayed = marked.Replayed
 	return receipt, err
+}
+
+func requireConfirmedWorkspaceBindingTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, repoRoot string) error {
+	_, err := confirmedWorkspaceBindingIDTx(ctx, tx, tenantID, continuityID, repoRoot)
+	return err
+}
+
+func confirmedWorkspaceBindingIDTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, repoRoot string) (string, error) {
+	var bindingID string
+	err := tx.QueryRow(ctx, `
+SELECT id::text
+FROM continuity_bindings
+WHERE tenant_id = $1 AND continuity_id = $2::uuid AND repo_root = $3 AND binding_state = 'confirmed'
+FOR UPDATE`, tenantID, continuityID, repoRoot).Scan(&bindingID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("workspace binding is not confirmed for this continuity")
+	}
+	if err != nil {
+		return "", fmt.Errorf("lock confirmed workspace binding: %w", err)
+	}
+	return bindingID, nil
+}
+
+func requireUnboundWorkspaceRootTx(ctx context.Context, tx pgx.Tx, tenantID, repoRoot string) error {
+	var confirmed bool
+	if err := tx.QueryRow(ctx, `
+SELECT EXISTS (
+  SELECT 1 FROM continuity_bindings
+  WHERE tenant_id = $1 AND repo_root = $2 AND binding_state = 'confirmed'
+)`, tenantID, repoRoot).Scan(&confirmed); err != nil {
+		return fmt.Errorf("check workspace target binding: %w", err)
+	}
+	if confirmed {
+		return fmt.Errorf("workspace target root is already confirmed")
+	}
+	return nil
 }
 
 func loadSelectedActiveMemoriesTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID string, memoryIDs []string) ([]selectedBridgeMemory, error) {

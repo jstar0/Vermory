@@ -141,25 +141,25 @@ git commit -m "feat: add reversible conversation links"
 - Modify: `internal/runtime/bridge_service.go`
 - Modify: `internal/runtime/bridge_service_test.go`
 
-- [ ] **Step 1: Write failing adopt/rebind tests**
+- [x] **Step 1: Write failing adopt/rebind tests**
 
 Prove adopt adds an alias, rebind retires old and confirms new, both preserve continuity/memory, target conflicts fail, and reversal restores exact prior binding state.
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime -run 'TestBridge.*Adopt|TestBridge.*Rebind'
 ```
 
-- [ ] **Step 3: Implement transactional binding effects**
+- [x] **Step 3: Implement transactional binding effects**
 
 Use existing normalized workspace roots and binding states. No path inference or directory-name matching is allowed.
 
-- [ ] **Step 4: Implement exact reversal**
+- [x] **Step 4: Implement exact reversal**
 
 Adopt reversal retires only the added alias. Rebind reversal retires the new root and restores the old binding.
 
-- [ ] **Step 5: Run runtime tests and commit**
+- [x] **Step 5: Run runtime tests and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime

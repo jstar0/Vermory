@@ -148,6 +148,137 @@ func TestBridgeExportIsBoundedDurableAndRevocable(t *testing.T) {
 	}
 }
 
+func TestBridgeAdoptAddsReversibleWorkspaceAlias(t *testing.T) {
+	ctx := context.Background()
+	store := openTestStore(t)
+	governance := NewGovernanceService(store, "local")
+	original, err := governance.ConfirmWorkspace(ctx, "/fixtures/adopt-original")
+	requireNoError(t, err)
+	seed, err := governance.AddSource(ctx, "/fixtures/adopt-original", GovernanceWriteRequest{
+		OperationID: "adopt-source",
+		Content:     "Build the final PDF with make final-pdf.",
+		SourceRef:   "fixture:B02:adopt",
+	})
+	requireNoError(t, err)
+	if seed.Memory.Status != "active" {
+		t.Fatalf("workspace seed is not active: %#v", seed)
+	}
+
+	service := NewBridgeService(store, "local")
+	adopted, err := service.AdoptWorkspaceAnchor(ctx, AdoptWorkspaceAnchorRequest{
+		OperationID:      "bridge-adopt-worktree",
+		ExistingRepoRoot: "/fixtures/adopt-original",
+		NewRepoRoot:      "/fixtures/adopt-worktree",
+	})
+	requireNoError(t, err)
+	if adopted.Action != BridgeActionAdopt || adopted.SourceContinuityID != original.ContinuityID || adopted.TargetContinuityID != original.ContinuityID {
+		t.Fatalf("unexpected adopt receipt: %#v", adopted)
+	}
+	for _, root := range []string{"/fixtures/adopt-original", "/fixtures/adopt-worktree"} {
+		resolution, err := store.ResolveWorkspace(ctx, "local", WorkspaceAnchor{RepoRoot: root})
+		requireNoError(t, err)
+		if resolution.Status != ResolutionResolved || resolution.ContinuityID != original.ContinuityID {
+			t.Fatalf("adopted root %s did not resolve to original continuity: %#v", root, resolution)
+		}
+	}
+	prepared, err := NewService(store, "local").PrepareContext(ctx, PrepareContextRequest{
+		OperationID: "bridge-adopt-consume",
+		Workspace:   WorkspaceAnchor{RepoRoot: "/fixtures/adopt-worktree"},
+		Task:        "How is the final PDF built?",
+	})
+	requireNoError(t, err)
+	requireContains(t, prepared.Context, "make final-pdf")
+
+	_, err = governance.ConfirmWorkspace(ctx, "/fixtures/adopt-conflict")
+	requireNoError(t, err)
+	_, err = service.AdoptWorkspaceAnchor(ctx, AdoptWorkspaceAnchorRequest{
+		OperationID:      "bridge-adopt-conflict",
+		ExistingRepoRoot: "/fixtures/adopt-original",
+		NewRepoRoot:      "/fixtures/adopt-conflict",
+	})
+	if err == nil || !strings.Contains(err.Error(), "already") {
+		t.Fatalf("adopt accepted a root owned by another continuity: %v", err)
+	}
+
+	reversed, err := service.Reverse(ctx, ReverseBridgeRequest{OperationID: "bridge-adopt-reverse", BridgeID: adopted.ID})
+	requireNoError(t, err)
+	if reversed.Status != BridgeStatusReversed {
+		t.Fatalf("adopt was not reversed: %#v", reversed)
+	}
+	alias, err := store.ResolveWorkspace(ctx, "local", WorkspaceAnchor{RepoRoot: "/fixtures/adopt-worktree"})
+	requireNoError(t, err)
+	if alias.Status != ResolutionNeedsConfirmation {
+		t.Fatalf("reversed alias still resolves: %#v", alias)
+	}
+	stillOriginal, err := store.ResolveWorkspace(ctx, "local", WorkspaceAnchor{RepoRoot: "/fixtures/adopt-original"})
+	requireNoError(t, err)
+	if stillOriginal.Status != ResolutionResolved || stillOriginal.ContinuityID != original.ContinuityID {
+		t.Fatalf("adopt reversal altered original binding: %#v", stillOriginal)
+	}
+}
+
+func TestBridgeRebindMovesWorkspaceContinuityAndReverses(t *testing.T) {
+	ctx := context.Background()
+	store := openTestStore(t)
+	governance := NewGovernanceService(store, "local")
+	original, err := governance.ConfirmWorkspace(ctx, "/fixtures/thesis-old")
+	requireNoError(t, err)
+	_, err = governance.AddSource(ctx, "/fixtures/thesis-old", GovernanceWriteRequest{
+		OperationID: "rebind-source",
+		Content:     "Build the final PDF with make final-pdf.",
+		SourceRef:   "fixture:B02:rebind",
+	})
+	requireNoError(t, err)
+
+	service := NewBridgeService(store, "local")
+	rebound, err := service.RebindWorkspace(ctx, RebindWorkspaceRequest{
+		OperationID: "bridge-rebind-thesis",
+		OldRepoRoot: "/fixtures/thesis-old",
+		NewRepoRoot: "/fixtures/thesis-new",
+	})
+	requireNoError(t, err)
+	if rebound.Action != BridgeActionRebind || rebound.SourceContinuityID != original.ContinuityID || rebound.TargetContinuityID != original.ContinuityID {
+		t.Fatalf("unexpected rebind receipt: %#v", rebound)
+	}
+	oldResolution, err := store.ResolveWorkspace(ctx, "local", WorkspaceAnchor{RepoRoot: "/fixtures/thesis-old"})
+	requireNoError(t, err)
+	newResolution, err := store.ResolveWorkspace(ctx, "local", WorkspaceAnchor{RepoRoot: "/fixtures/thesis-new"})
+	requireNoError(t, err)
+	if oldResolution.Status != ResolutionNeedsConfirmation || newResolution.Status != ResolutionResolved || newResolution.ContinuityID != original.ContinuityID {
+		t.Fatalf("rebind did not move the exact anchor: old=%#v new=%#v", oldResolution, newResolution)
+	}
+	prepared, err := NewService(store, "local").PrepareContext(ctx, PrepareContextRequest{
+		OperationID: "bridge-rebind-consume",
+		Workspace:   WorkspaceAnchor{RepoRoot: "/fixtures/thesis-new"},
+		Task:        "How is the final PDF built?",
+	})
+	requireNoError(t, err)
+	requireContains(t, prepared.Context, "make final-pdf")
+
+	replay, err := service.RebindWorkspace(ctx, RebindWorkspaceRequest{
+		OperationID: "bridge-rebind-thesis",
+		OldRepoRoot: "/fixtures/thesis-old",
+		NewRepoRoot: "/fixtures/thesis-new",
+	})
+	requireNoError(t, err)
+	if !replay.Replayed || replay.ID != rebound.ID {
+		t.Fatalf("rebind replay changed operation: first=%#v replay=%#v", rebound, replay)
+	}
+
+	reversed, err := service.Reverse(ctx, ReverseBridgeRequest{OperationID: "bridge-rebind-reverse", BridgeID: rebound.ID})
+	requireNoError(t, err)
+	if reversed.Status != BridgeStatusReversed {
+		t.Fatalf("rebind was not reversed: %#v", reversed)
+	}
+	oldResolution, err = store.ResolveWorkspace(ctx, "local", WorkspaceAnchor{RepoRoot: "/fixtures/thesis-old"})
+	requireNoError(t, err)
+	newResolution, err = store.ResolveWorkspace(ctx, "local", WorkspaceAnchor{RepoRoot: "/fixtures/thesis-new"})
+	requireNoError(t, err)
+	if oldResolution.Status != ResolutionResolved || oldResolution.ContinuityID != original.ContinuityID || newResolution.Status != ResolutionNeedsConfirmation {
+		t.Fatalf("rebind reversal did not restore exact state: old=%#v new=%#v", oldResolution, newResolution)
+	}
+}
+
 func confirmConversationMemoryForBridge(t *testing.T, store *Store, tenantID string, anchor ConversationAnchor, operationPrefix, content string) (ConversationResolution, string) {
 	t.Helper()
 	ctx := context.Background()

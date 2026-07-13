@@ -22,6 +22,11 @@ func (s *BridgeService) PromoteConversationToWorkspace(ctx context.Context, requ
 	if err := request.Validate(); err != nil {
 		return BridgeReceipt{}, err
 	}
+	sourceAnchor := request.Source.Channel + "/" + request.Source.ThreadID
+	fingerprint := bridgeRequestFingerprint(sourceAnchor, request.TargetRepoRoot, strings.Join(request.MemoryIDs, ","))
+	if replay, found, err := s.store.ReplayBridgeOperation(ctx, s.tenantID, request.OperationID, BridgeActionPromote, fingerprint); err != nil || found {
+		return replay, err
+	}
 	source, err := s.store.ResolveConversation(ctx, s.tenantID, request.Source)
 	if err != nil {
 		return BridgeReceipt{}, err
@@ -42,7 +47,7 @@ func (s *BridgeService) PromoteConversationToWorkspace(ctx context.Context, requ
 		request.OperationID,
 		source.ContinuityID,
 		target.ContinuityID,
-		request.Source.Channel+"/"+request.Source.ThreadID,
+		sourceAnchor,
 		request.TargetRepoRoot,
 		request.MemoryIDs,
 	)
@@ -54,6 +59,10 @@ func (s *BridgeService) ExportWorkspace(ctx context.Context, request ExportWorks
 	}
 	if err := request.Validate(); err != nil {
 		return BridgeReceipt{}, err
+	}
+	fingerprint := bridgeRequestFingerprint(request.RepoRoot, strings.Join(request.MemoryIDs, ","), request.Title, request.TargetProfile)
+	if replay, found, err := s.store.ReplayBridgeOperation(ctx, s.tenantID, request.OperationID, BridgeActionExport, fingerprint); err != nil || found {
+		return replay, err
 	}
 	resolution, err := s.store.ResolveWorkspace(ctx, s.tenantID, WorkspaceAnchor{RepoRoot: request.RepoRoot})
 	if err != nil {
@@ -81,6 +90,12 @@ func (s *BridgeService) LinkConversations(ctx context.Context, request LinkConve
 	if err := request.Validate(); err != nil {
 		return BridgeReceipt{}, err
 	}
+	primaryAnchor := request.Primary.Channel + "/" + request.Primary.ThreadID
+	linkedAnchor := request.Linked.Channel + "/" + request.Linked.ThreadID
+	fingerprint := bridgeRequestFingerprint(primaryAnchor, linkedAnchor)
+	if replay, found, err := s.store.ReplayBridgeOperation(ctx, s.tenantID, request.OperationID, BridgeActionLink, fingerprint); err != nil || found {
+		return replay, err
+	}
 	primary, err := s.store.ResolveConversation(ctx, s.tenantID, request.Primary)
 	if err != nil {
 		return BridgeReceipt{}, err
@@ -101,9 +116,51 @@ func (s *BridgeService) LinkConversations(ctx context.Context, request LinkConve
 		request.OperationID,
 		primary.ContinuityID,
 		linked.ContinuityID,
-		request.Primary.Channel+"/"+request.Primary.ThreadID,
-		request.Linked.Channel+"/"+request.Linked.ThreadID,
+		primaryAnchor,
+		linkedAnchor,
 	)
+}
+
+func (s *BridgeService) AdoptWorkspaceAnchor(ctx context.Context, request AdoptWorkspaceAnchorRequest) (BridgeReceipt, error) {
+	if err := s.configured(); err != nil {
+		return BridgeReceipt{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return BridgeReceipt{}, err
+	}
+	fingerprint := bridgeRequestFingerprint(request.ExistingRepoRoot, request.NewRepoRoot)
+	if replay, found, err := s.store.ReplayBridgeOperation(ctx, s.tenantID, request.OperationID, BridgeActionAdopt, fingerprint); err != nil || found {
+		return replay, err
+	}
+	existing, err := s.store.ResolveWorkspace(ctx, s.tenantID, WorkspaceAnchor{RepoRoot: request.ExistingRepoRoot})
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
+	if existing.Status != ResolutionResolved {
+		return BridgeReceipt{}, fmt.Errorf("existing workspace requires confirmation")
+	}
+	return s.store.AdoptWorkspaceBinding(ctx, s.tenantID, request.OperationID, existing.ContinuityID, request.ExistingRepoRoot, request.NewRepoRoot)
+}
+
+func (s *BridgeService) RebindWorkspace(ctx context.Context, request RebindWorkspaceRequest) (BridgeReceipt, error) {
+	if err := s.configured(); err != nil {
+		return BridgeReceipt{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return BridgeReceipt{}, err
+	}
+	fingerprint := bridgeRequestFingerprint(request.OldRepoRoot, request.NewRepoRoot)
+	if replay, found, err := s.store.ReplayBridgeOperation(ctx, s.tenantID, request.OperationID, BridgeActionRebind, fingerprint); err != nil || found {
+		return replay, err
+	}
+	existing, err := s.store.ResolveWorkspace(ctx, s.tenantID, WorkspaceAnchor{RepoRoot: request.OldRepoRoot})
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
+	if existing.Status != ResolutionResolved {
+		return BridgeReceipt{}, fmt.Errorf("old workspace requires confirmation")
+	}
+	return s.store.RebindWorkspaceBinding(ctx, s.tenantID, request.OperationID, existing.ContinuityID, request.OldRepoRoot, request.NewRepoRoot)
 }
 
 func (s *BridgeService) Reverse(ctx context.Context, request ReverseBridgeRequest) (BridgeReceipt, error) {
