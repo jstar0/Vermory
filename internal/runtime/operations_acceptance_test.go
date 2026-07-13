@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -173,6 +175,37 @@ func TestOperationsRecovery(t *testing.T) {
 		recoveryRows := operationsTurnCountEventually(t, admin.pool, "ops-after-recovery")
 		if outageRows != 0 || recoveryRows != 1 {
 			t.Fatalf("unexpected persistence after outage recovery: outage=%d recovery=%d", outageRows, recoveryRows)
+		}
+	})
+
+	t.Run("trimpath release binary migrates outside repository", func(t *testing.T) {
+		dedicatedURL, _, _ := createOperationsDatabase(t, databaseURL)
+		moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
+		if err != nil {
+			t.Fatal(err)
+		}
+		binaryPath := filepath.Join(t.TempDir(), "vermory")
+		build := exec.Command("go", "build", "-trimpath", "-o", binaryPath, "./cmd/vermory")
+		build.Dir = moduleRoot
+		if output, err := build.CombinedOutput(); err != nil {
+			t.Fatalf("build release binary: %v\n%s", err, output)
+		}
+		migrate := exec.Command(binaryPath, "database", "migrate", "--database-url", dedicatedURL)
+		migrate.Dir = t.TempDir()
+		if output, err := migrate.CombinedOutput(); err != nil {
+			t.Fatalf("migrate outside repository: %v\n%s", err, output)
+		}
+		pool, err := pgxpool.New(context.Background(), dedicatedURL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(pool.Close)
+		var schemaVersion int64
+		if err := pool.QueryRow(context.Background(), `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&schemaVersion); err != nil {
+			t.Fatal(err)
+		}
+		if schemaVersion != 9 {
+			t.Fatalf("release migration reached schema %d", schemaVersion)
 		}
 	})
 }

@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
+
+	storepostgres "vermory/internal/store/postgres"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -137,7 +137,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("set migration dialect: %w", err)
 	}
-	return goose.UpContext(ctx, db, migrationDir())
+	goose.SetBaseFS(storepostgres.Migrations)
+	defer goose.SetBaseFS(nil)
+	return goose.UpContext(ctx, db, "migrations")
 }
 
 func (s *Store) ResetForTest(ctx context.Context) error {
@@ -835,12 +837,4 @@ LIMIT $4`, tenantID, continuityID, query, limit)
 		return nil, fmt.Errorf("iterate active memory: %w", err)
 	}
 	return memories, nil
-}
-
-func migrationDir() string {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		return filepath.Join("internal", "store", "postgres", "migrations")
-	}
-	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "store", "postgres", "migrations"))
 }
