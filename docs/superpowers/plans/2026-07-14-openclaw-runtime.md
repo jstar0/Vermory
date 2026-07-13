@@ -449,6 +449,6 @@ PATH="/opt/homebrew/opt/node@24/bin:$PATH" pnpm -C integrations/openclaw check
 git diff --check
 ```
 
-- [ ] **Step 8: Complete checklist, commit, push, and update Draft PR**
+- [x] **Step 8: Complete checklist, commit, push, and update Draft PR**
 
 Commit evidence and checked plan, push `agent/grok-cli-runtime`, and update Draft PR 1 with the stable OpenClaw version, official plugin boundary, real Grok route, deterministic gates, and remaining overall-goal slices. Keep the overall Vermory goal active and advance the main plan to identity/authorization/PostgreSQL RLS.
