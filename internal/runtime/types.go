@@ -78,11 +78,13 @@ func (r *PrepareContextRequest) Validate() error {
 }
 
 type CommitObservationRequest struct {
-	OperationID string          `json:"operation_id"`
-	DeliveryID  string          `json:"delivery_id,omitempty"`
-	Kind        ObservationKind `json:"kind"`
-	Content     string          `json:"content"`
-	SourceRef   string          `json:"source_ref,omitempty"`
+	OperationID        string          `json:"operation_id"`
+	DeliveryID         string          `json:"delivery_id,omitempty"`
+	Kind               ObservationKind `json:"kind"`
+	Content            string          `json:"content"`
+	SourceRef          string          `json:"source_ref,omitempty"`
+	SupersedesMemoryID string          `json:"supersedes_memory_id,omitempty"`
+	TargetMemoryID     string          `json:"target_memory_id,omitempty"`
 }
 
 func (r *CommitObservationRequest) Validate() error {
@@ -99,6 +101,17 @@ func (r *CommitObservationRequest) Validate() error {
 	r.DeliveryID = strings.TrimSpace(r.DeliveryID)
 	r.Content = strings.TrimSpace(r.Content)
 	r.SourceRef = strings.TrimSpace(r.SourceRef)
+	r.SupersedesMemoryID = strings.TrimSpace(r.SupersedesMemoryID)
+	r.TargetMemoryID = strings.TrimSpace(r.TargetMemoryID)
+	if r.SupersedesMemoryID != "" && r.Kind != ObservationKindUserCorrection && r.Kind != ObservationKindSourceUpdate {
+		return fmt.Errorf("supersedes_memory_id is only allowed for user_correction or source_update")
+	}
+	if r.Kind == ObservationKindForgetRequest && r.TargetMemoryID == "" {
+		return fmt.Errorf("target_memory_id is required for forget_request")
+	}
+	if r.TargetMemoryID != "" && r.Kind != ObservationKindForgetRequest {
+		return fmt.Errorf("target_memory_id is only allowed for forget_request")
+	}
 	return nil
 }
 

@@ -38,6 +38,19 @@ func TestCommitObservationRequestRejectsUnsupportedKind(t *testing.T) {
 	}
 }
 
+func TestCommitObservationRequestRejectsAgentResultSupersession(t *testing.T) {
+	req := CommitObservationRequest{
+		OperationID:        "writeback-1",
+		Kind:               ObservationKindAgentResult,
+		Content:            "Use checkout_eta_v3.",
+		SupersedesMemoryID: "e6fb79d6-f2cc-48a1-8fe2-595df8f5b316",
+	}
+	err := req.Validate()
+	if err == nil || !strings.Contains(err.Error(), "supersedes_memory_id") {
+		t.Fatalf("expected supersession validation error, got %v", err)
+	}
+}
+
 func TestPrepareContextRequestClampsMaxItems(t *testing.T) {
 	req := PrepareContextRequest{
 		OperationID: "prepare-1",
