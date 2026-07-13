@@ -382,15 +382,15 @@ git commit -m "test: prove OpenClaw continuity gates"
 - Consumes: built Vermory binary, plugin package, isolated OpenClaw state, local PostgreSQL, and authenticated local Grok CLI.
 - Produces: real runtime inspection, model outputs, receipts, database assertions, restart evidence, and a completed OpenClaw checklist.
 
-- [ ] **Step 1: Build artifacts and create isolated OpenClaw state**
+- [x] **Step 1: Build artifacts and create isolated OpenClaw state**
 
 Use `/tmp/vermory-openclaw-state` and `/tmp/vermory-openclaw-config/openclaw.json`. Do not read or modify the user's default `~/.openclaw` state. Use Node 24 explicitly in `PATH`.
 
-- [ ] **Step 2: Configure a Grok CLI backend**
+- [x] **Step 2: Configure a stable Grok CLI backend**
 
-Configure provider id `grok-cli` with absolute command `/opt/homebrew/bin/grok`, args for single-turn JSON output, `input: "arg"`, `output: "json"`, `modelArg: "--model"`, `sessionArg: "--session-id"`, and a resume path compatible with Grok's `--resume`. Disable Grok subagents and web search for deterministic replay. Do not expose Grok credentials to OpenClaw config.
+Configure provider id `grok-cli` through an operator-owned wrapper that isolates `HOME` and `GROK_HOME`, with single-turn JSON output, `input: "arg"`, `output: "json"`, and `modelArg: "--model"`. Disable Grok native tools, subagents, web search, and memory. Use `sessionMode: "none"` so continuity evidence cannot depend on Grok's private session cache; OpenClaw retains the canonical session key and transcript while Vermory supplies governed continuity. Do not expose Grok credentials to OpenClaw config or the repository.
 
-- [ ] **Step 3: Install and inspect the plugin**
+- [x] **Step 3: Install and inspect the plugin**
 
 ```bash
 OPENCLAW_STATE_DIR=/tmp/vermory-openclaw-state \
@@ -406,7 +406,7 @@ pnpm -C integrations/openclaw exec openclaw plugins inspect vermory --runtime --
 
 Assert runtime inspection reports `before_prompt_build` and `agent_end`, with no memory-slot ownership.
 
-- [ ] **Step 4: Start Vermory and OpenClaw, then run O01 through real Grok**
+- [x] **Step 4: Start Vermory and OpenClaw, then run O01 through real Grok**
 
 Run `vermory web-chat --provider external` on loopback. Start the OpenClaw Gateway in the isolated state. Use explicit session keys A/B/C and `openclaw agent --json --model grok-cli/grok-4.5`.
 
@@ -423,15 +423,15 @@ Capture:
 - task-local English override followed by Chinese default restoration;
 - link reversal and a fresh B delivery.
 
-- [ ] **Step 5: Run outage proof**
+- [x] **Step 5: Run outage proof**
 
 Stop Vermory, send a fresh OpenClaw turn, and prove Grok still answers while plugin logs a prepare failure and PostgreSQL contains no successful delivery/turn completion for that operation.
 
-- [ ] **Step 6: Write evidence with deterministic/model separation**
+- [x] **Step 6: Write evidence with deterministic/model separation**
 
 Record versions, commands with secrets omitted, plugin inspection summary, session anchors in operator-only evidence, model route, model answer excerpts, database counts/lifecycle, fresh delivery bodies, restart PIDs/timestamps, outage result, and failed probes. State that model wording is behavioral evidence while isolation/deletion/lifecycle claims come from PostgreSQL and delivery inspection.
 
-- [ ] **Step 7: Run release verification**
+- [x] **Step 7: Run release verification**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \

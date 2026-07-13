@@ -50,7 +50,7 @@ PATH="/opt/homebrew/opt/node@24/bin:$PATH" \
 go build -o ./bin/vermory ./cmd/vermory
 ```
 
-`pnpm check` runs 36 plugin tests, strict TypeScript checking, and the ESM build. `pnpm pack --dry-run` can be used to inspect the publishable package; only `dist`, `openclaw.plugin.json`, and `package.json` are included.
+`pnpm check` runs 37 plugin tests, strict TypeScript checking, and the ESM build. `pnpm pack --dry-run` can be used to inspect the publishable package; only `dist`, `openclaw.plugin.json`, and `package.json` are included.
 
 ## Start Vermory
 
@@ -152,6 +152,20 @@ export OPENCLAW_CONFIG_PATH=/tmp/vermory-openclaw-config/openclaw.json
 ```
 
 Create the config directory and file before installation. Every install, inspect, gateway, and agent command in the isolated run must use the same two environment variables.
+
+### Stable Grok CLI Replay
+
+Grok CLI `0.2.99` can discover user-level Grok and Claude plugins, MCP servers, and compatibility configuration. That is appropriate for normal interactive use but can contaminate structured benchmark output. Use an operator-owned wrapper for isolated replay:
+
+```sh
+#!/bin/sh
+exec env \
+  HOME=/tmp/vermory-home \
+  GROK_HOME=/tmp/vermory-grok-home \
+  /opt/homebrew/bin/grok "$@"
+```
+
+Keep authenticated `auth.json` material outside the repository. For deterministic continuity validation, configure the backend with the wrapper command, `sessionMode: "none"`, and `--tools ""`. OpenClaw still owns the canonical session key and transcript, while every Grok call is stateless and Vermory must provide the governed continuity. This avoids treating a private Grok session cache as proof that Vermory recall works.
 
 ## Governance Operations
 
