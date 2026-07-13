@@ -90,3 +90,5 @@ The PostgreSQL server itself ran on the host, not inside Linux. This evidence pr
 ## Cleanup
 
 The dedicated database, admin role, runtime role, temporary TCP bridge, and `vermory-ops-i02-arm64` Colima profile were removed after capture. Existing `default`, `chatweb`, and running `contextmesh-eval` Colima profiles were not stopped or modified.
+
+The final repository release gate reran the complete Go suite, race-sensitive runtime packages, `go vet`, module tidiness, OpenClaw checks, pack dry-run, Git whitespace checks, and host artifact-to-manifest SHA-256 comparison. All passed.

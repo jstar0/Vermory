@@ -196,7 +196,7 @@ git commit -m "test: verify Linux runtime portability"
 - Modify: `docs/evidence/2026-07-14-postgresql-operations-recovery.md`
 - Modify: `docs/evidence/2026-07-14-linux-runtime-portability.md`
 
-- [ ] **Step 1: Run operations release verification**
+- [x] **Step 1: Run operations release verification**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
@@ -206,7 +206,7 @@ git diff --exit-code -- go.mod go.sum
 git diff --check
 ```
 
-- [ ] **Step 2: Mark only freshly verified checklist items**
+- [x] **Step 2: Mark only freshly verified checklist items**
 
 Review the operations evidence for credentials, ambiguous claims, source/target mismatch, and missing failure statuses before marking completion.
 

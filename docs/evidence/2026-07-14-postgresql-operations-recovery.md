@@ -176,3 +176,19 @@ Raw token values, token digests, runtime passwords, and connection strings were 
 ## Cleanup
 
 After evidence capture, both dedicated `vermory_ops_i02_*` databases, the dedicated runtime role, the temporary dump, and the temporary release binary were removed. The loopback listener on port `8792` was stopped and verified free. The shared `vermory_test` database and unrelated evidence resources were not removed.
+
+## Release Gate
+
+Fresh verification after the recovery and embedded-migration changes passed:
+
+```text
+go test -p 1 -count=1 ./...: pass
+go test -race on authn/runtime/webchat/identitycli/operatorcli/cmd/provider: pass
+go vet ./...: pass
+go mod tidy with zero go.mod/go.sum diff: pass
+Darwin release build SHA-256: aacd8a3e90023b34898cfb044b7cdb01f453ad30390087181e5e55e8e662790e
+OpenClaw check: pass
+OpenClaw pack dry-run: pass
+git diff --check: pass
+Linux manifest hashes match generated artifacts: pass
+```
