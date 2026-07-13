@@ -45,7 +45,7 @@ Examples include a repository changing decisions over several sessions, a long-r
 Priority sources are:
 
 1. Authorized real local workflows across varied projects and domains.
-2. Real Codex, Claude Code, Gemini CLI, domestic coding-tool, Web Chat, and everyday-assistant trajectories.
+2. Real Codex, Grok, domestic coding-tool, Web Chat, and everyday-assistant trajectories. Gemini CLI is retired and is not an active client target.
 3. Authorized long-running conversation matters with privacy-safe anonymization.
 4. Public repositories, issues, pull requests, releases, documentation, and migrations.
 5. Official or verified public benchmark datasets where licensing permits.
