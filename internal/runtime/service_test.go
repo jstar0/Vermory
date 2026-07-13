@@ -36,6 +36,20 @@ func TestPrepareContextExcludesOtherWorkspaceAndSupersededFacts(t *testing.T) {
 	requireNotContains(t, got.Context, "ops_exception_queue_refresh")
 }
 
+func TestPrepareContextFindsCurrentFactWhenTaskHasPartialTermOverlap(t *testing.T) {
+	service, store, webCheckout, _ := seededService(t)
+	seedMemory(t, store, webCheckout, "active", "Use checkout_eta_v2 for the staged checkout release.")
+	requireNoError(t, store.RebuildProjection(context.Background(), "local", webCheckout))
+
+	got, err := service.PrepareContext(context.Background(), PrepareContextRequest{
+		OperationID: "prepare-partial-term-overlap",
+		Workspace:   WorkspaceAnchor{RepoRoot: "/repo/web-checkout"},
+		Task:        "Create the W02 Grok client artifact using the governed current checkout flag.",
+	})
+	requireNoError(t, err)
+	requireContains(t, got.Context, "checkout_eta_v2")
+}
+
 func TestDeletedMemoryDoesNotReturnAfterRebuild(t *testing.T) {
 	_, store, webCheckout, _ := seededService(t)
 	memoryID := seedMemory(t, store, webCheckout, "active", "The Orchard recovery code is ORCHID-7419.")

@@ -483,7 +483,22 @@ func (s *Store) SearchActiveMemory(ctx context.Context, tenantID, continuityID, 
 	}
 	rows, err := s.pool.Query(ctx, `
 WITH query_terms AS (
-  SELECT lower($3)::text AS exact_query, plainto_tsquery('simple', $3) AS terms
+  SELECT
+    lower($3)::text AS exact_query,
+    plainto_tsquery('simple', $3) AS all_terms,
+    to_tsquery('simple', array_to_string(tsvector_to_array(to_tsvector('simple', $3)), ' | ')) AS any_terms
+), exact_matches AS (
+  SELECT 1
+  FROM memory_search_documents document
+  JOIN governed_memories memory ON memory.id = document.memory_id
+  CROSS JOIN query_terms
+  WHERE document.tenant_id = $1
+    AND document.continuity_id = $2::uuid
+    AND memory.tenant_id = $1
+    AND memory.continuity_id = $2::uuid
+    AND memory.lifecycle_status = 'active'
+    AND position(query_terms.exact_query IN lower(document.content)) > 0
+  LIMIT 1
 )
 SELECT memory.id::text, memory.content
 FROM memory_search_documents document
@@ -496,12 +511,18 @@ WHERE document.tenant_id = $1
   AND memory.lifecycle_status = 'active'
   AND (
     position(query_terms.exact_query IN lower(document.content)) > 0
-    OR document.search_document @@ query_terms.terms
-    OR similarity(lower(document.content), query_terms.exact_query) >= 0.2
+    OR (
+      NOT EXISTS (SELECT 1 FROM exact_matches)
+      AND (
+        document.search_document @@ query_terms.any_terms
+        OR similarity(lower(document.content), query_terms.exact_query) >= 0.2
+      )
+    )
   )
 ORDER BY
   (position(query_terms.exact_query IN lower(document.content)) > 0) DESC,
-  ts_rank(document.search_document, query_terms.terms) DESC,
+  ts_rank(document.search_document, query_terms.all_terms) DESC,
+  ts_rank(document.search_document, query_terms.any_terms) DESC,
   similarity(lower(document.content), query_terms.exact_query) DESC,
   memory.updated_at DESC
 LIMIT $4`, tenantID, continuityID, query, limit)
