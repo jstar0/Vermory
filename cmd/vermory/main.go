@@ -87,6 +87,7 @@ func newRootCommand() *cobra.Command {
 	rootCmd.AddCommand(identitycli.NewDatabaseCommand())
 	rootCmd.AddCommand(newWebChatCommand())
 	rootCmd.AddCommand(newServeCommand())
+	rootCmd.AddCommand(newBenchmarkLongMemEvalCommand())
 
 	mcpStdioCmd := &cobra.Command{
 		Use:   "mcp-stdio",

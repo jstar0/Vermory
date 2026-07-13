@@ -122,11 +122,11 @@ git commit -m "feat: freeze LongMemEval sample scoring"
 - Produces: `app.RunLongMemEvalSample(ctx context.Context, opts LongMemEvalOptions) (LongMemEvalReport, error)`
 - Produces: CLI command `vermory benchmark-longmemeval`.
 
-- [ ] **Step 1: Write failing orchestration tests**
+- [x] **Step 1: Write failing orchestration tests**
 
 Use a real test PostgreSQL database and a deterministic provider double to prove four conditions per record, isolated conversation continuities, source-governed active memories, recorded deliveries, semantic-only packets, stable artifacts, and retained provider failures.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -136,15 +136,15 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 ./
 
 Expected: FAIL because the runner and command do not exist.
 
-- [ ] **Step 3: Implement four conditions**
+- [x] **Step 3: Implement four conditions**
 
 Build `no_context`, `full_oracle_history`, and `plain_lexical_retrieval` directly through the shared provider interface. For `vermory_packet`, resolve a record-specific conversation, commit each official oracle session as an active `source_update`, and call the production conversation service so retrieval, delivery, and answer persistence use PostgreSQL.
 
-- [ ] **Step 4: Implement artifacts and execution validation**
+- [x] **Step 4: Implement artifacts and execution validation**
 
 Write source metadata, semantic requests, provider responses, deterministic scores, Markdown report, and execution manifest. Validate the final execution manifest before returning success.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 Run focused tests and the CLI help test, then:
 

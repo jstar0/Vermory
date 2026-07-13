@@ -31,7 +31,7 @@ func TestExperiment0CLIIsRegistered(t *testing.T) {
 
 func TestProviderCommandsAdvertiseGrokCLI(t *testing.T) {
 	for _, command := range newRootCommand().Commands() {
-		if command.Name() != "eval-self-case" && command.Name() != "eval-casebook" && command.Name() != "eval-matrix" && command.Name() != "probe-provider" && command.Name() != "acceptance-report" {
+		if command.Name() != "eval-self-case" && command.Name() != "eval-casebook" && command.Name() != "eval-matrix" && command.Name() != "probe-provider" && command.Name() != "acceptance-report" && command.Name() != "benchmark-longmemeval" {
 			continue
 		}
 		flag := command.Flags().Lookup("provider")
@@ -39,6 +39,32 @@ func TestProviderCommandsAdvertiseGrokCLI(t *testing.T) {
 			t.Fatalf("command %q must advertise grok-cli provider support", command.Name())
 		}
 	}
+}
+
+func TestBenchmarkLongMemEvalCommandIsRegistered(t *testing.T) {
+	for _, command := range newRootCommand().Commands() {
+		if command.Name() != "benchmark-longmemeval" {
+			continue
+		}
+		for _, flagName := range []string{
+			"database-url",
+			"source-dataset",
+			"qualification",
+			"execution",
+			"artifact-root",
+			"provider",
+			"base-url",
+			"api-key-env",
+			"model",
+			"run-id",
+		} {
+			if command.Flags().Lookup(flagName) == nil {
+				t.Fatalf("benchmark-longmemeval must expose --%s", flagName)
+			}
+		}
+		return
+	}
+	t.Fatal("expected benchmark-longmemeval command")
 }
 
 func TestMCPStdioCommandIsRegistered(t *testing.T) {
