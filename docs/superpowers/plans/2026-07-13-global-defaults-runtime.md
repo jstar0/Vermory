@@ -88,27 +88,27 @@ git commit -m "feat: add global defaults authority store"
 - Produces: `NewGlobalDefaultsService`, `Inspect`, `Set`, `Correct`, and `Forget`.
 - Produces: validated request and receipt types used by HTTP and CLI surfaces.
 
-- [ ] **Step 1: Write failing service tests**
+- [x] **Step 1: Write failing service tests**
 
 Test explicit set/inspect/correct/forget, normalized key validation, duplicate active key rejection, idempotent replay, and unconfigured service rejection.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime -run 'TestGlobalDefaultsService'
 ```
 
-- [ ] **Step 3: Implement the minimal service**
+- [x] **Step 3: Implement the minimal service**
 
 The service must own the tenant, call only explicit global-default store methods, and never accept a continuity ID or tenant ID from the caller.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime -run 'TestGlobalDefaultsService'
 ```
 
-- [ ] **Step 5: Commit the service slice**
+- [x] **Step 5: Commit the service slice**
 
 ```bash
 git add internal/runtime/global_defaults_types.go internal/runtime/global_defaults_service.go internal/runtime/global_defaults_service_test.go
