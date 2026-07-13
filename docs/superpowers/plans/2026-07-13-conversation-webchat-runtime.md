@@ -513,7 +513,7 @@ git commit -m "test: prove persistent conversation hard gates"
 - Consumes: built `vermory web-chat`, authenticated local `grok` CLI, local PostgreSQL.
 - Produces: reproducible real-provider evidence and an updated Draft PR.
 
-- [ ] **Step 1: Build the binary and start the local server**
+- [x] **Step 1: Build the binary and start the local server**
 
 ```bash
 go build -o /tmp/vermory-webchat ./cmd/vermory
@@ -525,15 +525,15 @@ go build -o /tmp/vermory-webchat ./cmd/vermory
   --listen 127.0.0.1:8787
 ```
 
-- [ ] **Step 2: Replay multi-turn, restart, confirmation, deletion, and idempotency**
+- [x] **Step 2: Replay multi-turn, restart, confirmation, deletion, and idempotency**
 
 Use `curl` with stable operation IDs. Preserve redacted request/response JSON and PostgreSQL assertions. Repeat one completed operation and verify the response receipt is replayed without a second provider invocation.
 
-- [ ] **Step 3: Document exact user flow and evidence**
+- [x] **Step 3: Document exact user flow and evidence**
 
 The runbook must explain normal chat, inspection, confirm, correction, forget, restart, provider failure, and the local-only security boundary. It must not claim Global Defaults, bridges, OpenClaw, remote multi-tenancy, or original benchmark completion.
 
-- [ ] **Step 4: Run final verification**
+- [x] **Step 4: Run final verification**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
@@ -549,7 +549,7 @@ Expected: every command exits zero and the worktree contains only intended evide
 - [ ] **Step 5: Commit and push**
 
 ```bash
-git add docs/integrations/local-web-chat-conversation-slice.md artifacts/runtime/C04-grok-webchat-runtime
+git add docs/integrations/local-web-chat-conversation-slice.md docs/evidence/2026-07-13-grok-webchat-runtime.md docs/superpowers/plans/2026-07-13-conversation-webchat-runtime.md
 git commit -m "docs: add real conversation web chat replay"
 git push origin agent/grok-cli-runtime
 ```
