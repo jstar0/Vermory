@@ -170,27 +170,27 @@ git commit -m "feat: deliver global defaults to runtime consumers"
 - Consumes: `GlobalDefaultsService`.
 - Produces: `/v1/defaults` endpoints and `vermory defaults` commands.
 
-- [ ] **Step 1: Write failing HTTP and CLI tests**
+- [x] **Step 1: Write failing HTTP and CLI tests**
 
 Test all four operations, server-owned tenant behavior, unknown JSON rejection, not-found safety, and durable receipts after server/command recreation.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/webchat ./internal/operatorcli ./cmd/vermory -run 'Test.*Default'
 ```
 
-- [ ] **Step 3: Implement the surfaces**
+- [x] **Step 3: Implement the surfaces**
 
 Wire the same store and server-owned tenant into conversation and default services. Do not accept tenant or continuity identifiers in request bodies.
 
-- [ ] **Step 4: Run package tests and verify GREEN**
+- [x] **Step 4: Run package tests and verify GREEN**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/webchat ./internal/operatorcli ./cmd/vermory
 ```
 
-- [ ] **Step 5: Commit the surface slice**
+- [x] **Step 5: Commit the surface slice**
 
 ```bash
 git add internal/webchat/handler.go internal/webchat/handler_test.go cmd/vermory/web_chat.go cmd/vermory/web_chat_test.go internal/operatorcli/command.go internal/operatorcli/command_test.go cmd/vermory/main.go

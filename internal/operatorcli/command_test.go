@@ -26,6 +26,11 @@ type commandMemoryList struct {
 	Memories     []runtime.GovernedMemory `json:"memories"`
 }
 
+type commandDefaultList struct {
+	ContinuityID string                   `json:"continuity_id"`
+	Defaults     []runtime.GovernedMemory `json:"defaults"`
+}
+
 func TestWorkspaceAndMemoryCommandsCompleteGovernedFlow(t *testing.T) {
 	databaseURL := resetCommandStore(t)
 
@@ -99,6 +104,40 @@ func TestMemoryCommandsRejectUnconfirmedWorkspace(t *testing.T) {
 	}
 }
 
+func TestDefaultsCommandsCompleteExplicitLifecycle(t *testing.T) {
+	databaseURL := resetCommandStore(t)
+	created := runJSONCommand(t, databaseURL,
+		"defaults", "set",
+		"--operation-id", "cli-default-set",
+		"--key", "reply_language",
+		"--content", "Default user-facing replies to Chinese unless the active task explicitly requests another language.")
+	if created.ContinuityID == "" || created.MemoryID == "" || created.MemoryStatus != "active" {
+		t.Fatalf("unexpected default set receipt: %#v", created)
+	}
+
+	listed := runDefaultListCommand(t, databaseURL)
+	if listed.ContinuityID != created.ContinuityID || len(listed.Defaults) != 1 || listed.Defaults[0].MemoryKey != "reply_language" {
+		t.Fatalf("unexpected default list: %#v", listed)
+	}
+
+	corrected := runJSONCommand(t, databaseURL,
+		"defaults", "correct",
+		"--operation-id", "cli-default-correct",
+		"--memory-id", created.MemoryID,
+		"--content", "Default user-facing replies to Chinese.")
+	if corrected.MemoryID == created.MemoryID || corrected.MemoryStatus != "active" {
+		t.Fatalf("unexpected default correction receipt: %#v", corrected)
+	}
+
+	forgotten := runJSONCommand(t, databaseURL,
+		"defaults", "forget",
+		"--operation-id", "cli-default-forget",
+		"--memory-id", corrected.MemoryID)
+	if forgotten.MemoryID != corrected.MemoryID || forgotten.MemoryStatus != "deleted" {
+		t.Fatalf("unexpected default forget receipt: %#v", forgotten)
+	}
+}
+
 func resetCommandStore(t *testing.T) string {
 	t.Helper()
 	databaseURL := os.Getenv("VERMORY_TEST_DATABASE_URL")
@@ -162,9 +201,26 @@ func runMemoryListCommand(t *testing.T, databaseURL, repoRoot string) commandMem
 	return listed
 }
 
+func runDefaultListCommand(t *testing.T, databaseURL string) commandDefaultList {
+	t.Helper()
+	var output bytes.Buffer
+	root := newTestRoot()
+	root.SetOut(&output)
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"defaults", "inspect", "--database-url", databaseURL, "--tenant-id", "local"})
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var listed commandDefaultList
+	if err := json.Unmarshal(output.Bytes(), &listed); err != nil {
+		t.Fatal(err)
+	}
+	return listed
+}
+
 func newTestRoot() *cobra.Command {
 	root := &cobra.Command{Use: "vermory", SilenceErrors: true, SilenceUsage: true}
-	root.AddCommand(NewWorkspaceCommand(), NewMemoryCommand())
+	root.AddCommand(NewWorkspaceCommand(), NewMemoryCommand(), NewDefaultsCommand())
 	return root
 }
 

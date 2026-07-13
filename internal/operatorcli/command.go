@@ -195,6 +195,103 @@ func NewMemoryCommand() *cobra.Command {
 	return command
 }
 
+func NewDefaultsCommand() *cobra.Command {
+	options := connectionOptions{}
+	command := &cobra.Command{
+		Use:   "defaults",
+		Short: "Manage explicit global defaults",
+	}
+	addConnectionFlags(command, &options)
+
+	inspect := &cobra.Command{
+		Use:   "inspect",
+		Short: "List global default lifecycle state",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withGlobalDefaults(cmd.Context(), options, func(service *runtime.GlobalDefaultsService) error {
+				inspection, err := service.Inspect(cmd.Context())
+				if err != nil {
+					return err
+				}
+				return writeJSON(cmd, inspection)
+			})
+		},
+	}
+
+	var setOperationID, setKey, setContent string
+	set := &cobra.Command{
+		Use:   "set",
+		Short: "Create one explicit global default",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withGlobalDefaults(cmd.Context(), options, func(service *runtime.GlobalDefaultsService) error {
+				receipt, err := service.Set(cmd.Context(), runtime.SetGlobalDefaultRequest{
+					OperationID: setOperationID,
+					Key:         setKey,
+					Content:     setContent,
+				})
+				if err != nil {
+					return err
+				}
+				return writeJSON(cmd, receipt)
+			})
+		},
+	}
+	set.Flags().StringVar(&setOperationID, "operation-id", "", "idempotency key")
+	set.Flags().StringVar(&setKey, "key", "", "stable lowercase default key")
+	set.Flags().StringVar(&setContent, "content", "", "semantic default content")
+	markRequired(set, "operation-id", "key", "content")
+
+	var correctOperationID, correctMemoryID, correctContent string
+	correct := &cobra.Command{
+		Use:   "correct",
+		Short: "Replace one named active global default",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withGlobalDefaults(cmd.Context(), options, func(service *runtime.GlobalDefaultsService) error {
+				receipt, err := service.Correct(cmd.Context(), runtime.CorrectGlobalDefaultRequest{
+					OperationID: correctOperationID,
+					MemoryID:    correctMemoryID,
+					Content:     correctContent,
+				})
+				if err != nil {
+					return err
+				}
+				return writeJSON(cmd, receipt)
+			})
+		},
+	}
+	correct.Flags().StringVar(&correctOperationID, "operation-id", "", "idempotency key")
+	correct.Flags().StringVar(&correctMemoryID, "memory-id", "", "active global default to replace")
+	correct.Flags().StringVar(&correctContent, "content", "", "replacement semantic content")
+	markRequired(correct, "operation-id", "memory-id", "content")
+
+	var forgetOperationID, forgetMemoryID string
+	forget := &cobra.Command{
+		Use:   "forget",
+		Short: "Delete one named global default",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withGlobalDefaults(cmd.Context(), options, func(service *runtime.GlobalDefaultsService) error {
+				receipt, err := service.Forget(cmd.Context(), runtime.ForgetGlobalDefaultRequest{
+					OperationID: forgetOperationID,
+					MemoryID:    forgetMemoryID,
+				})
+				if err != nil {
+					return err
+				}
+				return writeJSON(cmd, receipt)
+			})
+		},
+	}
+	forget.Flags().StringVar(&forgetOperationID, "operation-id", "", "idempotency key")
+	forget.Flags().StringVar(&forgetMemoryID, "memory-id", "", "global default to delete")
+	markRequired(forget, "operation-id", "memory-id")
+
+	command.AddCommand(inspect, set, correct, forget)
+	return command
+}
+
 func addConnectionFlags(command *cobra.Command, options *connectionOptions) {
 	command.PersistentFlags().StringVar(&options.databaseURL, "database-url", "", "PostgreSQL connection URL")
 	command.PersistentFlags().StringVar(&options.tenantID, "tenant-id", "", "server-owned tenant identifier")
@@ -224,6 +321,24 @@ func withGovernance(ctx context.Context, options connectionOptions, run func(*ru
 		return err
 	}
 	return run(runtime.NewGovernanceService(store, options.tenantID))
+}
+
+func withGlobalDefaults(ctx context.Context, options connectionOptions, run func(*runtime.GlobalDefaultsService) error) error {
+	if strings.TrimSpace(options.databaseURL) == "" {
+		return fmt.Errorf("--database-url is required")
+	}
+	if strings.TrimSpace(options.tenantID) == "" {
+		return fmt.Errorf("--tenant-id is required")
+	}
+	store, err := runtime.OpenStore(ctx, options.databaseURL)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx); err != nil {
+		return err
+	}
+	return run(runtime.NewGlobalDefaultsService(store, options.tenantID))
 }
 
 func writeJSON(cmd *cobra.Command, value any) error {

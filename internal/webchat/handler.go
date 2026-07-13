@@ -14,17 +14,26 @@ import (
 const maxRequestBodyBytes int64 = 1 << 20
 
 type Handler struct {
-	service *runtime.ConversationService
-	mux     *http.ServeMux
+	service  *runtime.ConversationService
+	defaults *runtime.GlobalDefaultsService
+	mux      *http.ServeMux
 }
 
-func NewHandler(service *runtime.ConversationService) http.Handler {
-	handler := &Handler{service: service, mux: http.NewServeMux()}
+func NewHandler(service *runtime.ConversationService, defaultServices ...*runtime.GlobalDefaultsService) http.Handler {
+	var defaults *runtime.GlobalDefaultsService
+	if len(defaultServices) > 0 {
+		defaults = defaultServices[0]
+	}
+	handler := &Handler{service: service, defaults: defaults, mux: http.NewServeMux()}
 	handler.mux.HandleFunc("POST /v1/chat/turn", handler.chatTurn)
 	handler.mux.HandleFunc("POST /v1/memories/confirm", handler.confirmMemory)
 	handler.mux.HandleFunc("POST /v1/memories/correct", handler.correctMemory)
 	handler.mux.HandleFunc("POST /v1/memories/forget", handler.forgetMemory)
 	handler.mux.HandleFunc("GET /v1/conversations/inspect", handler.inspectConversation)
+	handler.mux.HandleFunc("GET /v1/defaults", handler.inspectDefaults)
+	handler.mux.HandleFunc("POST /v1/defaults/set", handler.setDefault)
+	handler.mux.HandleFunc("POST /v1/defaults/correct", handler.correctDefault)
+	handler.mux.HandleFunc("POST /v1/defaults/forget", handler.forgetDefault)
 	return handler
 }
 
@@ -57,6 +66,23 @@ type correctMemoryInput struct {
 type forgetMemoryInput struct {
 	conversationInput
 	MemoryID string `json:"memory_id"`
+}
+
+type setDefaultInput struct {
+	OperationID string `json:"operation_id"`
+	Key         string `json:"key"`
+	Content     string `json:"content"`
+}
+
+type correctDefaultInput struct {
+	OperationID string `json:"operation_id"`
+	MemoryID    string `json:"memory_id"`
+	Content     string `json:"content"`
+}
+
+type forgetDefaultInput struct {
+	OperationID string `json:"operation_id"`
+	MemoryID    string `json:"memory_id"`
 }
 
 func (h *Handler) chatTurn(response http.ResponseWriter, request *http.Request) {
@@ -144,6 +170,85 @@ func (h *Handler) inspectConversation(response http.ResponseWriter, request *htt
 	writeJSON(response, http.StatusOK, inspection)
 }
 
+func (h *Handler) inspectDefaults(response http.ResponseWriter, request *http.Request) {
+	if !h.requireDefaults(response) {
+		return
+	}
+	inspection, err := h.defaults.Inspect(request.Context())
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, inspection)
+}
+
+func (h *Handler) setDefault(response http.ResponseWriter, request *http.Request) {
+	if !h.requireDefaults(response) {
+		return
+	}
+	var input setDefaultInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.defaults.Set(request.Context(), runtime.SetGlobalDefaultRequest{
+		OperationID: input.OperationID,
+		Key:         input.Key,
+		Content:     input.Content,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) correctDefault(response http.ResponseWriter, request *http.Request) {
+	if !h.requireDefaults(response) {
+		return
+	}
+	var input correctDefaultInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.defaults.Correct(request.Context(), runtime.CorrectGlobalDefaultRequest{
+		OperationID: input.OperationID,
+		MemoryID:    input.MemoryID,
+		Content:     input.Content,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) forgetDefault(response http.ResponseWriter, request *http.Request) {
+	if !h.requireDefaults(response) {
+		return
+	}
+	var input forgetDefaultInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.defaults.Forget(request.Context(), runtime.ForgetGlobalDefaultRequest{
+		OperationID: input.OperationID,
+		MemoryID:    input.MemoryID,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) requireDefaults(response http.ResponseWriter) bool {
+	if h.defaults != nil {
+		return true
+	}
+	writeError(response, http.StatusInternalServerError, "internal_error", "request could not be completed")
+	return false
+}
+
 func decodeRequestJSON(response http.ResponseWriter, request *http.Request, target any) bool {
 	if mediaType := strings.TrimSpace(strings.Split(request.Header.Get("Content-Type"), ";")[0]); mediaType != "application/json" {
 		writeError(response, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json")
@@ -188,6 +293,8 @@ func isSafeClientError(message string) bool {
 		" cannot become memory",
 		"must be an active fact",
 		"already bound",
+		"already has an active value",
+		"key must use",
 	} {
 		if strings.Contains(message, fragment) {
 			return true

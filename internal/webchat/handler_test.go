@@ -71,6 +71,76 @@ func TestChatTurnRejectsTrailingJSONAndOversizedBody(t *testing.T) {
 	}
 }
 
+func TestGlobalDefaultsEndpointsUseServerOwnedTenantAndDurableState(t *testing.T) {
+	handler, store := testHandler(t, provider.Mock{Output: "unused"})
+	setResponse := performJSON(t, handler, http.MethodPost, "/v1/defaults/set", `{
+  "operation_id":"http-default-set",
+  "key":"reply_language",
+  "content":"Default user-facing replies to Chinese unless the active task explicitly requests another language."
+}`)
+	if setResponse.Code != http.StatusOK {
+		t.Fatalf("set returned %d: %s", setResponse.Code, setResponse.Body.String())
+	}
+	var created runtime.GlobalDefaultMutationReceipt
+	decodeResponse(t, setResponse, &created)
+	if created.ContinuityID == "" || created.MemoryID == "" || created.MemoryStatus != "active" {
+		t.Fatalf("unexpected set receipt: %#v", created)
+	}
+
+	forbidden := performJSON(t, handler, http.MethodPost, "/v1/defaults/set", `{
+  "operation_id":"http-default-forbidden-tenant",
+  "key":"output_format",
+  "content":"Use Markdown.",
+  "tenant_id":"attacker"
+}`)
+	if forbidden.Code != http.StatusBadRequest {
+		t.Fatalf("request-owned tenant was accepted: %d %s", forbidden.Code, forbidden.Body.String())
+	}
+
+	restarted := NewHandler(
+		runtime.NewConversationService(store, "local", provider.Mock{Output: "unused"}, "test-model", runtime.ConversationServiceConfig{}),
+		runtime.NewGlobalDefaultsService(store, "local"),
+	)
+	inspectRequest := httptest.NewRequest(http.MethodGet, "/v1/defaults", nil)
+	inspectResponse := httptest.NewRecorder()
+	restarted.ServeHTTP(inspectResponse, inspectRequest)
+	if inspectResponse.Code != http.StatusOK {
+		t.Fatalf("inspect returned %d: %s", inspectResponse.Code, inspectResponse.Body.String())
+	}
+	var inspection runtime.GlobalDefaultsInspection
+	decodeResponse(t, inspectResponse, &inspection)
+	if inspection.ContinuityID != created.ContinuityID || len(inspection.Defaults) != 1 || inspection.Defaults[0].ID != created.MemoryID {
+		t.Fatalf("restarted handler lost durable default: %#v", inspection)
+	}
+
+	correctResponse := performJSON(t, restarted, http.MethodPost, "/v1/defaults/correct", `{
+  "operation_id":"http-default-correct",
+  "memory_id":"`+created.MemoryID+`",
+  "content":"Default user-facing replies to Chinese."
+}`)
+	if correctResponse.Code != http.StatusOK {
+		t.Fatalf("correct returned %d: %s", correctResponse.Code, correctResponse.Body.String())
+	}
+	var corrected runtime.GlobalDefaultMutationReceipt
+	decodeResponse(t, correctResponse, &corrected)
+	if corrected.MemoryID == created.MemoryID || corrected.MemoryStatus != "active" {
+		t.Fatalf("unexpected correction receipt: %#v", corrected)
+	}
+
+	forgetResponse := performJSON(t, restarted, http.MethodPost, "/v1/defaults/forget", `{
+  "operation_id":"http-default-forget",
+  "memory_id":"`+corrected.MemoryID+`"
+}`)
+	if forgetResponse.Code != http.StatusOK {
+		t.Fatalf("forget returned %d: %s", forgetResponse.Code, forgetResponse.Body.String())
+	}
+	var forgotten runtime.GlobalDefaultMutationReceipt
+	decodeResponse(t, forgetResponse, &forgotten)
+	if forgotten.MemoryStatus != "deleted" || forgotten.MemoryID != corrected.MemoryID {
+		t.Fatalf("unexpected forget receipt: %#v", forgotten)
+	}
+}
+
 func TestMemoryGovernanceAndInspectionUseExactConversation(t *testing.T) {
 	handler, _ := testHandler(t, provider.Mock{Output: "fact for matter A"})
 	turnResponse := performJSON(t, handler, http.MethodPost, "/v1/chat/turn", `{
@@ -167,7 +237,8 @@ func testHandler(t *testing.T, llm provider.Provider) (http.Handler, *runtime.St
 		t.Fatal(err)
 	}
 	service := runtime.NewConversationService(store, "local", llm, "test-model", runtime.ConversationServiceConfig{})
-	return NewHandler(service), store
+	defaults := runtime.NewGlobalDefaultsService(store, "local")
+	return NewHandler(service, defaults), store
 }
 
 func performJSON(t *testing.T, handler http.Handler, method, path, body string) *httptest.ResponseRecorder {

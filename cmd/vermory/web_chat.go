@@ -81,9 +81,10 @@ func newWebChatCommand() *cobra.Command {
 				model,
 				runtime.ConversationServiceConfig{},
 			)
+			defaults := runtime.NewGlobalDefaultsService(store, options.TenantID)
 			server := &http.Server{
 				Addr:              options.Listen,
-				Handler:           webchat.NewHandler(service),
+				Handler:           webchat.NewHandler(service, defaults),
 				ReadHeaderTimeout: 5 * time.Second,
 				ReadTimeout:       30 * time.Second,
 				WriteTimeout:      5 * time.Minute,
