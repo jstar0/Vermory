@@ -392,30 +392,30 @@ git commit -m "feat: authenticate OpenClaw requests"
 - Consumes: frozen I01, identity CLI, runtime role grants, `serve`, authenticated handler, OpenClaw plugin token env, local PostgreSQL, and authenticated Grok CLI.
 - Produces: deterministic I01-I05 proof and real I06 process-boundary evidence.
 
-- [ ] **Step 1: Write failing authenticated acceptance**
+- [x] **Step 1: Write failing authenticated acceptance**
 
 Issue client/operator tokens for A and B, drive the same anchor under both tenants, confirm A-only memory, prove B isolation, prove client role denial, revoke/expire tokens, omit tenant filters under the runtime role, attempt cross-tenant FK writes, and run concurrent pool reuse.
 
-- [ ] **Step 2: Verify RED then GREEN**
+- [x] **Step 2: Verify RED then GREEN**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/webchat -run 'TestI01Authenticated' -v
 ```
 
-- [ ] **Step 3: Write deployment runbook**
+- [x] **Step 3: Write deployment runbook**
 
 Document migration, runtime role creation/grant, token issue/revoke, loopback/TLS serving, role matrix, OpenClaw token env, RLS verification, backup sensitivity for auth digests, and uninstall/revocation boundaries.
 
-- [ ] **Step 4: Run real authenticated OpenClaw/Grok replay**
+- [x] **Step 4: Run real authenticated OpenClaw/Grok replay**
 
 Use isolated state and a dedicated database. Start `serve` with a non-owner runtime role, issue an OpenClaw client token, run one governed recall turn through `VERMORY_API_TOKEN`, inspect PostgreSQL, revoke the token, then prove the next OpenClaw turn remains available but has no successful Vermory lifecycle row.
 
-- [ ] **Step 5: Write evidence with deterministic/model separation**
+- [x] **Step 5: Write evidence with deterministic/model separation**
 
 Include exact versions, role attributes, policy inventory, filter-omission query results, pool reuse, token lifecycle counts, OpenClaw model route, revocation logs, and safe excerpts. Omit all real token values and digests.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
