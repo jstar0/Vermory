@@ -81,6 +81,7 @@ func newRootCommand() *cobra.Command {
 	rootCmd.AddCommand(operatorcli.NewWorkspaceCommand())
 	rootCmd.AddCommand(operatorcli.NewMemoryCommand())
 	rootCmd.AddCommand(operatorcli.NewDefaultsCommand())
+	rootCmd.AddCommand(operatorcli.NewBridgeCommand())
 	rootCmd.AddCommand(newWebChatCommand())
 
 	mcpStdioCmd := &cobra.Command{

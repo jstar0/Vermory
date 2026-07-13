@@ -16,6 +16,7 @@ const maxRequestBodyBytes int64 = 1 << 20
 type Handler struct {
 	service  *runtime.ConversationService
 	defaults *runtime.GlobalDefaultsService
+	bridges  *runtime.BridgeService
 	mux      *http.ServeMux
 }
 
@@ -24,7 +25,15 @@ func NewHandler(service *runtime.ConversationService, defaultServices ...*runtim
 	if len(defaultServices) > 0 {
 		defaults = defaultServices[0]
 	}
-	handler := &Handler{service: service, defaults: defaults, mux: http.NewServeMux()}
+	return newHandler(service, defaults, nil)
+}
+
+func NewHandlerWithGovernance(service *runtime.ConversationService, defaults *runtime.GlobalDefaultsService, bridges *runtime.BridgeService) http.Handler {
+	return newHandler(service, defaults, bridges)
+}
+
+func newHandler(service *runtime.ConversationService, defaults *runtime.GlobalDefaultsService, bridges *runtime.BridgeService) http.Handler {
+	handler := &Handler{service: service, defaults: defaults, bridges: bridges, mux: http.NewServeMux()}
 	handler.mux.HandleFunc("POST /v1/chat/turn", handler.chatTurn)
 	handler.mux.HandleFunc("POST /v1/memories/confirm", handler.confirmMemory)
 	handler.mux.HandleFunc("POST /v1/memories/correct", handler.correctMemory)
@@ -34,6 +43,13 @@ func NewHandler(service *runtime.ConversationService, defaultServices ...*runtim
 	handler.mux.HandleFunc("POST /v1/defaults/set", handler.setDefault)
 	handler.mux.HandleFunc("POST /v1/defaults/correct", handler.correctDefault)
 	handler.mux.HandleFunc("POST /v1/defaults/forget", handler.forgetDefault)
+	handler.mux.HandleFunc("POST /v1/bridges/promote", handler.promoteBridge)
+	handler.mux.HandleFunc("POST /v1/bridges/link", handler.linkBridge)
+	handler.mux.HandleFunc("POST /v1/bridges/export", handler.exportBridge)
+	handler.mux.HandleFunc("POST /v1/bridges/adopt", handler.adoptBridge)
+	handler.mux.HandleFunc("POST /v1/bridges/rebind", handler.rebindBridge)
+	handler.mux.HandleFunc("POST /v1/bridges/reverse", handler.reverseBridge)
+	handler.mux.HandleFunc("GET /v1/bridges/{bridge_id}", handler.inspectBridge)
 	return handler
 }
 
@@ -83,6 +99,47 @@ type correctDefaultInput struct {
 type forgetDefaultInput struct {
 	OperationID string `json:"operation_id"`
 	MemoryID    string `json:"memory_id"`
+}
+
+type promoteBridgeInput struct {
+	OperationID    string   `json:"operation_id"`
+	SourceChannel  string   `json:"source_channel"`
+	SourceThreadID string   `json:"source_thread_id"`
+	TargetRepoRoot string   `json:"target_repo_root"`
+	MemoryIDs      []string `json:"memory_ids"`
+}
+
+type linkBridgeInput struct {
+	OperationID     string `json:"operation_id"`
+	PrimaryChannel  string `json:"primary_channel"`
+	PrimaryThreadID string `json:"primary_thread_id"`
+	LinkedChannel   string `json:"linked_channel"`
+	LinkedThreadID  string `json:"linked_thread_id"`
+}
+
+type exportBridgeInput struct {
+	OperationID   string   `json:"operation_id"`
+	RepoRoot      string   `json:"repo_root"`
+	MemoryIDs     []string `json:"memory_ids"`
+	Title         string   `json:"title"`
+	TargetProfile string   `json:"target_profile"`
+}
+
+type adoptBridgeInput struct {
+	OperationID      string `json:"operation_id"`
+	ExistingRepoRoot string `json:"existing_repo_root"`
+	NewRepoRoot      string `json:"new_repo_root"`
+}
+
+type rebindBridgeInput struct {
+	OperationID string `json:"operation_id"`
+	OldRepoRoot string `json:"old_repo_root"`
+	NewRepoRoot string `json:"new_repo_root"`
+}
+
+type reverseBridgeInput struct {
+	OperationID string `json:"operation_id"`
+	BridgeID    string `json:"bridge_id"`
 }
 
 func (h *Handler) chatTurn(response http.ResponseWriter, request *http.Request) {
@@ -249,6 +306,157 @@ func (h *Handler) requireDefaults(response http.ResponseWriter) bool {
 	return false
 }
 
+func (h *Handler) promoteBridge(response http.ResponseWriter, request *http.Request) {
+	if !h.requireBridges(response) {
+		return
+	}
+	var input promoteBridgeInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.bridges.PromoteConversationToWorkspace(request.Context(), runtime.PromoteConversationToWorkspaceRequest{
+		OperationID: input.OperationID,
+		Source: runtime.ConversationAnchor{
+			Channel:  input.SourceChannel,
+			ThreadID: input.SourceThreadID,
+		},
+		TargetRepoRoot: input.TargetRepoRoot,
+		MemoryIDs:      input.MemoryIDs,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) linkBridge(response http.ResponseWriter, request *http.Request) {
+	if !h.requireBridges(response) {
+		return
+	}
+	var input linkBridgeInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.bridges.LinkConversations(request.Context(), runtime.LinkConversationsRequest{
+		OperationID: input.OperationID,
+		Primary: runtime.ConversationAnchor{
+			Channel:  input.PrimaryChannel,
+			ThreadID: input.PrimaryThreadID,
+		},
+		Linked: runtime.ConversationAnchor{
+			Channel:  input.LinkedChannel,
+			ThreadID: input.LinkedThreadID,
+		},
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) exportBridge(response http.ResponseWriter, request *http.Request) {
+	if !h.requireBridges(response) {
+		return
+	}
+	var input exportBridgeInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.bridges.ExportWorkspace(request.Context(), runtime.ExportWorkspaceRequest{
+		OperationID:   input.OperationID,
+		RepoRoot:      input.RepoRoot,
+		MemoryIDs:     input.MemoryIDs,
+		Title:         input.Title,
+		TargetProfile: input.TargetProfile,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) adoptBridge(response http.ResponseWriter, request *http.Request) {
+	if !h.requireBridges(response) {
+		return
+	}
+	var input adoptBridgeInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.bridges.AdoptWorkspaceAnchor(request.Context(), runtime.AdoptWorkspaceAnchorRequest{
+		OperationID:      input.OperationID,
+		ExistingRepoRoot: input.ExistingRepoRoot,
+		NewRepoRoot:      input.NewRepoRoot,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) rebindBridge(response http.ResponseWriter, request *http.Request) {
+	if !h.requireBridges(response) {
+		return
+	}
+	var input rebindBridgeInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.bridges.RebindWorkspace(request.Context(), runtime.RebindWorkspaceRequest{
+		OperationID: input.OperationID,
+		OldRepoRoot: input.OldRepoRoot,
+		NewRepoRoot: input.NewRepoRoot,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) reverseBridge(response http.ResponseWriter, request *http.Request) {
+	if !h.requireBridges(response) {
+		return
+	}
+	var input reverseBridgeInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.bridges.Reverse(request.Context(), runtime.ReverseBridgeRequest{
+		OperationID: input.OperationID,
+		BridgeID:    input.BridgeID,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) inspectBridge(response http.ResponseWriter, request *http.Request) {
+	if !h.requireBridges(response) {
+		return
+	}
+	receipt, err := h.bridges.Inspect(request.Context(), request.PathValue("bridge_id"))
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) requireBridges(response http.ResponseWriter) bool {
+	if h.bridges != nil {
+		return true
+	}
+	writeError(response, http.StatusInternalServerError, "internal_error", "request could not be completed")
+	return false
+}
+
 func decodeRequestJSON(response http.ResponseWriter, request *http.Request, target any) bool {
 	if mediaType := strings.TrimSpace(strings.Split(request.Header.Get("Content-Type"), ";")[0]); mediaType != "application/json" {
 		writeError(response, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json")
@@ -277,7 +485,7 @@ func writeServiceError(response http.ResponseWriter, err error) {
 	message := err.Error()
 	switch {
 	case strings.Contains(message, "does not exist"):
-		writeError(response, http.StatusNotFound, "not_found", "conversation does not exist")
+		writeError(response, http.StatusNotFound, "not_found", "resource does not exist")
 	case isSafeClientError(message):
 		writeError(response, http.StatusBadRequest, "invalid_request", message)
 	default:
@@ -295,6 +503,13 @@ func isSafeClientError(message string) bool {
 		"already bound",
 		"already has an active value",
 		"key must use",
+		"requires confirmation",
+		"already confirmed",
+		"already linked",
+		"must be active",
+		"must be different",
+		"duplicate item",
+		"is unsupported",
 	} {
 		if strings.Contains(message, fragment) {
 			return true

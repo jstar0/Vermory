@@ -178,25 +178,25 @@ git commit -m "feat: add reversible workspace anchor bridges"
 - Modify: `cmd/vermory/main.go`
 - Create: `docs/integrations/durable-bridges-runtime.md`
 
-- [ ] **Step 1: Write failing HTTP/CLI tests**
+- [x] **Step 1: Write failing HTTP/CLI tests**
 
 Cover all five actions, inspect, reverse, unknown-field rejection, server-owned tenant, durable replay after recreation, and safe errors.
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/webchat ./internal/operatorcli ./cmd/vermory -run 'Test.*Bridge'
 ```
 
-- [ ] **Step 3: Implement endpoints and commands**
+- [x] **Step 3: Implement endpoints and commands**
 
 HTTP and CLI must call the same `BridgeService`. No normal workspace MCP authority tools are added.
 
-- [ ] **Step 4: Document semantics and limits**
+- [x] **Step 4: Document semantics and limits**
 
 Document snapshot promotion, linked governed-memory versus local raw history, export revocation limits, and exact adopt/rebind reversal.
 
-- [ ] **Step 5: Run package tests and commit**
+- [x] **Step 5: Run package tests and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/webchat ./internal/operatorcli ./cmd/vermory

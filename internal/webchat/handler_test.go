@@ -141,6 +141,142 @@ func TestGlobalDefaultsEndpointsUseServerOwnedTenantAndDurableState(t *testing.T
 	}
 }
 
+func TestBridgeEndpointsExposeDurableServerOwnedGovernance(t *testing.T) {
+	handler, store := testHandler(t, provider.Mock{Output: "unused"})
+	ctx := context.Background()
+	conversationA, memoryA := seedBridgeConversationMemory(t, store, "bridge-http-a", runtime.ConversationAnchor{Channel: "web_chat", ThreadID: "release-a"}, "Use checkout_eta_v2 for the staged checkout release.")
+	conversationB, _ := seedBridgeConversationMemory(t, store, "bridge-http-b", runtime.ConversationAnchor{Channel: "openclaw_dm", ThreadID: "release-b"}, "Run the checkout smoke suite before rollout.")
+	workspaceID, err := store.ConfirmWorkspaceBinding(ctx, "local", "/fixtures/http-bridge-workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	governance := runtime.NewGovernanceService(store, "local")
+	workspaceMemory, err := governance.AddSource(ctx, "/fixtures/http-bridge-workspace", runtime.GovernanceWriteRequest{
+		OperationID: "http-bridge-workspace-source",
+		Content:     "Run the checkout smoke suite before rollout.",
+		SourceRef:   "fixture:http:bridge",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	promote := performJSON(t, handler, http.MethodPost, "/v1/bridges/promote", `{
+  "operation_id":"http-bridge-promote",
+  "source_channel":"web_chat",
+  "source_thread_id":"release-a",
+  "target_repo_root":"/fixtures/http-bridge-workspace",
+  "memory_ids":["`+memoryA+`"]
+}`)
+	if promote.Code != http.StatusOK {
+		t.Fatalf("promote returned %d: %s", promote.Code, promote.Body.String())
+	}
+	var promoted runtime.BridgeReceipt
+	decodeResponse(t, promote, &promoted)
+	if promoted.Action != runtime.BridgeActionPromote || promoted.SourceContinuityID != conversationA || promoted.TargetContinuityID != workspaceID {
+		t.Fatalf("unexpected promote receipt: %#v", promoted)
+	}
+
+	forbidden := performJSON(t, handler, http.MethodPost, "/v1/bridges/promote", `{
+  "operation_id":"http-bridge-forbidden",
+  "source_channel":"web_chat",
+  "source_thread_id":"release-a",
+  "target_repo_root":"/fixtures/http-bridge-workspace",
+  "memory_ids":["`+memoryA+`"],
+  "tenant_id":"attacker"
+}`)
+	if forbidden.Code != http.StatusBadRequest {
+		t.Fatalf("request-owned tenant was accepted: %d %s", forbidden.Code, forbidden.Body.String())
+	}
+
+	link := performJSON(t, handler, http.MethodPost, "/v1/bridges/link", `{
+  "operation_id":"http-bridge-link",
+  "primary_channel":"web_chat",
+  "primary_thread_id":"release-a",
+  "linked_channel":"openclaw_dm",
+  "linked_thread_id":"release-b"
+}`)
+	if link.Code != http.StatusOK {
+		t.Fatalf("link returned %d: %s", link.Code, link.Body.String())
+	}
+	var linked runtime.BridgeReceipt
+	decodeResponse(t, link, &linked)
+	if linked.Action != runtime.BridgeActionLink || linked.TargetContinuityID != conversationB {
+		t.Fatalf("unexpected link receipt: %#v", linked)
+	}
+
+	exportedResponse := performJSON(t, handler, http.MethodPost, "/v1/bridges/export", `{
+  "operation_id":"http-bridge-export",
+  "repo_root":"/fixtures/http-bridge-workspace",
+  "memory_ids":["`+workspaceMemory.Memory.MemoryID+`"],
+  "title":"Release handoff",
+  "target_profile":"team_handoff"
+}`)
+	if exportedResponse.Code != http.StatusOK {
+		t.Fatalf("export returned %d: %s", exportedResponse.Code, exportedResponse.Body.String())
+	}
+	var exported runtime.BridgeReceipt
+	decodeResponse(t, exportedResponse, &exported)
+	if exported.Action != runtime.BridgeActionExport || !strings.Contains(exported.ExportBody, "smoke suite") {
+		t.Fatalf("unexpected export receipt: %#v", exported)
+	}
+
+	_, err = store.ConfirmWorkspaceBinding(ctx, "local", "/fixtures/http-adopt-original")
+	if err != nil {
+		t.Fatal(err)
+	}
+	adoptResponse := performJSON(t, handler, http.MethodPost, "/v1/bridges/adopt", `{
+  "operation_id":"http-bridge-adopt",
+  "existing_repo_root":"/fixtures/http-adopt-original",
+  "new_repo_root":"/fixtures/http-adopt-alias"
+}`)
+	if adoptResponse.Code != http.StatusOK {
+		t.Fatalf("adopt returned %d: %s", adoptResponse.Code, adoptResponse.Body.String())
+	}
+
+	_, err = store.ConfirmWorkspaceBinding(ctx, "local", "/fixtures/http-rebind-old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rebindResponse := performJSON(t, handler, http.MethodPost, "/v1/bridges/rebind", `{
+  "operation_id":"http-bridge-rebind",
+  "old_repo_root":"/fixtures/http-rebind-old",
+  "new_repo_root":"/fixtures/http-rebind-new"
+}`)
+	if rebindResponse.Code != http.StatusOK {
+		t.Fatalf("rebind returned %d: %s", rebindResponse.Code, rebindResponse.Body.String())
+	}
+
+	restarted := NewHandlerWithGovernance(
+		runtime.NewConversationService(store, "local", provider.Mock{Output: "unused"}, "test-model", runtime.ConversationServiceConfig{}),
+		runtime.NewGlobalDefaultsService(store, "local"),
+		runtime.NewBridgeService(store, "local"),
+	)
+	inspectRequest := httptest.NewRequest(http.MethodGet, "/v1/bridges/"+promoted.ID, nil)
+	inspectResponse := httptest.NewRecorder()
+	restarted.ServeHTTP(inspectResponse, inspectRequest)
+	if inspectResponse.Code != http.StatusOK {
+		t.Fatalf("inspect returned %d: %s", inspectResponse.Code, inspectResponse.Body.String())
+	}
+	var inspected runtime.BridgeReceipt
+	decodeResponse(t, inspectResponse, &inspected)
+	if inspected.ID != promoted.ID || len(inspected.Events) != 1 {
+		t.Fatalf("restarted handler lost bridge state: %#v", inspected)
+	}
+
+	reverse := performJSON(t, restarted, http.MethodPost, "/v1/bridges/reverse", `{
+  "operation_id":"http-bridge-promote-reverse",
+  "bridge_id":"`+promoted.ID+`"
+}`)
+	if reverse.Code != http.StatusOK {
+		t.Fatalf("reverse returned %d: %s", reverse.Code, reverse.Body.String())
+	}
+	var reversed runtime.BridgeReceipt
+	decodeResponse(t, reverse, &reversed)
+	if reversed.Status != runtime.BridgeStatusReversed || len(reversed.Events) != 2 {
+		t.Fatalf("unexpected reverse receipt: %#v", reversed)
+	}
+}
+
 func TestMemoryGovernanceAndInspectionUseExactConversation(t *testing.T) {
 	handler, _ := testHandler(t, provider.Mock{Output: "fact for matter A"})
 	turnResponse := performJSON(t, handler, http.MethodPost, "/v1/chat/turn", `{
@@ -238,7 +374,31 @@ func testHandler(t *testing.T, llm provider.Provider) (http.Handler, *runtime.St
 	}
 	service := runtime.NewConversationService(store, "local", llm, "test-model", runtime.ConversationServiceConfig{})
 	defaults := runtime.NewGlobalDefaultsService(store, "local")
-	return NewHandler(service, defaults), store
+	bridges := runtime.NewBridgeService(store, "local")
+	return NewHandlerWithGovernance(service, defaults, bridges), store
+}
+
+func seedBridgeConversationMemory(t *testing.T, store *runtime.Store, operationPrefix string, anchor runtime.ConversationAnchor, content string) (string, string) {
+	t.Helper()
+	ctx := context.Background()
+	resolution, err := store.ResolveOrCreateConversation(ctx, "local", anchor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observation, err := store.CommitObservation(ctx, "local", resolution.ContinuityID, runtime.CommitObservationRequest{
+		OperationID: operationPrefix + ":message",
+		Kind:        runtime.ObservationKindUserMessage,
+		Content:     content,
+		SourceRef:   "fixture:http:conversation",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	memory, err := store.ConfirmConversationObservation(ctx, "local", resolution.ContinuityID, observation.ObservationID, operationPrefix+":confirm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resolution.ContinuityID, memory.MemoryID
 }
 
 func performJSON(t *testing.T, handler http.Handler, method, path, body string) *httptest.ResponseRecorder {
