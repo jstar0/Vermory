@@ -1,0 +1,129 @@
+# Local Operator Workspace Governance
+
+This guide runs the local trusted-governance path for a workspace continuity.
+It is deliberately separate from MCP normal flow: an AI client can retrieve
+governed context and write a proposed result, but it cannot confirm a
+workspace, promote its own result, replace a fact, or delete a fact.
+
+Use a dedicated disposable PostgreSQL database and synthetic facts. Do not put
+real source text, credentials, personal paths, or chat history in this guide,
+its command history, or Git artifacts.
+
+## Build
+
+From the repository root:
+
+```bash
+go build -o ./bin/vermory ./cmd/vermory
+```
+
+The operator commands write one JSON receipt to stdout. Errors and diagnostics
+are written to stderr.
+
+## Confirm And Inspect
+
+Confirming a root is explicit. Repeating confirmation for the same normalized
+root returns its existing continuity instead of creating another one.
+
+```bash
+./bin/vermory workspace inspect \
+  --database-url 'postgresql:///vermory_w03?host=/tmp' \
+  --tenant-id local-w03 \
+  --repo-root /fixtures/vermory-w03
+
+./bin/vermory workspace confirm \
+  --database-url 'postgresql:///vermory_w03?host=/tmp' \
+  --tenant-id local-w03 \
+  --repo-root /fixtures/vermory-w03
+```
+
+The first command returns `{"status":"needs_confirmation",...}` and does
+not create a continuity. The second returns `{"status":"resolved",...}`
+with a `continuity_id`.
+
+Confirmation only binds this exact root. A rename, worktree, mirror, or new
+path is not inferred to be the same workspace; explicit rebind is a separate
+bridge capability and is not part of this slice.
+
+## Record, Correct, And Forget
+
+Every mutation requires an operator-selected `operation_id`. Reusing the same
+ID for a retry is idempotent. Keep the `memory_id` from each JSON receipt: it
+is the only accepted target for correction or deletion.
+
+```bash
+./bin/vermory memory add-source \
+  --database-url 'postgresql:///vermory_w03?host=/tmp' \
+  --tenant-id local-w03 \
+  --repo-root /fixtures/vermory-w03 \
+  --operation-id w03-source-v1 \
+  --source-ref fixture:W03:release-notes-v1 \
+  --content 'Use checkout_eta_v1 for the staged checkout release.'
+
+./bin/vermory memory inspect \
+  --database-url 'postgresql:///vermory_w03?host=/tmp' \
+  --tenant-id local-w03 \
+  --repo-root /fixtures/vermory-w03
+```
+
+Copy the active v1 `memory_id` from the inspect response into the correction:
+
+```bash
+./bin/vermory memory correct \
+  --database-url 'postgresql:///vermory_w03?host=/tmp' \
+  --tenant-id local-w03 \
+  --repo-root /fixtures/vermory-w03 \
+  --operation-id w03-correct-v2 \
+  --memory-id '<v1-memory-id>' \
+  --content 'Use checkout_eta_v2 for the staged checkout release.'
+```
+
+The correction atomically supersedes only the named active fact. It does not
+use content similarity to choose a target. Copy the returned v2 `memory_id`
+into the forget operation:
+
+```bash
+./bin/vermory memory forget \
+  --database-url 'postgresql:///vermory_w03?host=/tmp' \
+  --tenant-id local-w03 \
+  --repo-root /fixtures/vermory-w03 \
+  --operation-id w03-forget-v2 \
+  --memory-id '<v2-memory-id>'
+```
+
+`memory forget` intentionally accepts no free-text reason or content flag.
+Its bounded observation is `Operator requested deletion.` so a deletion
+request cannot repeat a sensitive fact in a new audit observation. The target
+memory, its origin observation, and its lexical projection are redacted or
+removed by the same authority transaction.
+
+## Connect A Local Client
+
+MCP remains a two-tool normal-flow server. For a temporary Grok CLI replay,
+register a user-local server against this dedicated database:
+
+```bash
+grok mcp add vermory-w03 -- "$(pwd)/bin/vermory" mcp-stdio \
+  --database-url 'postgresql:///vermory_w03?host=/tmp' \
+  --tenant-id local-w03
+
+grok mcp doctor vermory-w03 --json
+```
+
+A qualifying real-client replay must use the exact confirmed root, call
+`prepare_context`, complete a narrow repository task, preserve its artifact
+and verification output, then call `commit_observation` with the delivery
+receipt. Its write-back must remain `proposed`. Preserve a redacted delivery
+and observation ledger under ignored `artifacts/runtime/W03/`.
+
+The Go tests in this repository prove the command and lifecycle contract, not
+that a model invoked the MCP tools. A Codex replay remains unavailable when
+the official Codex account is out of quota; do not replace that unavailable
+evidence with a scripted pass or a Grok result.
+
+After a temporary replay, remove the user-local server if it is no longer
+needed:
+
+```bash
+grok mcp remove vermory-w03
+```

@@ -32,7 +32,7 @@
 - Consumes: `Store.ConfirmWorkspaceBinding`, `Store.ResolveWorkspace`, `Store.CommitGovernedObservation`, `Store.RebuildProjection`, and the `governed_memories` lifecycle tables.
 - Produces: `NewGovernanceService`, scoped inspect/list operations, and three explicit trusted mutations for the CLI package.
 
-- [ ] **Step 1: Write failing governance tests**
+- [x] **Step 1: Write failing governance tests**
 
 Create `internal/runtime/governance_test.go` with the following tests. Reuse the existing package-private `openTestStore`, `mustSearch`, and `requireNoError` helpers from runtime tests.
 
@@ -131,7 +131,7 @@ func TestGovernanceRejectsCrossWorkspaceCorrectionAndReplaysSource(t *testing.T)
 }
 ```
 
-- [ ] **Step 2: Run the focused runtime tests to verify RED**
+- [x] **Step 2: Run the focused runtime tests to verify RED**
 
 Run:
 
@@ -141,7 +141,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -count=
 
 Expected: compile failure because `GovernanceService`, `GovernanceWriteRequest`, and its methods do not exist.
 
-- [ ] **Step 3: Add the smallest scoped facade and list query**
+- [x] **Step 3: Add the smallest scoped facade and list query**
 
 In `internal/runtime/postgres_store.go`, add the list type and query; it must filter by both tenant and continuity before returning any content:
 
@@ -286,7 +286,7 @@ func (s *GovernanceService) configured() error {
 }
 ```
 
-- [ ] **Step 4: Run the focused runtime tests to verify GREEN**
+- [x] **Step 4: Run the focused runtime tests to verify GREEN**
 
 Run:
 
@@ -296,7 +296,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -count=
 
 Expected: PASS. The new test proves source activation, explicitly targeted correction, deletion after rebuild, idempotency, and cross-workspace rejection; existing tests prove context and lifecycle behavior remains intact.
 
-- [ ] **Step 5: Commit the runtime facade**
+- [x] **Step 5: Commit the runtime facade**
 
 ```bash
 git add internal/runtime/governance.go internal/runtime/governance_test.go internal/runtime/postgres_store.go
@@ -315,7 +315,7 @@ git commit -m "feat: add trusted workspace governance runtime"
 - Consumes: `runtime.OpenStore`, `Store.Migrate`, `NewGovernanceService`, `WorkspaceResolution`, `GovernedMemory`, and `GovernedObservationReceipt` from Task 1.
 - Produces: `vermory workspace confirm|inspect` and `vermory memory inspect|add-source|correct|forget` with JSON stdout receipts.
 
-- [ ] **Step 1: Write failing command tests**
+- [x] **Step 1: Write failing command tests**
 
 Create `internal/operatorcli/command_test.go`. The helper opens and resets `VERMORY_TEST_DATABASE_URL` with exported runtime methods, then runs a fresh Cobra root for every invocation so flag state cannot leak between commands.
 
@@ -517,7 +517,7 @@ func TestOperatorMemoryForgetHasNoFreeTextFlag(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the command tests to verify RED**
+- [x] **Step 2: Run the command tests to verify RED**
 
 Run:
 
@@ -527,7 +527,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -count=
 
 Expected: package or command-registration failure because `internal/operatorcli` and the root commands do not exist.
 
-- [ ] **Step 3: Implement the focused command package**
+- [x] **Step 3: Implement the focused command package**
 
 Create `internal/operatorcli/command.go`. Use JSON to keep receipts parseable even when a fact contains whitespace or a newline:
 
@@ -741,7 +741,7 @@ rootCmd.AddCommand(operatorcli.NewWorkspaceCommand())
 rootCmd.AddCommand(operatorcli.NewMemoryCommand())
 ```
 
-- [ ] **Step 4: Run the command, runtime, and MCP tests to verify GREEN**
+- [x] **Step 4: Run the command, runtime, and MCP tests to verify GREEN**
 
 Run:
 
@@ -752,7 +752,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -c
 Expected: PASS. The command test proves the full source/correct/forget flow;
 the MCP package still proves that only two unprivileged tools are advertised.
 
-- [ ] **Step 5: Commit the CLI surface**
+- [x] **Step 5: Commit the CLI surface**
 
 ```bash
 git add internal/operatorcli/command.go internal/operatorcli/command_test.go cmd/vermory/main.go cmd/vermory/main_test.go
@@ -769,7 +769,7 @@ git commit -m "feat: add local workspace governance cli"
 - Consumes: the command names and JSON receipt fields implemented in Task 2 and the existing `vermory mcp-stdio` transport.
 - Produces: an exact local replay guide that distinguishes scripted contract evidence from a real client run.
 
-- [ ] **Step 1: Add the replay guide and concise README entry**
+- [x] **Step 1: Add the replay guide and concise README entry**
 
 Create `docs/integrations/local-operator-workspace-slice.md` with this
 replay, substituting a dedicated disposable local database and a
@@ -815,7 +815,7 @@ Add one short Chinese README section that links to this guide and explains
 that operator commands are local, explicit governance controls rather than
 ordinary AI tools.
 
-- [ ] **Step 2: Run the full verification suite and a local command replay**
+- [x] **Step 2: Run the full verification suite and a local command replay**
 
 Run:
 
@@ -835,7 +835,7 @@ commit generated database state, tool transcripts, user paths, or credentials.
 Expected: all commands succeed, test suites pass, `memory forget` exposes no
 free-text flag, and a freshly rebuilt projection contains no deleted W03 fact.
 
-- [ ] **Step 3: Commit documentation and evidence-safe replay assets**
+- [x] **Step 3: Commit documentation and evidence-safe replay assets**
 
 ```bash
 git add docs/integrations/local-operator-workspace-slice.md README.zh-CN.md cmd/vermory/main_test.go

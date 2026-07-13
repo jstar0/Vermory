@@ -95,6 +95,10 @@ go run ./cmd/vermory experiment-0 \
   --run-id experiment-0-v1
 ```
 
+## 本地工作区治理
+
+普通 AI 客户端只通过 MCP 获取已确认工作区的有效上下文，并把任务结果写回为待确认观察。工作区确认、来源事实记录、指定事实纠正和指定事实遗忘由本机操作者显式执行，不作为模型工具开放。完整命令、JSON 回执和 Grok 本地重放边界见[本地工作区治理指南](docs/integrations/local-operator-workspace-slice.md)。
+
 ## 开发原则
 
 后续能力按照以下顺序推进：
