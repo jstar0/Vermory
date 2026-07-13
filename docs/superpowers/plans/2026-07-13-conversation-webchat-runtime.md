@@ -23,7 +23,8 @@
 
 ## File Structure
 
-- `internal/store/postgres/migrations/00004_conversation_runtime.sql`: conversation constraints, bindings, observation kinds, and durable chat-turn receipts.
+- `internal/store/postgres/migrations/00004_conversation_continuity.sql`: conversation constraints, bindings, and observation kinds.
+- `internal/store/postgres/migrations/00005_conversation_turns.sql`: durable chat-turn receipts.
 - `internal/runtime/conversation_types.go`: validated conversation anchors, chat requests/receipts, inspection and governance request types.
 - `internal/runtime/conversation_store.go`: conversation binding, recent observation, turn idempotency, completion/failure, and confirmation persistence.
 - `internal/runtime/conversation_service.go`: provider-independent chat orchestration, context assembly, inspection, confirm, correct, and forget.
@@ -41,7 +42,7 @@
 ### Task 1: Conversation Authority Schema And Exact Binding
 
 **Files:**
-- Create: `internal/store/postgres/migrations/00004_conversation_runtime.sql`
+- Create: `internal/store/postgres/migrations/00004_conversation_continuity.sql`
 - Create: `internal/runtime/conversation_types.go`
 - Create: `internal/runtime/conversation_store.go`
 - Create: `internal/runtime/conversation_store_test.go`
@@ -51,7 +52,7 @@
 - Produces: `ConversationAnchor.Normalized()`, `Store.ResolveOrCreateConversation(ctx, tenantID, anchor)`, `Store.ListRecentConversationObservations(ctx, tenantID, continuityID, beforeObservationID, limit)`.
 - Produces: `ConversationResolution`, `ConversationObservation`, and conversation-aware continuity validation shared by later tasks.
 
-- [ ] **Step 1: Write failing exact-binding and history tests**
+- [x] **Step 1: Write failing exact-binding and history tests**
 
 Add tests that require persistence and isolation:
 
@@ -78,7 +79,7 @@ func TestConversationAnchorRejectsMissingThread(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -88,7 +89,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./inter
 
 Expected: compile failure because the conversation types and store methods do not exist.
 
-- [ ] **Step 3: Add the migration and minimal store implementation**
+- [x] **Step 3: Add the migration and minimal store implementation**
 
 The migration must:
 
@@ -114,11 +115,11 @@ CREATE UNIQUE INDEX conversation_bindings_confirmed_anchor_idx
 
 Extend the observation-kind check with `user_message`, `assistant_message`, and `user_confirmation`. Update `ResetForTest` so the new relations are truncated. Add a shared store check that accepts either an active workspace or active conversation continuity instead of the current workspace-only SQL.
 
-- [ ] **Step 4: Add operation replay fingerprint validation**
+- [x] **Step 4: Add operation replay fingerprint validation**
 
 When an observation operation already exists, compare continuity, kind, content, and source reference. Return `Replayed: true` only for the identical logical request; reject changed content, kind, source, or continuity.
 
-- [ ] **Step 5: Run runtime tests and verify GREEN**
+- [x] **Step 5: Run runtime tests and verify GREEN**
 
 Run:
 
@@ -128,10 +129,10 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./inter
 
 Expected: PASS, including all existing workspace tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
-git add internal/store/postgres/migrations/00004_conversation_runtime.sql internal/runtime/conversation_types.go internal/runtime/conversation_store.go internal/runtime/conversation_store_test.go internal/runtime/postgres_store.go
+git add internal/store/postgres/migrations/00004_conversation_continuity.sql internal/runtime/conversation_types.go internal/runtime/conversation_store.go internal/runtime/conversation_store_test.go internal/runtime/postgres_store.go
 git commit -m "feat: add conversation authority storage"
 ```
 
@@ -140,7 +141,7 @@ git commit -m "feat: add conversation authority storage"
 ### Task 2: Durable Chat Turns And Two-Layer Context
 
 **Files:**
-- Modify: `internal/store/postgres/migrations/00004_conversation_runtime.sql`
+- Create: `internal/store/postgres/migrations/00005_conversation_turns.sql`
 - Modify: `internal/runtime/conversation_types.go`
 - Modify: `internal/runtime/conversation_store.go`
 - Create: `internal/runtime/conversation_service.go`
@@ -188,7 +189,7 @@ Expected: compile failure because `ConversationService` and chat-turn persistenc
 
 - [ ] **Step 3: Add durable `conversation_turns` receipts**
 
-Create a relation with:
+Create `00005_conversation_turns.sql` with:
 
 ```sql
 CREATE TABLE conversation_turns (
@@ -243,7 +244,7 @@ Expected: PASS with exactly one provider call for an idempotent replay.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add internal/store/postgres/migrations/00004_conversation_runtime.sql internal/runtime/conversation_types.go internal/runtime/conversation_store.go internal/runtime/conversation_service.go internal/runtime/conversation_service_test.go
+git add internal/store/postgres/migrations/00005_conversation_turns.sql internal/runtime/conversation_types.go internal/runtime/conversation_store.go internal/runtime/conversation_service.go internal/runtime/conversation_service_test.go
 git commit -m "feat: add persistent conversation turns"
 ```
 

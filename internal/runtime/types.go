@@ -14,10 +14,13 @@ const (
 type ObservationKind string
 
 const (
-	ObservationKindAgentResult    ObservationKind = "agent_result"
-	ObservationKindUserCorrection ObservationKind = "user_correction"
-	ObservationKindSourceUpdate   ObservationKind = "source_update"
-	ObservationKindForgetRequest  ObservationKind = "forget_request"
+	ObservationKindAgentResult      ObservationKind = "agent_result"
+	ObservationKindUserCorrection   ObservationKind = "user_correction"
+	ObservationKindSourceUpdate     ObservationKind = "source_update"
+	ObservationKindForgetRequest    ObservationKind = "forget_request"
+	ObservationKindUserMessage      ObservationKind = "user_message"
+	ObservationKindAssistantMessage ObservationKind = "assistant_message"
+	ObservationKindUserConfirmation ObservationKind = "user_confirmation"
 )
 
 type WorkspaceAnchor struct {
@@ -117,7 +120,13 @@ func (r *CommitObservationRequest) Validate() error {
 
 func (k ObservationKind) Valid() bool {
 	switch k {
-	case ObservationKindAgentResult, ObservationKindUserCorrection, ObservationKindSourceUpdate, ObservationKindForgetRequest:
+	case ObservationKindAgentResult,
+		ObservationKindUserCorrection,
+		ObservationKindSourceUpdate,
+		ObservationKindForgetRequest,
+		ObservationKindUserMessage,
+		ObservationKindAssistantMessage,
+		ObservationKindUserConfirmation:
 		return true
 	default:
 		return false

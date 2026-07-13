@@ -97,7 +97,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 func (s *Store) ResetForTest(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 TRUNCATE memory_search_documents, memory_deliveries, governed_memories,
-  observations, continuity_bindings, continuity_spaces CASCADE`)
+  observations, conversation_bindings, continuity_bindings, continuity_spaces CASCADE`)
 	if err != nil {
 		return fmt.Errorf("reset runtime store: %w", err)
 	}
@@ -239,7 +239,8 @@ func commitObservationTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID 
 	if err := tx.QueryRow(ctx, `
 SELECT EXISTS (
   SELECT 1 FROM continuity_spaces
-  WHERE id = $1::uuid AND tenant_id = $2 AND continuity_line = 'workspace' AND state = 'active'
+  WHERE id = $1::uuid AND tenant_id = $2
+    AND continuity_line IN ('workspace', 'conversation') AND state = 'active'
 )`, continuityID, tenantID).Scan(&validContinuity); err != nil {
 		return ObservationReceipt{}, fmt.Errorf("check observation continuity: %w", err)
 	}
@@ -247,13 +248,23 @@ SELECT EXISTS (
 		return ObservationReceipt{}, fmt.Errorf("continuity is not active for this tenant")
 	}
 
-	var existingID, existingContinuityID string
+	var existingID, existingContinuityID, existingKind, existingContent, existingSourceRef string
 	err := tx.QueryRow(ctx, `
-SELECT id::text, continuity_id::text FROM observations
-WHERE tenant_id = $1 AND operation_id = $2`, tenantID, request.OperationID).Scan(&existingID, &existingContinuityID)
+SELECT id::text, continuity_id::text, observation_kind, content, source_ref
+FROM observations
+WHERE tenant_id = $1 AND operation_id = $2`, tenantID, request.OperationID).Scan(
+		&existingID,
+		&existingContinuityID,
+		&existingKind,
+		&existingContent,
+		&existingSourceRef,
+	)
 	if err == nil {
-		if existingContinuityID != continuityID {
-			return ObservationReceipt{}, fmt.Errorf("operation_id is already bound to another continuity")
+		if existingContinuityID != continuityID ||
+			existingKind != string(request.Kind) ||
+			existingContent != request.Content ||
+			existingSourceRef != request.SourceRef {
+			return ObservationReceipt{}, fmt.Errorf("operation_id is already bound to another logical observation")
 		}
 		return ObservationReceipt{ObservationID: existingID, Replayed: true}, nil
 	}
