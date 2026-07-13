@@ -335,7 +335,7 @@ git commit -m "feat: govern conversation memory"
 - Consumes: `runtime.ConversationService` public methods.
 - Produces: `webchat.NewHandler(service)` implementing `http.Handler`.
 
-- [ ] **Step 1: Write failing HTTP contract tests**
+- [x] **Step 1: Write failing HTTP contract tests**
 
 Use `httptest.NewServer` and verify:
 
@@ -347,7 +347,7 @@ Use `httptest.NewServer` and verify:
 - inspect returns only the requested continuity;
 - errors never include database URL or provider raw output.
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./internal/webchat -count=1
@@ -355,7 +355,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./inter
 
 Expected: package or symbol missing.
 
-- [ ] **Step 3: Implement the minimal handler**
+- [x] **Step 3: Implement the minimal handler**
 
 Register only:
 
@@ -369,7 +369,7 @@ mux.HandleFunc("GET /v1/conversations/inspect", h.inspectConversation)
 
 Use `http.MaxBytesReader`, `json.Decoder.DisallowUnknownFields`, one JSON value per body, `Content-Type: application/json`, and stable error codes. Do not expose internal error strings for `500` responses.
 
-- [ ] **Step 4: Run tests and verify GREEN**
+- [x] **Step 4: Run tests and verify GREEN**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./internal/webchat -count=1
@@ -377,7 +377,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./inter
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/webchat/handler.go internal/webchat/handler_test.go
