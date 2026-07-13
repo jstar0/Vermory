@@ -38,25 +38,25 @@
 - Create: `internal/runtime/bridge_store_test.go`
 - Modify: `internal/runtime/postgres_store.go`
 
-- [ ] **Step 1: Freeze B01/B02 and verify fixture hashes**
+- [x] **Step 1: Freeze B01/B02 and verify fixture hashes**
 
 Use the repository reality-case schema. B01 must distinguish selected confirmed memory from unconfirmed/noise. B02 must contain linked, unrelated, pre-link, post-link, reversed-link, rebind, and reversed-rebind expectations.
 
-- [ ] **Step 2: Write failing ledger tests**
+- [x] **Step 2: Write failing ledger tests**
 
 Test action/status constraints, operation replay fingerprint checks, append-only events, tenant scoping, and reversal replay semantics.
 
-- [ ] **Step 3: Run focused tests and verify RED**
+- [x] **Step 3: Run focused tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime -run 'TestBridgeLedger'
 ```
 
-- [ ] **Step 4: Implement migration and minimal ledger helpers**
+- [x] **Step 4: Implement migration and minimal ledger helpers**
 
 Create `bridge_operations`, `bridge_events`, `bridge_memory_effects`, and `conversation_links`. Extend `ResetForTest` in dependency-safe order.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime -run 'TestBridgeLedger'
