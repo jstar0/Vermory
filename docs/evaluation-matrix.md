@@ -4,7 +4,7 @@
 
 ## Purpose
 
-This document records the model-by-task evaluation matrix for ContextMesh direct providers. Unlike one-off smoke runs, the matrix is meant to exercise multiple real self-case tasks across multiple models under the same four-baseline loop.
+This document records the model and client consumption matrix for the legacy direct-provider harness. Unlike one-off smoke runs, it exercises the same packet contract across multiple compatible model targets and client harnesses.
 
 ## Self-Case Task Set
 
@@ -194,9 +194,9 @@ Task coverage:
 
 Observed pattern:
 
-- `gemini-3-flash` is the best current overall default on the tested self-case set.
-- `gemini-3.1-pro` is strong on evidence wording, but it still produced forbidden phrases like `invented teams` / `fake timelines` on the real-case-policy task.
-- `glm-5` is usable and stable, but weaker than the Gemini pair on the current wording-sensitive tasks.
+- The three models respond differently to the same packet and task, so they remain useful compatibility-test objects.
+- `gemini-3.1-pro` produced forbidden phrases like `invented teams` / `fake timelines` on the real-case-policy task; the evidence is retained rather than replaced by a cleaner run.
+- The task-level scores identify packet, runner, assertion, or consumer behavior that needs investigation. They do not choose a product-wide default model.
 
 Notable task-level results from `contextmesh_packet` baseline:
 
@@ -230,8 +230,8 @@ Task coverage:
 Observed pattern:
 
 - Both models are fully integrated into the current matrix workflow and can be treated as covered SiliconFlow domestic-model test objects.
-- `Qwen/Qwen3-30B-A3B-Instruct-2507` is materially stronger than `Qwen/Qwen3-Coder-30B-A3B-Instruct` on the tested self-case wording tasks.
-- `Qwen/Qwen3-Coder-30B-A3B-Instruct` is still a valid test target, but its packet-baseline performance is inconsistent on architecture and domestic-scope tasks.
+- Their differing outputs expose where a packet, task wording, or assertion contract needs further scrutiny.
+- Both remain valid test targets regardless of isolated-task scores.
 
 Important scope note:
 
@@ -241,8 +241,16 @@ Important scope note:
 
 The matrix is intended to answer:
 
-- which models are stable across several real ContextMesh tasks
-- whether the same model degrades on stale-context correction, domestic scope retention, architecture wording, evidence wording, or real-case policy wording
-- whether a model should be Tier A, Tier B, or excluded from default use
+- whether a model or client can consume the same governed packet and preserve required current facts
+- whether the same integration degrades on stale-context correction, scope retention, architecture wording, evidence wording, or real-case policy wording
+- which failure belongs to the packet, runner, assertion contract, or consuming client
 
 The matrix does not by itself prove browser, CLI, or MCP tool integration quality.
+
+## Grok CLI Casebook Evidence
+
+- Provider mode: `grok-cli`, using the locally authenticated `grok` executable with model `grok-4.5`.
+- Every request starts as an isolated single turn with cross-session memory, web search, plan mode, and subagents disabled. The harness stores the returned CLI JSON as `raw.json`.
+- Workspace run `vermory-grok-workspace-v2` executed the first task of `101-workspace-parallel-repos`. Its no-context baseline scored `0.33`; both the ordinary summary and legacy packet baseline scored `1.00` for declared facts and isolation assertions. The corresponding acceptance artifact `vermory-grok-workspace-acceptance-v2` passed.
+- Conversation run `vermory-grok-conversation-v4` executed the first chat-contract task of `201-conversation-housing-search` at `1.00`; it retained the active Seattle, budget, pet, one-bedroom, Fremont, and commute facts without workspace framing. The corresponding acceptance artifact `vermory-grok-conversation-acceptance-v2` passed.
+- These runs are consumer-compatibility evidence, not a model ranking or proof that Grok completed a real coding-agent task. The harness deliberately disables tools and browser/search behavior.

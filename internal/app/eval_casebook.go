@@ -344,6 +344,7 @@ func toEvalTask(task casebook.Task) eval.Task {
 		ID:             task.ID,
 		Prompt:         task.Prompt,
 		MustInclude:    append([]string(nil), task.MustInclude...),
+		MustIncludeAny: append([][]string(nil), task.MustIncludeAny...),
 		MustNotInclude: append([]string(nil), task.MustNotInclude...),
 	}
 }
@@ -367,7 +368,7 @@ func casebookPlainSummary(claims []domain.Claim, source string) string {
 
 func conversationHistory(loadedCase casebook.Case) []string {
 	lines := []string{
-		"User: Please keep the answer grounded in ContextMesh repository facts.",
+		"User: Please keep the answer grounded in the provided continuity facts.",
 		"Assistant: I will only rely on the provided continuity view.",
 	}
 	if snippet := firstNonEmptyLine(loadedCase.SourceMD); snippet != "" {

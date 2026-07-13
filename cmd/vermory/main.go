@@ -96,7 +96,7 @@ func newRootCommand() *cobra.Command {
 	}
 	evalSelfCaseCmd.Flags().StringVar(&databaseURL, "database-url", "", "optional PostgreSQL connection URL for migration preflight")
 	evalSelfCaseCmd.Flags().StringVar(&artifactRoot, "artifact-root", "./artifacts", "artifact output root")
-	evalSelfCaseCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, openai-compatible, siliconflow, or duojie")
+	evalSelfCaseCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, grok-cli, openai-compatible, siliconflow, or duojie")
 	evalSelfCaseCmd.Flags().StringVar(&providerBaseURL, "base-url", "", "direct provider base URL")
 	evalSelfCaseCmd.Flags().StringVar(&providerAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	evalSelfCaseCmd.Flags().StringVar(&providerModel, "model", "", "provider model name")
@@ -133,7 +133,7 @@ func newRootCommand() *cobra.Command {
 		},
 	}
 	probeProviderCmd.Flags().StringVar(&artifactRoot, "artifact-root", "./artifacts", "artifact output root")
-	probeProviderCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, openai-compatible, siliconflow, or duojie")
+	probeProviderCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, grok-cli, openai-compatible, siliconflow, or duojie")
 	probeProviderCmd.Flags().StringVar(&providerBaseURL, "base-url", "", "direct provider base URL")
 	probeProviderCmd.Flags().StringVar(&providerAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	probeProviderCmd.Flags().StringSliceVar(&providerModels, "models", nil, "provider model names to probe")
@@ -167,7 +167,7 @@ func newRootCommand() *cobra.Command {
 		},
 	}
 	evalMatrixCmd.Flags().StringVar(&artifactRoot, "artifact-root", "./artifacts", "artifact output root")
-	evalMatrixCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, openai-compatible, siliconflow, or duojie")
+	evalMatrixCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, grok-cli, openai-compatible, siliconflow, or duojie")
 	evalMatrixCmd.Flags().StringVar(&providerBaseURL, "base-url", "", "direct provider base URL")
 	evalMatrixCmd.Flags().StringVar(&providerAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	evalMatrixCmd.Flags().StringSliceVar(&providerModels, "models", nil, "provider model names to evaluate")
@@ -199,7 +199,7 @@ func newRootCommand() *cobra.Command {
 		},
 	}
 	evalCasebookCmd.Flags().StringVar(&artifactRoot, "artifact-root", "./artifacts", "artifact output root")
-	evalCasebookCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, openai-compatible, siliconflow, or duojie")
+	evalCasebookCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, grok-cli, openai-compatible, siliconflow, or duojie")
 	evalCasebookCmd.Flags().StringVar(&providerBaseURL, "base-url", "", "direct provider base URL")
 	evalCasebookCmd.Flags().StringVar(&providerAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	evalCasebookCmd.Flags().StringVar(&providerModel, "model", "", "provider model name")
@@ -232,7 +232,7 @@ func newRootCommand() *cobra.Command {
 		},
 	}
 	evalCasebookSuiteCmd.Flags().StringVar(&artifactRoot, "artifact-root", "./artifacts", "artifact output root")
-	evalCasebookSuiteCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, openai-compatible, siliconflow, or duojie")
+	evalCasebookSuiteCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, grok-cli, openai-compatible, siliconflow, or duojie")
 	evalCasebookSuiteCmd.Flags().StringVar(&providerBaseURL, "base-url", "", "direct provider base URL")
 	evalCasebookSuiteCmd.Flags().StringVar(&providerAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	evalCasebookSuiteCmd.Flags().StringVar(&providerModel, "model", "", "provider model name")
@@ -279,7 +279,7 @@ func newRootCommand() *cobra.Command {
 		},
 	}
 	acceptanceReportCmd.Flags().StringVar(&artifactRoot, "artifact-root", "./artifacts", "artifact output root")
-	acceptanceReportCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, openai-compatible, siliconflow, or duojie")
+	acceptanceReportCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, grok-cli, openai-compatible, siliconflow, or duojie")
 	acceptanceReportCmd.Flags().StringVar(&providerBaseURL, "base-url", "", "direct provider base URL")
 	acceptanceReportCmd.Flags().StringVar(&providerAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	acceptanceReportCmd.Flags().StringVar(&providerModel, "model", "", "provider model name")
@@ -343,7 +343,7 @@ func newRootCommand() *cobra.Command {
 		},
 	}
 	internalReadyCmd.Flags().StringVar(&artifactRoot, "artifact-root", "./artifacts", "artifact output root")
-	internalReadyCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, openai-compatible, siliconflow, or duojie")
+	internalReadyCmd.Flags().StringVar(&providerName, "provider", "mock", "provider: mock, grok-cli, openai-compatible, siliconflow, or duojie")
 	internalReadyCmd.Flags().StringVar(&providerBaseURL, "base-url", "", "direct provider base URL")
 	internalReadyCmd.Flags().StringVar(&providerAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	internalReadyCmd.Flags().StringVar(&providerModel, "model", "", "provider model name")

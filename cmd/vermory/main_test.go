@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestRealityAttestationCLIExposesVerifyButNoSignCommand(t *testing.T) {
 	verifyFound := false
@@ -24,4 +27,16 @@ func TestExperiment0CLIIsRegistered(t *testing.T) {
 		}
 	}
 	t.Fatal("expected experiment-0 command")
+}
+
+func TestProviderCommandsAdvertiseGrokCLI(t *testing.T) {
+	for _, command := range newRootCommand().Commands() {
+		if command.Name() != "eval-self-case" && command.Name() != "eval-casebook" && command.Name() != "eval-matrix" && command.Name() != "probe-provider" && command.Name() != "acceptance-report" {
+			continue
+		}
+		flag := command.Flags().Lookup("provider")
+		if flag == nil || !strings.Contains(flag.Usage, "grok-cli") {
+			t.Fatalf("command %q must advertise grok-cli provider support", command.Name())
+		}
+	}
 }

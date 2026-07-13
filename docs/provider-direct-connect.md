@@ -10,11 +10,24 @@ This document records the direct provider path retained by the Vermory legacy ev
 
 - Secrets are provided only through environment variables.
 - Provider URLs and model names are runtime flags, not source-controlled configuration.
-- The current implementation uses a direct OpenAI-compatible `/v1/chat/completions` adapter.
+- OpenAI-compatible providers use direct `/v1/chat/completions` calls.
+- The locally authenticated Grok CLI is supported as a separate client harness; it does not route through NewAPI, a Mac mini gateway, or a private control plane.
 
 ## Supported Direct Provider Modes
 
-### 1. SiliconFlow
+### 1. Grok CLI
+
+- Provider flag: `--provider grok-cli`
+- Authentication: current local `grok` CLI login; the adapter does not read an API key or base URL.
+- Default model: `grok-4.5`
+- Each request is a fresh single turn with `--no-memory`, `--disable-web-search`, `--no-plan`, `--no-subagents`, `--max-turns 1`, and JSON output.
+- Verified real casebook runs:
+  - Workspace consumer: `vermory-grok-workspace-v2`
+  - Workspace acceptance: `vermory-grok-workspace-acceptance-v2`
+  - Conversation consumer: `vermory-grok-conversation-v4`
+  - Conversation acceptance: `vermory-grok-conversation-acceptance-v2`
+
+### 2. SiliconFlow
 
 - Provider flag: `--provider siliconflow`
 - Default base URL: `https://api.siliconflow.cn/v1`
@@ -29,7 +42,7 @@ This document records the direct provider path retained by the Vermory legacy ev
   - `Qwen/Qwen3-30B-A3B-Instruct-2507`: clean `OK`
   - `deepseek-ai/DeepSeek-V4-Flash`: timed out in direct probe mode under current client timeout, even though the full self-case run had succeeded earlier
 
-### 2. Duojie
+### 3. Duojie
 
 - Provider flag: `--provider duojie`
 - Default base URL: `https://api.duojie.games/v1`
@@ -50,14 +63,14 @@ The following quick probes were executed through direct `/v1/chat/completions` c
 - `gemini-3-flash`: usable, returns standard assistant `content`, upstream reported model alias `gemini-3-flash-preview`
 - `gemini-3.1-pro`: usable, returns standard assistant `content`
 - `glm-5`: usable, returns `content` plus extra `reasoning_content`, and now passes through the current provider adapter
-- `glm-5-turbo`: not acceptable as a clean tool-facing default; probe returned large reasoning text instead of stable final answer
-- `glm-5.1`: not acceptable as a clean tool-facing default; probe returned polluted output such as `OK</arg_value>`
+- `glm-5-turbo`: probe returned large reasoning text instead of a stable final answer
+- `glm-5.1`: probe returned polluted output such as `OK</arg_value>`
 
 Current engineering decision:
 
 - These models are retained as test targets, not merely recommended defaults.
 - A model may still be a valid test target even if it is slow, noisy, or currently unstable.
-- `glm-5-turbo` and `glm-5.1` remain covered as probe targets, but they are not clean enough for routine tool-facing baseline runs right now.
+- `glm-5-turbo` and `glm-5.1` remain covered as probe targets, with their observed output quality retained in artifacts.
 - `deepseek-ai/DeepSeek-V4-Flash` remains an explicit SiliconFlow test target, but it currently shows upstream timeout/busy risk and should be classified separately from the Qwen pair.
 
 ## Verified Commands
@@ -70,6 +83,30 @@ go run ./cmd/vermory eval-self-case \
   --model mock-model \
   --run-id mock-direct-smoke \
   --artifact-root ./artifacts-provider-smoke
+```
+
+### Grok CLI casebook runs
+
+```bash
+go run ./cmd/vermory eval-casebook \
+  --provider grok-cli \
+  --model grok-4.5 \
+  --case-dir ./casebook/cases/101-workspace-parallel-repos \
+  --line workspace \
+  --run-id vermory-grok-workspace-v2 \
+  --artifact-root ./artifacts-provider-smoke \
+  --max-tokens 512
+```
+
+```bash
+go run ./cmd/vermory eval-casebook \
+  --provider grok-cli \
+  --model grok-4.5 \
+  --case-dir ./casebook/cases/201-conversation-housing-search \
+  --line conversation \
+  --run-id vermory-grok-conversation-v4 \
+  --artifact-root ./artifacts-provider-smoke \
+  --max-tokens 512
 ```
 
 ### SiliconFlow
@@ -149,6 +186,8 @@ go run ./cmd/vermory probe-provider \
 - `artifacts-provider-smoke/platform-runs/duojie-glm-5-smoke`
 - `artifacts-provider-smoke/provider-probes/duojie-probe-full`
 - `artifacts-provider-smoke/provider-probes/siliconflow-probe-selected`
+- `artifacts-provider-smoke/casebook-runs/vermory-grok-workspace-v2`
+- `artifacts-provider-smoke/casebook-runs/vermory-grok-conversation-v4`
 
 Each run stores:
 
@@ -166,6 +205,7 @@ These runs prove:
 - the retained harness can call direct providers without an aggregation gateway
 - real provider outputs can be captured into repeatable artifacts
 - the four-baseline evaluation loop is operational
+- the locally authenticated Grok CLI can consume a packet in an isolated single-turn harness
 
 These runs do not yet prove:
 
@@ -173,6 +213,8 @@ These runs do not yet prove:
 - AI coding tool integration quality
 - browser or MCP consumption quality
 - strong real-world advantage on difficult project tasks
+
+The Grok harness deliberately disables tools and browser/search behavior. Its evidence is therefore packet-consumption evidence, not proof that a coding agent completed an implementation task.
 
 ## Current Test Coverage Status
 

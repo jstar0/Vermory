@@ -22,7 +22,7 @@ Vermory 不只是保存几段 memo，也不只是给 PostgreSQL 套一层向量�
 
 | 模式 | 主要锚点 | 用户侧行为 |
 |---|---|---|
-| Workspace-backed continuity | 仓库根目录、工作区路径、manifest、显式绑定 | 同一工作区可跨 Codex、Claude Code、Gemini CLI 等客户端接续；不同工作区默认隔离。 |
+| Workspace-backed continuity | 仓库根目录、工作区路径、manifest、显式绑定 | 同一工作区可跨 Codex、Claude Code、Grok 等客户端接续；不同工作区默认隔离。 |
 | Conversation-backed continuity | thread、渠道、联系人、命名事务或话题 | 日常事务可以跨会话继续，但无关话题不能被擅自合并。 |
 | Global Defaults | 用户显式确认的稳定偏好和长期设置 | 只保留薄而稳定的默认层，临时任务要求不能污染全局偏好。 |
 

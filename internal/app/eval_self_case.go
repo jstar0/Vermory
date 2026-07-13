@@ -88,6 +88,12 @@ func buildProvider(opts EvalSelfCaseOptions) (provider.Provider, string, string,
 			model = "mock-model"
 		}
 		return provider.Mock{}, "mock", "mock", model, nil
+	case "grok-cli":
+		model := strings.TrimSpace(opts.Model)
+		if model == "" {
+			model = "grok-4.5"
+		}
+		return provider.NewGrokCLI(provider.GrokCLIConfig{}), "real", providerName, model, nil
 	case "openai-compatible", "siliconflow", "duojie":
 		baseURL, apiKeyEnv := providerRuntimeInputs(providerName, opts)
 		model := strings.TrimSpace(opts.Model)

@@ -44,10 +44,11 @@ type Claim struct {
 }
 
 type Task struct {
-	ID             string   `json:"id"`
-	Prompt         string   `json:"prompt"`
-	MustInclude    []string `json:"must_include"`
-	MustNotInclude []string `json:"must_not_include"`
+	ID             string     `json:"id"`
+	Prompt         string     `json:"prompt"`
+	MustInclude    []string   `json:"must_include"`
+	MustIncludeAny [][]string `json:"must_include_any,omitempty"`
+	MustNotInclude []string   `json:"must_not_include"`
 }
 
 type Case struct {
