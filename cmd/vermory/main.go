@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"vermory/internal/app"
 	"vermory/internal/brand"
+	"vermory/internal/mcpserver"
 	"vermory/internal/memorybackend"
 	"vermory/internal/reality"
+	"vermory/internal/runtime"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 )
 
@@ -49,6 +53,8 @@ func newRootCommand() *cobra.Command {
 	var loadQueries int
 	var loadConcurrency int
 	var loadScopeSuffix string
+	var mcpDatabaseURL string
+	var mcpTenantID string
 
 	rootCmd := &cobra.Command{
 		Use:           brand.Slug,
@@ -71,6 +77,33 @@ func newRootCommand() *cobra.Command {
 	runSelfCaseCmd.Flags().StringVar(&databaseURL, "database-url", "", "PostgreSQL connection URL")
 	runSelfCaseCmd.Flags().StringVar(&artifactRoot, "artifact-root", "./artifacts", "artifact output root")
 	rootCmd.AddCommand(runSelfCaseCmd)
+
+	mcpStdioCmd := &cobra.Command{
+		Use:   "mcp-stdio",
+		Short: "Run the local workspace continuity MCP server over stdio",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if strings.TrimSpace(mcpDatabaseURL) == "" {
+				return fmt.Errorf("--database-url is required")
+			}
+			if strings.TrimSpace(mcpTenantID) == "" {
+				return fmt.Errorf("--tenant-id is required")
+			}
+			store, err := runtime.OpenStore(cmd.Context(), mcpDatabaseURL)
+			if err != nil {
+				return err
+			}
+			defer store.Close()
+			if err := store.Migrate(cmd.Context()); err != nil {
+				return err
+			}
+			handler := mcpserver.New(runtime.NewService(store, mcpTenantID), mcpserver.Config{TenantID: mcpTenantID})
+			return mcpserver.NewServer(handler).Run(cmd.Context(), &mcp.StdioTransport{})
+		},
+	}
+	mcpStdioCmd.Flags().StringVar(&mcpDatabaseURL, "database-url", "", "PostgreSQL connection URL")
+	mcpStdioCmd.Flags().StringVar(&mcpTenantID, "tenant-id", "", "server-owned tenant identifier")
+	rootCmd.AddCommand(mcpStdioCmd)
 
 	evalSelfCaseCmd := &cobra.Command{
 		Use:   "eval-self-case",

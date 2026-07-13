@@ -40,3 +40,18 @@ func TestProviderCommandsAdvertiseGrokCLI(t *testing.T) {
 		}
 	}
 }
+
+func TestMCPStdioCommandIsRegistered(t *testing.T) {
+	for _, command := range newRootCommand().Commands() {
+		if command.Name() != "mcp-stdio" {
+			continue
+		}
+		for _, flagName := range []string{"database-url", "tenant-id"} {
+			if command.Flags().Lookup(flagName) == nil {
+				t.Fatalf("mcp-stdio must expose --%s", flagName)
+			}
+		}
+		return
+	}
+	t.Fatal("expected mcp-stdio command")
+}
