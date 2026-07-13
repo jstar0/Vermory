@@ -11,6 +11,7 @@ import (
 	"vermory/internal/brand"
 	"vermory/internal/mcpserver"
 	"vermory/internal/memorybackend"
+	"vermory/internal/operatorcli"
 	"vermory/internal/reality"
 	"vermory/internal/runtime"
 
@@ -77,6 +78,8 @@ func newRootCommand() *cobra.Command {
 	runSelfCaseCmd.Flags().StringVar(&databaseURL, "database-url", "", "PostgreSQL connection URL")
 	runSelfCaseCmd.Flags().StringVar(&artifactRoot, "artifact-root", "./artifacts", "artifact output root")
 	rootCmd.AddCommand(runSelfCaseCmd)
+	rootCmd.AddCommand(operatorcli.NewWorkspaceCommand())
+	rootCmd.AddCommand(operatorcli.NewMemoryCommand())
 
 	mcpStdioCmd := &cobra.Command{
 		Use:   "mcp-stdio",

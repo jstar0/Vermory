@@ -55,3 +55,34 @@ func TestMCPStdioCommandIsRegistered(t *testing.T) {
 	}
 	t.Fatal("expected mcp-stdio command")
 }
+
+func TestOperatorCommandsAreRegistered(t *testing.T) {
+	names := map[string]bool{}
+	for _, command := range newRootCommand().Commands() {
+		names[command.Name()] = true
+	}
+	for _, want := range []string{"workspace", "memory"} {
+		if !names[want] {
+			t.Fatalf("expected root command %q", want)
+		}
+	}
+}
+
+func TestOperatorMemoryForgetHasNoFreeTextFlag(t *testing.T) {
+	root := newRootCommand()
+	for _, parent := range root.Commands() {
+		if parent.Name() != "memory" {
+			continue
+		}
+		for _, child := range parent.Commands() {
+			if child.Name() != "forget" {
+				continue
+			}
+			if child.Flags().Lookup("reason") != nil || child.Flags().Lookup("content") != nil {
+				t.Fatal("forget command must not accept free-text deletion content")
+			}
+			return
+		}
+	}
+	t.Fatal("expected memory forget command")
+}
