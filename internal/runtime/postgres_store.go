@@ -38,6 +38,13 @@ type Memory struct {
 	Content string
 }
 
+type GovernedMemory struct {
+	ID                 string `json:"id"`
+	LifecycleStatus    string `json:"lifecycle_status"`
+	Content            string `json:"content"`
+	SupersedesMemoryID string `json:"supersedes_memory_id,omitempty"`
+}
+
 type DeliveryReceipt struct {
 	DeliveryID string
 	Context    string
@@ -468,6 +475,31 @@ WHERE tenant_id = $1 AND continuity_id = $2::uuid AND lifecycle_status = 'active
 		return fmt.Errorf("commit projection rebuild: %w", err)
 	}
 	return nil
+}
+
+func (s *Store) ListGovernedMemories(ctx context.Context, tenantID, continuityID string) ([]GovernedMemory, error) {
+	rows, err := s.pool.Query(ctx, `
+SELECT id::text, lifecycle_status, content, COALESCE(supersedes_memory_id::text, '')
+FROM governed_memories
+WHERE tenant_id = $1 AND continuity_id = $2::uuid
+ORDER BY created_at ASC, id ASC`, tenantID, continuityID)
+	if err != nil {
+		return nil, fmt.Errorf("list governed memories: %w", err)
+	}
+	defer rows.Close()
+
+	memories := make([]GovernedMemory, 0)
+	for rows.Next() {
+		var memory GovernedMemory
+		if err := rows.Scan(&memory.ID, &memory.LifecycleStatus, &memory.Content, &memory.SupersedesMemoryID); err != nil {
+			return nil, fmt.Errorf("scan governed memory: %w", err)
+		}
+		memories = append(memories, memory)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate governed memories: %w", err)
+	}
+	return memories, nil
 }
 
 func (s *Store) SearchActiveMemory(ctx context.Context, tenantID, continuityID, query string, limit int) ([]Memory, error) {
