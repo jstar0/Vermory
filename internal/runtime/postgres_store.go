@@ -705,6 +705,31 @@ WHERE tenant_id = $1 AND continuity_id = $2::uuid AND lifecycle_status = 'active
 	return nil
 }
 
+// RebuildAllProjections recreates disposable search state from authoritative active memories.
+// Operational callers must use an administrative store rather than the tenant-scoped runtime pool.
+func (s *Store) RebuildAllProjections(ctx context.Context) (int64, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("begin all-projection rebuild: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `DELETE FROM memory_search_documents`); err != nil {
+		return 0, fmt.Errorf("clear all search projections: %w", err)
+	}
+	result, err := tx.Exec(ctx, `
+INSERT INTO memory_search_documents (memory_id, tenant_id, continuity_id, content, search_document)
+SELECT id, tenant_id, continuity_id, content, to_tsvector('simple', content)
+FROM governed_memories
+WHERE lifecycle_status = 'active'`)
+	if err != nil {
+		return 0, fmt.Errorf("rebuild all search projections: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("commit all-projection rebuild: %w", err)
+	}
+	return result.RowsAffected(), nil
+}
+
 func (s *Store) ListGovernedMemories(ctx context.Context, tenantID, continuityID string) ([]GovernedMemory, error) {
 	ctx, err := withTenantContext(ctx, tenantID)
 	if err != nil {

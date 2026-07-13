@@ -72,7 +72,7 @@ git commit -m "test: freeze PostgreSQL operations recovery case"
 - Consumes: schema 9, `OpenStoreWithOptions`, token lifecycle, `RebuildProjection`, and runtime role grants.
 - Produces: deterministic migration replay, authoritative fingerprint, projection rebuild, and failure-recovery assertions.
 
-- [ ] **Step 1: Write failing recovery assertions**
+- [x] **Step 1: Write failing recovery assertions**
 
 Cover:
 
@@ -86,18 +86,18 @@ database connection failure returns no successful receipt
 new connection after recovery can authenticate and query its tenant
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime -run 'TestOperationsRecovery' -v
 ```
 
-- [ ] **Step 3: Implement only required recovery hooks**
+- [x] **Step 3: Implement only required recovery hooks**
 
 Do not add a custom backup format. Keep `Migrate`, `ResetForTest`, and projection rebuild explicit; add only an internal fingerprint helper if tests need stable comparison.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
