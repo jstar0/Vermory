@@ -68,6 +68,18 @@ func TestOperatorCommandsAreRegistered(t *testing.T) {
 	}
 }
 
+func TestIdentityAndDatabaseCommandsAreRegistered(t *testing.T) {
+	names := map[string]bool{}
+	for _, command := range newRootCommand().Commands() {
+		names[command.Name()] = true
+	}
+	for _, want := range []string{"identity", "database"} {
+		if !names[want] {
+			t.Fatalf("expected root command %q", want)
+		}
+	}
+}
+
 func TestOperatorMemoryForgetHasNoFreeTextFlag(t *testing.T) {
 	root := newRootCommand()
 	for _, parent := range root.Commands() {

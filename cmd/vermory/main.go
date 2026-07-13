@@ -9,6 +9,7 @@ import (
 
 	"vermory/internal/app"
 	"vermory/internal/brand"
+	"vermory/internal/identitycli"
 	"vermory/internal/mcpserver"
 	"vermory/internal/memorybackend"
 	"vermory/internal/operatorcli"
@@ -82,6 +83,8 @@ func newRootCommand() *cobra.Command {
 	rootCmd.AddCommand(operatorcli.NewMemoryCommand())
 	rootCmd.AddCommand(operatorcli.NewDefaultsCommand())
 	rootCmd.AddCommand(operatorcli.NewBridgeCommand())
+	rootCmd.AddCommand(identitycli.NewIdentityCommand())
+	rootCmd.AddCommand(identitycli.NewDatabaseCommand())
 	rootCmd.AddCommand(newWebChatCommand())
 
 	mcpStdioCmd := &cobra.Command{

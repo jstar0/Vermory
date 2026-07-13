@@ -173,29 +173,29 @@ func InspectToken(context.Context, *pgxpool.Pool, string) (TokenInspection, erro
 func GrantRuntimeRole(context.Context, *pgxpool.Pool, string) error
 ```
 
-- [ ] **Step 1: Write token unit tests**
+- [x] **Step 1: Write token unit tests**
 
 Cover format, cryptographic entropy source injection, bounded parsing, digest determinism, invalid role/tenant/subject/expiry, and no secret in `String`, JSON inspection, or errors.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 go test -count=1 ./internal/authn -run 'TestToken' -v
 ```
 
-- [ ] **Step 3: Implement minimal token primitives**
+- [x] **Step 3: Implement minimal token primitives**
 
 Use `crypto/rand`, base64url without padding, SHA-256, constant bounded lengths, and typed safe errors.
 
-- [ ] **Step 4: Write PostgreSQL lifecycle tests**
+- [x] **Step 4: Write PostgreSQL lifecycle tests**
 
 Cover issue replay, conflicting replay, authenticate, expiry, revoke, cross-tenant metadata isolation, and a runtime role that can execute the lookup function but cannot select `vermory_auth.api_tokens` or any legacy project/source/capsule table.
 
-- [ ] **Step 5: Implement lifecycle and role grants**
+- [x] **Step 5: Implement lifecycle and role grants**
 
 Use admin transactions for issue/revoke. `GrantRuntimeRole` validates the role exists and is neither superuser nor `BYPASSRLS`, then grants only the served-table operations, required sequences, schema usage, and token lookup execution.
 
-- [ ] **Step 6: Write CLI tests**
+- [x] **Step 6: Write CLI tests**
 
 Cover:
 
@@ -209,11 +209,11 @@ database migrate
 
 Require explicit admin database URL. Token issue prints the secret once; inspect/revoke never print it.
 
-- [ ] **Step 7: Implement commands and register them**
+- [x] **Step 7: Implement commands and register them**
 
 Keep token lifecycle out of HTTP. `database migrate` uses the existing runtime migration source through an admin store; `database grant-runtime` accepts a validated PostgreSQL role identifier.
 
-- [ ] **Step 8: Verify and commit**
+- [x] **Step 8: Verify and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
