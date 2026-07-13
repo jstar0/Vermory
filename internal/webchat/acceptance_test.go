@@ -135,6 +135,126 @@ func TestG01GlobalDefaultLocalOverrideAcceptance(t *testing.T) {
 	}
 }
 
+func TestB01ConversationWorkspacePromotionAcceptance(t *testing.T) {
+	manifest := loadFrozenManifest(t, filepath.Join("..", "..", "reality", "cases", "B01-conversation-workspace-promotion", "manifest.json"))
+	if manifest.ID != "B01-conversation-workspace-promotion" {
+		t.Fatalf("unexpected B01 manifest: %#v", manifest)
+	}
+	ctx := context.Background()
+	store := openAcceptanceStore(t, true)
+	sourceAnchor := runtime.ConversationAnchor{Channel: "web_chat", ThreadID: "release-planning"}
+	sourceContinuityID, selectedMemoryID := seedAcceptanceConversationMemory(t, store, "b01-selected", sourceAnchor, "Use checkout_eta_v2 for the staged checkout release.")
+	_, _ = seedAcceptanceConversationMemory(t, store, "b01-noise", sourceAnchor, "Run the checkout smoke suite before increasing rollout percentage.")
+	_, err := store.ConfirmWorkspaceBinding(ctx, "b01", "/fixtures/checkout-workspace")
+	if err != nil {
+		t.Fatal(err)
+	}
+	governance := runtime.NewGovernanceService(store, "b01")
+	smoke, err := governance.AddSource(ctx, "/fixtures/checkout-workspace", runtime.GovernanceWriteRequest{
+		OperationID: "b01-workspace-smoke",
+		Content:     "Run the checkout smoke suite before increasing rollout percentage.",
+		SourceRef:   "fixture:B01:smoke",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bridges := runtime.NewBridgeService(store, "b01")
+	promoted, err := bridges.PromoteConversationToWorkspace(ctx, runtime.PromoteConversationToWorkspaceRequest{
+		OperationID:    "b01-promote",
+		Source:         sourceAnchor,
+		TargetRepoRoot: "/fixtures/checkout-workspace",
+		MemoryIDs:      []string{selectedMemoryID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := runtime.NewService(store, "b01").PrepareContext(ctx, runtime.PrepareContextRequest{
+		OperationID: "b01-workspace-consume",
+		Workspace:   runtime.WorkspaceAnchor{RepoRoot: "/fixtures/checkout-workspace"},
+		Task:        "Which checkout flag should the staged release use?",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(prepared.Context, "checkout_eta_v2") || strings.Contains(prepared.Context, "mascot") {
+		t.Fatalf("B01 workspace context is not bounded: %s", prepared.Context)
+	}
+	exported, err := bridges.ExportWorkspace(ctx, runtime.ExportWorkspaceRequest{
+		OperationID:   "b01-export",
+		RepoRoot:      "/fixtures/checkout-workspace",
+		MemoryIDs:     []string{promoted.MemoryEffects[0].TargetMemoryID, smoke.Memory.MemoryID},
+		Title:         "Release handoff",
+		TargetProfile: "team_handoff",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(exported.ExportBody, "checkout_eta_v2") || !strings.Contains(exported.ExportBody, "smoke suite") || strings.Contains(exported.ExportBody, selectedMemoryID) {
+		t.Fatalf("B01 export is not semantic and bounded: %s", exported.ExportBody)
+	}
+	if _, err := bridges.Reverse(ctx, runtime.ReverseBridgeRequest{OperationID: "b01-reverse", BridgeID: promoted.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if matches, err := store.SearchActiveMemory(ctx, "b01", sourceContinuityID, "checkout_eta_v2", 5); err != nil || len(matches) != 1 {
+		t.Fatalf("B01 reversal altered source: matches=%#v err=%v", matches, err)
+	}
+}
+
+func TestB02LinkedConversationsWorkspaceRebindAcceptance(t *testing.T) {
+	manifest := loadFrozenManifest(t, filepath.Join("..", "..", "reality", "cases", "B02-linked-conversations-workspace-rebind", "manifest.json"))
+	if manifest.ID != "B02-linked-conversations-workspace-rebind" {
+		t.Fatalf("unexpected B02 manifest: %#v", manifest)
+	}
+	ctx := context.Background()
+	store := openAcceptanceStore(t, true)
+	primaryAnchor := runtime.ConversationAnchor{Channel: "openclaw_dm", ThreadID: "thesis-submission"}
+	linkedAnchor := runtime.ConversationAnchor{Channel: "web_chat", ThreadID: "thesis-submission"}
+	unrelatedAnchor := runtime.ConversationAnchor{Channel: "web_chat", ThreadID: "literature-plan"}
+	primaryID, _ := seedAcceptanceConversationMemory(t, store, "b02-deadline", primaryAnchor, "The thesis submission package is due on 18 July at 17:00.")
+	linkedID, _ := seedAcceptanceConversationMemory(t, store, "b02-style", linkedAnchor, "References use GB/T 7714-2015 numeric style.")
+	unrelatedID, _ := seedAcceptanceConversationMemory(t, store, "b02-unrelated", unrelatedAnchor, "Create a literature-reading plan for next semester.")
+	bridges := runtime.NewBridgeService(store, "b02")
+	linked, err := bridges.LinkConversations(ctx, runtime.LinkConversationsRequest{OperationID: "b02-link", Primary: primaryAnchor, Linked: linkedAnchor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if matches, err := store.SearchActiveConversationMemory(ctx, "b02", linkedID, "When is the package due?", 5); err != nil || len(matches) == 0 || !strings.Contains(matches[0].Content, "18 July") {
+		t.Fatalf("B02 linked memory was unavailable: matches=%#v err=%v", matches, err)
+	}
+	if matches, err := store.SearchActiveConversationMemory(ctx, "b02", unrelatedID, "When is the package due?", 5); err != nil || len(matches) != 0 {
+		t.Fatalf("B02 unrelated continuity leaked: matches=%#v err=%v", matches, err)
+	}
+	if _, err := bridges.Reverse(ctx, runtime.ReverseBridgeRequest{OperationID: "b02-link-reverse", BridgeID: linked.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if matches, err := store.SearchActiveConversationMemory(ctx, "b02", linkedID, "When is the package due?", 5); err != nil || len(matches) != 0 {
+		t.Fatalf("B02 reversed link still shared memory: matches=%#v err=%v", matches, err)
+	}
+	workspaceID, err := store.ConfirmWorkspaceBinding(ctx, "b02", "/fixtures/thesis-old")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = runtime.NewGovernanceService(store, "b02").AddSource(ctx, "/fixtures/thesis-old", runtime.GovernanceWriteRequest{OperationID: "b02-workspace-source", Content: "Build the final PDF with make final-pdf.", SourceRef: "fixture:B02:workspace"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rebound, err := bridges.RebindWorkspace(ctx, runtime.RebindWorkspaceRequest{OperationID: "b02-rebind", OldRepoRoot: "/fixtures/thesis-old", NewRepoRoot: "/fixtures/thesis-new"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newResolution, err := store.ResolveWorkspace(ctx, "b02", runtime.WorkspaceAnchor{RepoRoot: "/fixtures/thesis-new"})
+	if err != nil || newResolution.ContinuityID != workspaceID {
+		t.Fatalf("B02 rebind changed continuity: resolution=%#v err=%v", newResolution, err)
+	}
+	if _, err := bridges.Reverse(ctx, runtime.ReverseBridgeRequest{OperationID: "b02-rebind-reverse", BridgeID: rebound.ID}); err != nil {
+		t.Fatal(err)
+	}
+	oldResolution, err := store.ResolveWorkspace(ctx, "b02", runtime.WorkspaceAnchor{RepoRoot: "/fixtures/thesis-old"})
+	if err != nil || oldResolution.ContinuityID != workspaceID || primaryID == "" {
+		t.Fatalf("B02 rebind reversal failed: resolution=%#v err=%v", oldResolution, err)
+	}
+}
+
 type frozenManifest struct {
 	ID   string `json:"id"`
 	Task struct {
@@ -444,6 +564,25 @@ func acceptanceHandler(store *runtime.Store, tenantID string, llm provider.Provi
 		runtime.NewConversationService(store, tenantID, llm, "acceptance-model", runtime.ConversationServiceConfig{}),
 		runtime.NewGlobalDefaultsService(store, tenantID),
 	)
+}
+
+func seedAcceptanceConversationMemory(t *testing.T, store *runtime.Store, operationPrefix string, anchor runtime.ConversationAnchor, content string) (string, string) {
+	t.Helper()
+	ctx := context.Background()
+	tenantID := strings.Split(operationPrefix, "-")[0]
+	resolution, err := store.ResolveOrCreateConversation(ctx, tenantID, anchor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observation, err := store.CommitObservation(ctx, tenantID, resolution.ContinuityID, runtime.CommitObservationRequest{OperationID: operationPrefix + ":message", Kind: runtime.ObservationKindUserMessage, Content: content, SourceRef: "fixture:bridge:conversation"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	memory, err := store.ConfirmConversationObservation(ctx, tenantID, resolution.ContinuityID, observation.ObservationID, operationPrefix+":confirm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resolution.ContinuityID, memory.MemoryID
 }
 
 func inspectDefaults(t *testing.T, handler http.Handler) runtime.GlobalDefaultsInspection {

@@ -212,19 +212,19 @@ git commit -m "feat: expose durable bridge governance"
 - Create: `docs/evidence/2026-07-14-durable-bridges-runtime.md`
 - Modify: `docs/superpowers/plans/2026-07-14-durable-bridges-runtime.md`
 
-- [ ] **Step 1: Add B01/B02 acceptance tests**
+- [x] **Step 1: Add B01/B02 acceptance tests**
 
 Run the frozen trajectories through real PostgreSQL services and consumer boundaries. Deterministic checks must inspect actual deliveries, bindings, lifecycle rows, link groups, and export bodies.
 
-- [ ] **Step 2: Run a real external MCP promote/reverse replay**
+- [x] **Step 2: Run a real external MCP promote/reverse replay**
 
 Promote one confirmed conversation memory into a confirmed workspace, consume it through the built MCP stdio process, reverse the bridge, and prove a fresh MCP delivery omits it.
 
-- [ ] **Step 3: Run a real Grok link/reverse replay**
+- [x] **Step 3: Run a real Grok link/reverse replay**
 
 Use two Web Chat anchors with confirmed synthetic governed memories. Prove linked memory changes a real Grok answer, reverse the link, and use fresh persisted delivery context rather than model self-report to prove isolation.
 
-- [ ] **Step 4: Run release verification**
+- [x] **Step 4: Run release verification**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
