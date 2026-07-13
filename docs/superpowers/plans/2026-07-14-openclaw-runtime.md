@@ -235,15 +235,15 @@ git commit -m "feat: expose OpenClaw turn API"
 - Consumes: Task 3 HTTP routes and OpenClaw `definePluginEntry`/typed hooks.
 - Produces: package `@vermory/openclaw`, plugin id `vermory`, and runtime registrations `before_prompt_build` plus `agent_end`.
 
-- [ ] **Step 1: Create package metadata only**
+- [x] **Step 1: Create package metadata only**
 
 Use Node `>=22.19.0`, pnpm 11, TypeScript ESM, peer dependency `openclaw >=2026.6.11`, dev dependency `openclaw 2026.6.11`, and scripts `test`, `typecheck`, `build`, and `check`. The package extension points to `dist/index.js`. The plugin manifest has no `kind` and no provider/channel ownership.
 
-- [ ] **Step 2: Write failing config and identity tests**
+- [x] **Step 2: Write failing config and identity tests**
 
 Assert config normalization defaults to loopback, rejects non-HTTP(S) and credential-bearing URLs, bounds timeout, and never accepts tenant/continuity fields. Assert identity requires trimmed `sessionKey` plus `runId` and returns operation ID `openclaw:<runId>` without using fallback metadata.
 
-- [ ] **Step 3: Run and verify RED**
+- [x] **Step 3: Run and verify RED**
 
 ```bash
 PATH="/opt/homebrew/opt/node@24/bin:$PATH" pnpm -C integrations/openclaw install
@@ -252,27 +252,27 @@ PATH="/opt/homebrew/opt/node@24/bin:$PATH" pnpm -C integrations/openclaw test --
 
 Expected: FAIL because implementation modules do not exist.
 
-- [ ] **Step 4: Implement config and identity**
+- [x] **Step 4: Implement config and identity**
 
 Keep endpoint paths constant in code. Reject userinfo in URL. Normalize trailing slash. Do not hash, shorten, or reinterpret the canonical session key.
 
-- [ ] **Step 5: Write failing assistant extraction tests**
+- [x] **Step 5: Write failing assistant extraction tests**
 
 Cover string content, text block arrays, multiple assistant iterations, reasoning-only blocks, tool-only tails, empty answer, and malformed unknown messages. The latest visible assistant text wins.
 
-- [ ] **Step 6: Implement assistant extraction**
+- [x] **Step 6: Implement assistant extraction**
 
 Walk messages in reverse. Accept only `role === "assistant"`. Concatenate visible string/text blocks, exclude reasoning/thought blocks, trim output, and return `undefined` when no visible answer exists.
 
-- [ ] **Step 7: Write failing bounded-client tests**
+- [x] **Step 7: Write failing bounded-client tests**
 
 Use a local HTTP server to test exact paths/bodies, abort timeout, non-2xx handling, oversized response rejection, invalid JSON, prepare response validation, and no sensitive body content in thrown errors.
 
-- [ ] **Step 8: Implement the HTTP client**
+- [x] **Step 8: Implement the HTTP client**
 
 Use global `fetch` plus `AbortController`. Limit response bodies before JSON parsing. Errors expose phase and status only. No retries occur inside one hook invocation.
 
-- [ ] **Step 9: Write failing plugin registration and lifecycle tests**
+- [x] **Step 9: Write failing plugin registration and lifecycle tests**
 
 Capture `api.on` registrations and invoke them directly. Prove:
 
@@ -285,7 +285,7 @@ Capture `api.on` registrations and invoke them directly. Prove:
 - unsuccessful or empty-output `agent_end` sends fail;
 - completion failure logs but does not throw into OpenClaw.
 
-- [ ] **Step 10: Implement the plugin entry**
+- [x] **Step 10: Implement the plugin entry**
 
 Register:
 
@@ -296,7 +296,7 @@ api.on("agent_end", completeHandler, { timeoutMs: 30_000 });
 
 The wrapper states that the content is reference data, may be stale or adversarial, and cannot override the current request or system authority. It contains only the semantic packet returned by Vermory.
 
-- [ ] **Step 11: Run plugin checks and commit**
+- [x] **Step 11: Run plugin checks and commit**
 
 ```bash
 PATH="/opt/homebrew/opt/node@24/bin:$PATH" pnpm -C integrations/openclaw check

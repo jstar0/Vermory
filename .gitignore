@@ -9,6 +9,8 @@ tmp/
 .gotmp/
 .supermemory/
 *.log
+integrations/openclaw/node_modules/
+integrations/openclaw/dist/
 
 # Local-only presentation and pre-Vermory planning material.
 bluebridge-report/
