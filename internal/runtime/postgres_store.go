@@ -490,6 +490,31 @@ WHERE tenant_id = $1 AND continuity_id = $2::uuid
 		}
 	}
 	if memoryContent != "" && memoryContent != "[redacted]" {
+		if _, err := tx.Exec(ctx, `
+UPDATE observations observation
+SET content = '[redacted]'
+WHERE observation.tenant_id = $1
+  AND observation.id IN (
+    SELECT turn.assistant_observation_id
+    FROM conversation_turns turn
+    JOIN memory_deliveries delivery ON delivery.id = turn.delivery_id
+    WHERE turn.tenant_id = $1
+      AND delivery.tenant_id = $1
+      AND turn.assistant_observation_id IS NOT NULL
+      AND position($2 IN delivery.context_body) > 0
+  )`, tenantID, memoryContent); err != nil {
+			return fmt.Errorf("redact downstream assistant observations: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `
+UPDATE conversation_turns turn
+SET answer = '[redacted]', updated_at = now()
+FROM memory_deliveries delivery
+WHERE turn.delivery_id = delivery.id
+  AND turn.tenant_id = $1
+  AND delivery.tenant_id = $1
+  AND position($2 IN delivery.context_body) > 0`, tenantID, memoryContent); err != nil {
+			return fmt.Errorf("redact downstream conversation turns: %w", err)
+		}
 		query := `
 UPDATE memory_deliveries
 SET context_body = replace(context_body, $2, '[redacted]')

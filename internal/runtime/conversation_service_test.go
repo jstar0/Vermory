@@ -586,13 +586,16 @@ func TestConversationForgetRedactsOriginHistoryTurnReplayAndDelivery(t *testing.
 		ObservationID: turn.AssistantObservationID,
 	})
 	requireNoError(t, err)
-	llm.output = "Use the governed recovery guidance."
+	llm.output = "The governed recovery code is " + secret + "."
 	followup, err := service.Chat(ctx, ChatTurnRequest{
 		OperationID: "delete-followup",
 		Anchor:      anchor,
 		Message:     "What recovery information is retained?",
 	})
 	requireNoError(t, err)
+	if !strings.Contains(followup.Answer, secret) {
+		t.Fatalf("test setup did not persist a downstream secret echo: %#v", followup)
+	}
 	_, err = service.Forget(ctx, ForgetConversationMemoryRequest{
 		OperationID: "delete-forget",
 		Anchor:      anchor,

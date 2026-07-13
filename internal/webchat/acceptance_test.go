@@ -318,6 +318,7 @@ func TestO01OpenClawContinuityAcceptance(t *testing.T) {
 			t.Fatalf("O01 linked delivery pooled raw history %q: %s", forbidden, linkedDelivery.Context)
 		}
 	}
+	_ = completeOpenClawTurn(t, handler, "o01-b-linked", anchorB.ThreadID, "The linked access code is "+accessCode+".", model)
 
 	unrelated := prepareOpenClawTurn(t, handler, "o01-c-unrelated", anchorC.ThreadID, events[10])
 	for _, forbidden := range []string{"Friday at 15:30", "concierge", accessCode} {
@@ -357,7 +358,7 @@ func TestO01OpenClawContinuityAcceptance(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertSecretAbsentFromAuthority(t, tenantID, resolutionA.ContinuityID, accessCode)
-	assertSecretAbsentFromTenantDeliveries(t, tenantID, accessCode)
+	assertSecretAbsentFromTenantRecords(t, tenantID, accessCode)
 	for _, query := range []string{accessCode, "old cedar-style access sequence"} {
 		matches, err := store.SearchActiveConversationMemory(ctx, tenantID, resolutionA.ContinuityID, query, 5)
 		if err != nil {
@@ -850,21 +851,28 @@ func assertSecretAbsentFromAuthority(t *testing.T, tenantID, continuityID, secre
 	}
 }
 
-func assertSecretAbsentFromTenantDeliveries(t *testing.T, tenantID, secret string) {
+func assertSecretAbsentFromTenantRecords(t *testing.T, tenantID, secret string) {
 	t.Helper()
 	pool, err := pgxpool.New(context.Background(), os.Getenv("VERMORY_TEST_DATABASE_URL"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	var count int
-	if err := pool.QueryRow(context.Background(), `
-SELECT count(*) FROM memory_deliveries
-WHERE tenant_id = $1 AND context_body LIKE '%' || $2 || '%'`, tenantID, secret).Scan(&count); err != nil {
-		t.Fatal(err)
+	queries := []string{
+		`SELECT count(*) FROM observations WHERE tenant_id = $1 AND content LIKE '%' || $2 || '%'`,
+		`SELECT count(*) FROM governed_memories WHERE tenant_id = $1 AND content LIKE '%' || $2 || '%'`,
+		`SELECT count(*) FROM memory_search_documents WHERE tenant_id = $1 AND content LIKE '%' || $2 || '%'`,
+		`SELECT count(*) FROM memory_deliveries WHERE tenant_id = $1 AND context_body LIKE '%' || $2 || '%'`,
+		`SELECT count(*) FROM conversation_turns WHERE tenant_id = $1 AND answer LIKE '%' || $2 || '%'`,
 	}
-	if count != 0 {
-		t.Fatalf("deleted secret remains in tenant delivery history: count=%d", count)
+	for _, query := range queries {
+		var count int
+		if err := pool.QueryRow(context.Background(), query, tenantID, secret).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != 0 {
+			t.Fatalf("deleted secret remains in tenant record query %q: count=%d", query, count)
+		}
 	}
 }
 
