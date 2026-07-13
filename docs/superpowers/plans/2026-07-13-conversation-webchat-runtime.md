@@ -458,11 +458,11 @@ git commit -m "feat: run conversation web chat server"
 - Consumes: the public HTTP contract only for end-to-end assertions.
 - Produces: reproducible C01 and S01 hard-gate evidence in automated tests.
 
-- [ ] **Step 1: Write C01 acceptance through HTTP**
+- [x] **Step 1: Write C01 acceptance through HTTP**
 
 Load `reality/cases/C01-device-maintenance-continuity/events.jsonl`, submit chronological turns, explicitly confirm the current facts that should survive as governed memory, close and reopen the store/service, then submit the frozen final prompt. Assert the deterministic required and forbidden strings from the manifest.
 
-- [ ] **Step 2: Run C01 and verify RED where behavior is incomplete**
+- [x] **Step 2: Run C01 and verify RED where behavior is incomplete**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./internal/webchat -run TestC01 -count=1
@@ -470,15 +470,15 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./inter
 
 Expected: initial failure until restart-safe context and governance are correctly wired.
 
-- [ ] **Step 3: Make the minimal runtime corrections and verify C01 GREEN**
+- [x] **Step 3: Make the minimal runtime corrections and verify C01 GREEN**
 
 Do not weaken fixture assertions. Fix context ordering, persistence, or API behavior only.
 
-- [ ] **Step 4: Write S01 acceptance through HTTP**
+- [x] **Step 4: Write S01 acceptance through HTTP**
 
 Create a conversation observation containing the synthetic target, confirm it, add independent rotation guidance, forget the target, rebuild projection, restart the service, and run exact/paraphrased/related probes. Assert the target is absent from answers, inspection, recent context, search, and rebuilt projection while `rotated after use` remains available.
 
-- [ ] **Step 5: Run S01 and verify RED then GREEN**
+- [x] **Step 5: Run S01 and verify RED then GREEN**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./internal/webchat -run TestS01 -count=1
@@ -486,7 +486,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./inter
 
 Expected final result: PASS without removing or loosening forbidden-content checks.
 
-- [ ] **Step 6: Run the combined deterministic suite**
+- [x] **Step 6: Run the combined deterministic suite**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
@@ -494,7 +494,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -c
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/webchat/acceptance_test.go internal/runtime/conversation_service_test.go
