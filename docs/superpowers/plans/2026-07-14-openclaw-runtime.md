@@ -77,7 +77,6 @@ git commit -m "test: freeze OpenClaw continuity case"
 - Modify: `internal/runtime/conversation_store.go`
 - Modify: `internal/runtime/conversation_service.go`
 - Modify: `internal/runtime/conversation_service_test.go`
-- Modify: `internal/runtime/postgres_store_test.go`
 
 **Interfaces:**
 - Consumes: `ConversationAnchor`, `BeginConversationTurn`, `RecordDelivery`, Global Defaults, linked conversation memory search, and existing completion/failure storage.
@@ -114,7 +113,7 @@ func (s *ConversationService) CompleteExternalTurn(context.Context, CompleteExte
 func (s *ConversationService) FailExternalTurn(context.Context, FailExternalConversationTurnRequest) (ChatTurnReceipt, error)
 ```
 
-- [ ] **Step 1: Write failing service tests**
+- [x] **Step 1: Write failing service tests**
 
 Cover:
 
@@ -128,7 +127,7 @@ Cover:
 - fail marks only the exact in-progress turn failed and stores no assistant observation;
 - correction/deletion changes later fresh preparations but never mutates an already recorded delivery.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
@@ -137,7 +136,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 
 Expected: FAIL because external-turn types and methods do not exist.
 
-- [ ] **Step 3: Implement minimal store helpers**
+- [x] **Step 3: Implement minimal store helpers**
 
 Add:
 
@@ -148,17 +147,17 @@ func (s *Store) LookupConversationTurn(ctx context.Context, tenantID, operationI
 
 `AttachConversationTurnDelivery` must lock the turn, verify delivery tenant/continuity ownership, reject a conflicting delivery, and replay the same binding. `LookupConversationTurn` returns a not-found error instead of an empty receipt.
 
-- [ ] **Step 4: Implement prepare/complete/fail and refactor Chat**
+- [x] **Step 4: Implement prepare/complete/fail and refactor Chat**
 
 `PrepareExternalTurn` performs the existing pre-provider half of `Chat`, but calls `BuildConversationContext(defaults, memories, nil)`. `Chat` calls `PrepareExternalTurn`, invokes its provider only for an in-progress turn, then calls `CompleteExternalTurn`. Provider configuration is required only by `Chat`; external methods require only store and tenant.
 
-- [ ] **Step 5: Verify runtime behavior and commit**
+- [x] **Step 5: Verify runtime behavior and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime
 git diff --check
-git add internal/runtime/conversation_types.go internal/runtime/conversation_store.go internal/runtime/conversation_service.go internal/runtime/conversation_service_test.go internal/runtime/postgres_store_test.go
+git add internal/runtime/conversation_types.go internal/runtime/conversation_store.go internal/runtime/conversation_service.go internal/runtime/conversation_service_test.go
 git commit -m "feat: add external conversation turns"
 ```
 

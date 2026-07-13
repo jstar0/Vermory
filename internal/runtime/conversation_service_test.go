@@ -233,6 +233,151 @@ func TestConversationLinkedGovernedMemorySharesWithoutPoolingRawHistoryAndRevers
 	requireNotContains(t, llm.calls[5].ContextPacket, "C204")
 }
 
+func TestConversationExternalTurnPreparesGovernedContextWithoutRawHistory(t *testing.T) {
+	ctx := context.Background()
+	store := openTestStore(t)
+	primaryAnchor := ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:home-maintenance-a"}
+	linkedAnchor := ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:home-maintenance-b"}
+	primary, _ := confirmConversationMemoryForBridge(t, store, "local", primaryAnchor, "external-primary-appointment", "The plumbing inspection is Saturday at 10:00.")
+	linked, _ := confirmConversationMemoryForBridge(t, store, "local", linkedAnchor, "external-linked-access", "The technician must check in with the concierge.")
+	_, err := store.CommitObservation(ctx, "local", primary.ContinuityID, CommitObservationRequest{
+		OperationID: "external-primary-raw",
+		Kind:        ObservationKindUserMessage,
+		Content:     "PRIMARY_RAW_CHATTER about rain must stay local.",
+		SourceRef:   conversationUserSourceRef,
+	})
+	requireNoError(t, err)
+	_, err = store.CommitObservation(ctx, "local", linked.ContinuityID, CommitObservationRequest{
+		OperationID: "external-linked-raw",
+		Kind:        ObservationKindUserMessage,
+		Content:     "LINKED_RAW_CHATTER about lunch is already in OpenClaw.",
+		SourceRef:   conversationUserSourceRef,
+	})
+	requireNoError(t, err)
+	_, err = NewBridgeService(store, "local").LinkConversations(ctx, LinkConversationsRequest{
+		OperationID: "external-link",
+		Primary:     primaryAnchor,
+		Linked:      linkedAnchor,
+	})
+	requireNoError(t, err)
+	_, err = NewGlobalDefaultsService(store, "local").Set(ctx, SetGlobalDefaultRequest{
+		OperationID: "external-default",
+		Key:         "reply_language",
+		Content:     "Default user-facing replies to Chinese unless the current task explicitly requests another language.",
+	})
+	requireNoError(t, err)
+
+	service := NewConversationService(store, "local", nil, "", ConversationServiceConfig{})
+	request := ExternalConversationTurnRequest{
+		OperationID: "openclaw:run-prepare-1",
+		Anchor:      linkedAnchor,
+		Message:     "What is the current maintenance arrangement?",
+	}
+	prepared, err := service.PrepareExternalTurn(ctx, request)
+	requireNoError(t, err)
+	if prepared.Status != ChatTurnInProgress || prepared.DeliveryID == "" || prepared.Context == "" {
+		t.Fatalf("unexpected prepared turn: %#v", prepared)
+	}
+	for _, expected := range []string{
+		"Global defaults:",
+		"Default user-facing replies to Chinese",
+		"Governed memory:",
+		"Saturday at 10:00",
+		"check in with the concierge",
+	} {
+		requireContains(t, prepared.Context, expected)
+	}
+	for _, forbidden := range []string{"Recent conversation:", "PRIMARY_RAW_CHATTER", "LINKED_RAW_CHATTER", request.Message} {
+		requireNotContains(t, prepared.Context, forbidden)
+	}
+
+	replayed, err := service.PrepareExternalTurn(ctx, request)
+	requireNoError(t, err)
+	if !replayed.Replayed || replayed.ID != prepared.ID || replayed.DeliveryID != prepared.DeliveryID || replayed.Context != prepared.Context {
+		t.Fatalf("prepare replay changed persisted turn: first=%#v replay=%#v", prepared, replayed)
+	}
+	var userObservationCount int
+	err = store.pool.QueryRow(ctx, `SELECT count(*) FROM observations WHERE tenant_id = $1 AND operation_id = $2`, "local", request.OperationID).Scan(&userObservationCount)
+	requireNoError(t, err)
+	if userObservationCount != 1 {
+		t.Fatalf("prepare replay wrote %d user observations", userObservationCount)
+	}
+
+	conflictingMessage := request
+	conflictingMessage.Message = "different message"
+	if _, err := service.PrepareExternalTurn(ctx, conflictingMessage); err == nil {
+		t.Fatal("prepare accepted a conflicting message for the same operation")
+	}
+	conflictingAnchor := request
+	conflictingAnchor.Anchor = ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:unrelated-c"}
+	if _, err := service.PrepareExternalTurn(ctx, conflictingAnchor); err == nil {
+		t.Fatal("prepare accepted a conflicting anchor for the same operation")
+	}
+}
+
+func TestConversationExternalTurnCompletesAndFailsIdempotently(t *testing.T) {
+	ctx := context.Background()
+	store := openTestStore(t)
+	service := NewConversationService(store, "local", nil, "", ConversationServiceConfig{})
+	anchor := ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:external-lifecycle"}
+	prepared, err := service.PrepareExternalTurn(ctx, ExternalConversationTurnRequest{
+		OperationID: "openclaw:run-complete",
+		Anchor:      anchor,
+		Message:     "State the current appointment.",
+	})
+	requireNoError(t, err)
+
+	completion := CompleteExternalConversationTurnRequest{
+		OperationID: prepared.OperationID,
+		Anchor:      anchor,
+		Answer:      "The current appointment is Saturday at 10:00.",
+		Model:       "grok-cli/grok-4.5",
+	}
+	completed, err := service.CompleteExternalTurn(ctx, completion)
+	requireNoError(t, err)
+	if completed.Status != ChatTurnCompleted || completed.AssistantObservationID == "" || completed.Answer != completion.Answer || completed.Model != completion.Model {
+		t.Fatalf("unexpected completed turn: %#v", completed)
+	}
+	replayed, err := service.CompleteExternalTurn(ctx, completion)
+	requireNoError(t, err)
+	if !replayed.Replayed || replayed.ID != completed.ID || replayed.AssistantObservationID != completed.AssistantObservationID {
+		t.Fatalf("completion replay changed turn: first=%#v replay=%#v", completed, replayed)
+	}
+	wrongAnchor := completion
+	wrongAnchor.Anchor = ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:other"}
+	if _, err := service.CompleteExternalTurn(ctx, wrongAnchor); err == nil {
+		t.Fatal("completion accepted another continuity")
+	}
+	unknown := completion
+	unknown.OperationID = "openclaw:missing"
+	if _, err := service.CompleteExternalTurn(ctx, unknown); err == nil {
+		t.Fatal("completion accepted an unprepared operation")
+	}
+
+	failedPreparation, err := service.PrepareExternalTurn(ctx, ExternalConversationTurnRequest{
+		OperationID: "openclaw:run-fail",
+		Anchor:      anchor,
+		Message:     "This run will fail.",
+	})
+	requireNoError(t, err)
+	failure := FailExternalConversationTurnRequest{
+		OperationID:    failedPreparation.OperationID,
+		Anchor:         anchor,
+		FailureCode:    "openclaw_agent_error",
+		FailureMessage: "provider failed before a visible answer",
+	}
+	failed, err := service.FailExternalTurn(ctx, failure)
+	requireNoError(t, err)
+	if failed.Status != ChatTurnFailed || failed.FailureCode != failure.FailureCode || failed.AssistantObservationID != "" {
+		t.Fatalf("unexpected failed turn: %#v", failed)
+	}
+	failedReplay, err := service.FailExternalTurn(ctx, failure)
+	requireNoError(t, err)
+	if !failedReplay.Replayed || failedReplay.ID != failed.ID || failedReplay.AssistantObservationID != "" {
+		t.Fatalf("failure replay changed turn: first=%#v replay=%#v", failed, failedReplay)
+	}
+}
+
 func TestConversationServiceDoesNotCrossThreadBoundary(t *testing.T) {
 	store := openTestStore(t)
 	llm := &recordingProvider{output: "answer"}

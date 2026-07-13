@@ -418,6 +418,78 @@ RETURNING id::text, operation_id, status, continuity_id::text, user_observation_
 	return receipt, nil
 }
 
+func (s *Store) AttachConversationTurnDelivery(ctx context.Context, tenantID, turnID, deliveryID string) (ChatTurnReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("begin conversation delivery attachment: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var operationID, continuityID, existingDeliveryID string
+	if err := tx.QueryRow(ctx, `
+SELECT operation_id, continuity_id::text, COALESCE(delivery_id::text, '')
+FROM conversation_turns
+WHERE id = $1::uuid AND tenant_id = $2
+FOR UPDATE`, turnID, tenantID).Scan(&operationID, &continuityID, &existingDeliveryID); err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("lock conversation turn for delivery: %w", err)
+	}
+
+	var validDelivery bool
+	if err := tx.QueryRow(ctx, `
+SELECT EXISTS (
+  SELECT 1 FROM memory_deliveries
+  WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid
+)`, deliveryID, tenantID, continuityID).Scan(&validDelivery); err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("check prepared conversation delivery: %w", err)
+	}
+	if !validDelivery {
+		return ChatTurnReceipt{}, fmt.Errorf("delivery does not belong to this conversation")
+	}
+	if existingDeliveryID != "" && existingDeliveryID != deliveryID {
+		return ChatTurnReceipt{}, fmt.Errorf("conversation turn is already bound to another delivery")
+	}
+	replayed := existingDeliveryID == deliveryID
+	if existingDeliveryID == "" {
+		if _, err := tx.Exec(ctx, `
+UPDATE conversation_turns
+SET delivery_id = $1::uuid, updated_at = now()
+WHERE id = $2::uuid AND tenant_id = $3`, deliveryID, turnID, tenantID); err != nil {
+			return ChatTurnReceipt{}, fmt.Errorf("attach conversation delivery: %w", err)
+		}
+	}
+	receipt, found, err := lookupConversationTurnTx(ctx, tx, tenantID, operationID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	if !found {
+		return ChatTurnReceipt{}, fmt.Errorf("conversation turn disappeared during delivery attachment")
+	}
+	receipt.Replayed = replayed
+	if err := tx.Commit(ctx); err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("commit conversation delivery attachment: %w", err)
+	}
+	return receipt, nil
+}
+
+func (s *Store) LookupConversationTurn(ctx context.Context, tenantID, operationID string) (ChatTurnReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("begin conversation turn lookup: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	receipt, found, err := lookupConversationTurnTx(ctx, tx, tenantID, operationID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	if !found {
+		return ChatTurnReceipt{}, fmt.Errorf("conversation turn does not exist")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("commit conversation turn lookup: %w", err)
+	}
+	return receipt, nil
+}
+
 func (s *Store) CompleteConversationTurn(ctx context.Context, tenantID, turnID, deliveryID, answer, model string) (ChatTurnReceipt, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -528,7 +600,8 @@ func lookupConversationTurnTx(ctx context.Context, tx pgx.Tx, tenantID, operatio
 	err := tx.QueryRow(ctx, `
 SELECT id::text, operation_id, status, continuity_id::text,
        COALESCE(delivery_id::text, ''), user_observation_id::text,
-       COALESCE(assistant_observation_id::text, ''), answer, provider_model, failure_code
+       COALESCE(assistant_observation_id::text, ''), answer, provider_model, failure_code,
+       failure_message
 FROM conversation_turns
 WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(
 		&receipt.ID,
@@ -541,6 +614,7 @@ WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(
 		&receipt.Answer,
 		&receipt.Model,
 		&receipt.FailureCode,
+		&receipt.FailureMessage,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ChatTurnReceipt{}, false, nil

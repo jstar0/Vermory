@@ -96,7 +96,101 @@ type ChatTurnReceipt struct {
 	Answer                 string         `json:"answer,omitempty"`
 	Model                  string         `json:"model,omitempty"`
 	FailureCode            string         `json:"failure_code,omitempty"`
+	FailureMessage         string         `json:"failure_message,omitempty"`
 	Replayed               bool           `json:"replayed"`
+}
+
+type ExternalConversationTurnRequest struct {
+	OperationID string             `json:"operation_id"`
+	Anchor      ConversationAnchor `json:"-"`
+	Message     string             `json:"message"`
+}
+
+func (r *ExternalConversationTurnRequest) Validate() error {
+	request := ChatTurnRequest{OperationID: r.OperationID, Anchor: r.Anchor, Message: r.Message}
+	if err := request.Validate(); err != nil {
+		return err
+	}
+	r.OperationID = request.OperationID
+	r.Anchor = request.Anchor
+	r.Message = request.Message
+	return nil
+}
+
+type PreparedConversationTurn struct {
+	ChatTurnReceipt
+	Context string `json:"context,omitempty"`
+}
+
+type CompleteExternalConversationTurnRequest struct {
+	OperationID string             `json:"operation_id"`
+	Anchor      ConversationAnchor `json:"-"`
+	Answer      string             `json:"answer"`
+	Model       string             `json:"model"`
+}
+
+func (r *CompleteExternalConversationTurnRequest) Validate() error {
+	r.OperationID = strings.TrimSpace(r.OperationID)
+	r.Answer = strings.TrimSpace(r.Answer)
+	r.Model = strings.TrimSpace(r.Model)
+	if r.OperationID == "" {
+		return fmt.Errorf("operation_id is required")
+	}
+	if r.Answer == "" {
+		return fmt.Errorf("answer is required")
+	}
+	if r.Model == "" {
+		return fmt.Errorf("model is required")
+	}
+	if len(r.OperationID) > 512 {
+		return fmt.Errorf("operation_id is too long")
+	}
+	if len(r.Answer) > 128*1024 {
+		return fmt.Errorf("answer is too long")
+	}
+	if len(r.Model) > 512 {
+		return fmt.Errorf("model is too long")
+	}
+	anchor, err := r.Anchor.Normalized()
+	if err != nil {
+		return err
+	}
+	r.Anchor = anchor
+	return nil
+}
+
+type FailExternalConversationTurnRequest struct {
+	OperationID    string             `json:"operation_id"`
+	Anchor         ConversationAnchor `json:"-"`
+	FailureCode    string             `json:"failure_code"`
+	FailureMessage string             `json:"failure_message"`
+}
+
+func (r *FailExternalConversationTurnRequest) Validate() error {
+	r.OperationID = strings.TrimSpace(r.OperationID)
+	r.FailureCode = strings.TrimSpace(r.FailureCode)
+	r.FailureMessage = strings.TrimSpace(r.FailureMessage)
+	if r.OperationID == "" {
+		return fmt.Errorf("operation_id is required")
+	}
+	if r.FailureCode == "" {
+		return fmt.Errorf("failure_code is required")
+	}
+	if len(r.OperationID) > 512 {
+		return fmt.Errorf("operation_id is too long")
+	}
+	if len(r.FailureCode) > 128 {
+		return fmt.Errorf("failure_code is too long")
+	}
+	if len(r.FailureMessage) > 512 {
+		return fmt.Errorf("failure_message is too long")
+	}
+	anchor, err := r.Anchor.Normalized()
+	if err != nil {
+		return err
+	}
+	r.Anchor = anchor
+	return nil
 }
 
 type ConversationServiceConfig struct {

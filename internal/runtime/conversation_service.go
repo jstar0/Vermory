@@ -29,70 +29,118 @@ func NewConversationService(store *Store, tenantID string, llm provider.Provider
 }
 
 func (s *ConversationService) Chat(ctx context.Context, request ChatTurnRequest) (ChatTurnReceipt, error) {
-	if err := s.configured(); err != nil {
+	if err := s.configuredForChat(); err != nil {
 		return ChatTurnReceipt{}, err
 	}
-	if err := request.Validate(); err != nil {
-		return ChatTurnReceipt{}, err
-	}
-	resolution, err := s.store.ResolveOrCreateConversation(ctx, s.tenantID, request.Anchor)
+	prepared, err := s.prepareConversationTurn(ctx, request, true)
 	if err != nil {
 		return ChatTurnReceipt{}, err
 	}
-	turn, err := s.store.BeginConversationTurn(ctx, s.tenantID, resolution.ContinuityID, request)
-	if err != nil {
-		return ChatTurnReceipt{}, err
-	}
-	if turn.Replayed || turn.Status != ChatTurnInProgress {
-		return turn, nil
-	}
-
-	defaults, err := s.store.ListActiveGlobalDefaults(ctx, s.tenantID)
-	if err != nil {
-		return s.failTurn(ctx, turn, "global_defaults_retrieval_error", err)
-	}
-	memories, err := s.store.SearchActiveConversationMemory(ctx, s.tenantID, resolution.ContinuityID, request.Message, s.config.MemoryLimit)
-	if err != nil {
-		return s.failTurn(ctx, turn, "memory_retrieval_error", err)
-	}
-	recent, err := s.store.ListRecentConversationObservations(ctx, s.tenantID, resolution.ContinuityID, turn.UserObservationID, s.config.RecentLimit)
-	if err != nil {
-		return s.failTurn(ctx, turn, "history_retrieval_error", err)
-	}
-	contextPacket := BuildConversationContext(defaults, memories, recent)
-	delivery, err := s.store.RecordDelivery(
-		ctx,
-		s.tenantID,
-		resolution.ContinuityID,
-		"conversation-delivery:"+request.OperationID,
-		request.Message,
-		contextPacket,
-	)
-	if err != nil {
-		return s.failTurn(ctx, turn, "delivery_error", err)
+	if prepared.Status != ChatTurnInProgress {
+		return prepared.ChatTurnReceipt, nil
 	}
 
 	generated, err := s.provider.Generate(ctx, provider.GenerateRequest{
 		Model:         s.model,
 		System:        conversationSystemPrompt,
 		Prompt:        request.Message,
-		ContextPacket: delivery.Context,
+		ContextPacket: prepared.Context,
 	})
 	if err != nil {
-		return s.failTurn(ctx, turn, "provider_error", err)
+		return s.failTurn(ctx, prepared.ChatTurnReceipt, "provider_error", err)
 	}
 	model := strings.TrimSpace(generated.Model)
 	if model == "" {
 		model = s.model
 	}
-	return s.store.CompleteConversationTurn(
-		ctx,
-		s.tenantID,
-		turn.ID,
-		delivery.DeliveryID,
-		strings.TrimSpace(generated.Output),
-		model,
-	)
+	return s.CompleteExternalTurn(ctx, CompleteExternalConversationTurnRequest{
+		OperationID: request.OperationID,
+		Anchor:      request.Anchor,
+		Answer:      generated.Output,
+		Model:       model,
+	})
+}
+
+func (s *ConversationService) PrepareExternalTurn(ctx context.Context, request ExternalConversationTurnRequest) (PreparedConversationTurn, error) {
+	if err := request.Validate(); err != nil {
+		return PreparedConversationTurn{}, err
+	}
+	return s.prepareConversationTurn(ctx, ChatTurnRequest{
+		OperationID: request.OperationID,
+		Anchor:      request.Anchor,
+		Message:     request.Message,
+	}, false)
+}
+
+func (s *ConversationService) CompleteExternalTurn(ctx context.Context, request CompleteExternalConversationTurnRequest) (ChatTurnReceipt, error) {
+	if err := s.configured(); err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	resolution, err := s.confirmedConversation(ctx, request.Anchor)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	turn, err := s.store.LookupConversationTurn(ctx, s.tenantID, request.OperationID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	if turn.ContinuityID != resolution.ContinuityID {
+		return ChatTurnReceipt{}, fmt.Errorf("operation_id is already bound to another conversation turn")
+	}
+	switch turn.Status {
+	case ChatTurnCompleted:
+		if turn.Answer != request.Answer || turn.Model != request.Model {
+			return ChatTurnReceipt{}, fmt.Errorf("operation_id is already bound to another conversation completion")
+		}
+		turn.Replayed = true
+		return turn, nil
+	case ChatTurnFailed:
+		return ChatTurnReceipt{}, fmt.Errorf("conversation turn is already failed")
+	case ChatTurnInProgress:
+		if turn.DeliveryID == "" {
+			return ChatTurnReceipt{}, fmt.Errorf("conversation turn has no prepared delivery")
+		}
+	default:
+		return ChatTurnReceipt{}, fmt.Errorf("conversation turn has invalid status %q", turn.Status)
+	}
+	return s.store.CompleteConversationTurn(ctx, s.tenantID, turn.ID, turn.DeliveryID, request.Answer, request.Model)
+}
+
+func (s *ConversationService) FailExternalTurn(ctx context.Context, request FailExternalConversationTurnRequest) (ChatTurnReceipt, error) {
+	if err := s.configured(); err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	resolution, err := s.confirmedConversation(ctx, request.Anchor)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	turn, err := s.store.LookupConversationTurn(ctx, s.tenantID, request.OperationID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	if turn.ContinuityID != resolution.ContinuityID {
+		return ChatTurnReceipt{}, fmt.Errorf("operation_id is already bound to another conversation turn")
+	}
+	switch turn.Status {
+	case ChatTurnFailed:
+		if turn.FailureCode != request.FailureCode || turn.FailureMessage != request.FailureMessage {
+			return ChatTurnReceipt{}, fmt.Errorf("operation_id is already bound to another conversation failure")
+		}
+		turn.Replayed = true
+		return turn, nil
+	case ChatTurnCompleted:
+		return ChatTurnReceipt{}, fmt.Errorf("conversation turn is already completed")
+	case ChatTurnInProgress:
+	default:
+		return ChatTurnReceipt{}, fmt.Errorf("conversation turn has invalid status %q", turn.Status)
+	}
+	return s.store.FailConversationTurn(ctx, s.tenantID, turn.ID, request.FailureCode, request.FailureMessage)
 }
 
 func (s *ConversationService) Confirm(ctx context.Context, request ConfirmConversationMemoryRequest) (MemoryReceipt, error) {
@@ -206,6 +254,68 @@ func BuildConversationContext(defaults, memories []Memory, recent []Conversation
 	return strings.Join(sections, "\n\n")
 }
 
+func (s *ConversationService) prepareConversationTurn(ctx context.Context, request ChatTurnRequest, includeRecent bool) (PreparedConversationTurn, error) {
+	if err := s.configured(); err != nil {
+		return PreparedConversationTurn{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return PreparedConversationTurn{}, err
+	}
+	resolution, err := s.store.ResolveOrCreateConversation(ctx, s.tenantID, request.Anchor)
+	if err != nil {
+		return PreparedConversationTurn{}, err
+	}
+	turn, err := s.store.BeginConversationTurn(ctx, s.tenantID, resolution.ContinuityID, request)
+	if err != nil {
+		return PreparedConversationTurn{}, err
+	}
+	if turn.Status != ChatTurnInProgress {
+		return PreparedConversationTurn{ChatTurnReceipt: turn}, nil
+	}
+
+	defaults, err := s.store.ListActiveGlobalDefaults(ctx, s.tenantID)
+	if err != nil {
+		return s.failPreparedTurn(ctx, turn, "global_defaults_retrieval_error", err)
+	}
+	memories, err := s.store.SearchActiveConversationMemory(ctx, s.tenantID, resolution.ContinuityID, request.Message, s.config.MemoryLimit)
+	if err != nil {
+		return s.failPreparedTurn(ctx, turn, "memory_retrieval_error", err)
+	}
+	var recent []ConversationObservation
+	if includeRecent {
+		recent, err = s.store.ListRecentConversationObservations(ctx, s.tenantID, resolution.ContinuityID, turn.UserObservationID, s.config.RecentLimit)
+		if err != nil {
+			return s.failPreparedTurn(ctx, turn, "history_retrieval_error", err)
+		}
+	}
+	contextPacket := BuildConversationContext(defaults, memories, recent)
+	delivery, err := s.store.RecordDelivery(
+		ctx,
+		s.tenantID,
+		resolution.ContinuityID,
+		"conversation-delivery:"+request.OperationID,
+		request.Message,
+		contextPacket,
+	)
+	if err != nil {
+		return s.failPreparedTurn(ctx, turn, "delivery_error", err)
+	}
+	attached, err := s.store.AttachConversationTurnDelivery(ctx, s.tenantID, turn.ID, delivery.DeliveryID)
+	if err != nil {
+		return s.failPreparedTurn(ctx, turn, "delivery_attachment_error", err)
+	}
+	attached.Replayed = turn.Replayed || delivery.Replayed || attached.Replayed
+	return PreparedConversationTurn{ChatTurnReceipt: attached, Context: delivery.Context}, nil
+}
+
+func (s *ConversationService) failPreparedTurn(ctx context.Context, turn ChatTurnReceipt, code string, cause error) (PreparedConversationTurn, error) {
+	failed, err := s.failTurn(ctx, turn, code, cause)
+	if err != nil {
+		return PreparedConversationTurn{}, err
+	}
+	return PreparedConversationTurn{ChatTurnReceipt: failed}, nil
+}
+
 func (s *ConversationService) failTurn(ctx context.Context, turn ChatTurnReceipt, code string, cause error) (ChatTurnReceipt, error) {
 	message := strings.TrimSpace(cause.Error())
 	if len(message) > 512 {
@@ -215,8 +325,18 @@ func (s *ConversationService) failTurn(ctx context.Context, turn ChatTurnReceipt
 }
 
 func (s *ConversationService) configured() error {
-	if s.store == nil || s.tenantID == "" || s.provider == nil {
+	if s.store == nil || s.tenantID == "" {
 		return fmt.Errorf("conversation service is not configured")
+	}
+	return nil
+}
+
+func (s *ConversationService) configuredForChat() error {
+	if err := s.configured(); err != nil {
+		return err
+	}
+	if s.provider == nil {
+		return fmt.Errorf("conversation provider is not configured")
 	}
 	return nil
 }
