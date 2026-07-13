@@ -36,11 +36,11 @@
 - Consumes: existing reality case schema and current I01 authenticated case.
 - Produces: immutable migration, dump/restore, projection-loss, outage, and Linux portability pressures.
 
-- [ ] **Step 1: Write the failing I02 case validation**
+- [x] **Step 1: Write the failing I02 case validation**
 
 Require pressures named `migration_replay`, `backup_restore`, `projection_rebuild`, `runtime_role_reprovision`, `database_outage`, `linux_amd64`, and `linux_arm64`; require no credential-shaped fixture values.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 go test -count=1 ./internal/reality -run 'Test.*I02'
@@ -48,14 +48,14 @@ go test -count=1 ./internal/reality -run 'Test.*I02'
 
 Expected: FAIL because I02 and its fixture lock do not exist.
 
-- [ ] **Step 3: Freeze hashes and validate**
+- [x] **Step 3: Freeze hashes and validate**
 
 ```bash
 go test -count=1 ./internal/reality
 git diff --check
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add reality/cases/I02-postgresql-operations-recovery internal/reality

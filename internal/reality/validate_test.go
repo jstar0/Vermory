@@ -229,6 +229,38 @@ func TestI01AuthenticatedMultiTenantCaseIsFrozen(t *testing.T) {
 	}
 }
 
+func TestI02PostgreSQLOperationsRecoveryCaseIsFrozen(t *testing.T) {
+	c, err := LoadCase("../../reality/cases/I02-postgresql-operations-recovery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ValidateCase(c); len(got) != 0 {
+		t.Fatalf("expected valid I02 case, got violations: %#v", got)
+	}
+
+	requireStrings(t, c.Manifest.Pressures,
+		"migration_replay",
+		"backup_restore",
+		"projection_rebuild",
+		"runtime_role_reprovision",
+		"database_outage",
+		"linux_amd64",
+		"linux_arm64",
+	)
+	for _, source := range c.Manifest.Sources {
+		data, err := os.ReadFile(filepath.Join("../../reality/cases/I02-postgresql-operations-recovery", source.FixturePath))
+		if err != nil {
+			t.Fatal(err)
+		}
+		lower := strings.ToLower(string(data))
+		for _, forbidden := range []string{"vmt_", "sk-", "password=", "postgresql://"} {
+			if strings.Contains(lower, forbidden) {
+				t.Fatalf("fixture %s contains credential-shaped value %q", source.FixturePath, forbidden)
+			}
+		}
+	}
+}
+
 func loadValidCase(t *testing.T) Case {
 	t.Helper()
 	c, err := LoadCase("../../reality/testdata/valid-public")
