@@ -12,6 +12,10 @@ import (
 )
 
 func (s *Store) SearchActiveConversationMemory(ctx context.Context, tenantID, continuityID, query string, limit int) ([]Memory, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("search query is required")
@@ -105,7 +109,11 @@ LIMIT $4`, tenantID, continuityID, query, limit)
 const conversationUserSourceRef = "conversation:user"
 
 func (s *Store) ResolveConversation(ctx context.Context, tenantID string, anchor ConversationAnchor) (ConversationResolution, error) {
-	anchor, err := anchor.Normalized()
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return ConversationResolution{}, err
+	}
+	anchor, err = anchor.Normalized()
 	if err != nil {
 		return ConversationResolution{}, err
 	}
@@ -137,7 +145,11 @@ WHERE b.tenant_id = $1 AND b.channel = $2 AND b.thread_id = $3
 }
 
 func (s *Store) ResolveOrCreateConversation(ctx context.Context, tenantID string, anchor ConversationAnchor) (ConversationResolution, error) {
-	anchor, err := anchor.Normalized()
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return ConversationResolution{}, err
+	}
+	anchor, err = anchor.Normalized()
 	if err != nil {
 		return ConversationResolution{}, err
 	}
@@ -200,6 +212,10 @@ VALUES ($1::uuid, $2, $3, $4, 'confirmed')`, continuityID, tenantID, anchor.Chan
 }
 
 func (s *Store) ListRecentConversationObservations(ctx context.Context, tenantID, continuityID, beforeObservationID string, limit int) ([]ConversationObservation, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
 	if limit <= 0 {
 		limit = defaultRecentConversationObservations
 	}
@@ -209,7 +225,7 @@ func (s *Store) ListRecentConversationObservations(ctx context.Context, tenantID
 
 	var beforeSequence int64
 	if beforeObservationID != "" {
-		err := s.pool.QueryRow(ctx, `
+		err = s.pool.QueryRow(ctx, `
 SELECT o.observation_seq
 FROM observations o
 JOIN continuity_spaces c ON c.id = o.continuity_id
@@ -258,6 +274,10 @@ LIMIT $4`, tenantID, continuityID, beforeSequence, limit)
 }
 
 func (s *Store) ListConversationObservations(ctx context.Context, tenantID, continuityID string, limit int) ([]ConversationObservation, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
 	if limit <= 0 || limit > maxRecentConversationObservations {
 		limit = maxRecentConversationObservations
 	}
@@ -291,6 +311,10 @@ LIMIT $3`, tenantID, continuityID, limit)
 }
 
 func (s *Store) ConfirmConversationObservation(ctx context.Context, tenantID, continuityID, observationID, operationID string) (MemoryReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return MemoryReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return MemoryReceipt{}, fmt.Errorf("begin conversation confirmation: %w", err)
@@ -360,6 +384,10 @@ VALUES ($1::uuid, $2, $3::uuid, $4, to_tsvector('simple', $4))`, memoryID, tenan
 }
 
 func (s *Store) BeginConversationTurn(ctx context.Context, tenantID, continuityID string, request ChatTurnRequest) (ChatTurnReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return ChatTurnReceipt{}, fmt.Errorf("begin conversation turn: %w", err)
@@ -414,6 +442,10 @@ RETURNING id::text, operation_id, status, continuity_id::text, user_observation_
 }
 
 func (s *Store) AttachConversationTurnDelivery(ctx context.Context, tenantID, turnID, deliveryID string) (ChatTurnReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return ChatTurnReceipt{}, fmt.Errorf("begin conversation delivery attachment: %w", err)
@@ -467,6 +499,10 @@ WHERE id = $2::uuid AND tenant_id = $3`, deliveryID, turnID, tenantID); err != n
 }
 
 func (s *Store) LookupConversationTurn(ctx context.Context, tenantID, operationID string) (ChatTurnReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return ChatTurnReceipt{}, fmt.Errorf("begin conversation turn lookup: %w", err)
@@ -486,6 +522,10 @@ func (s *Store) LookupConversationTurn(ctx context.Context, tenantID, operationI
 }
 
 func (s *Store) CompleteConversationTurn(ctx context.Context, tenantID, turnID, deliveryID, answer, model string) (ChatTurnReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return ChatTurnReceipt{}, fmt.Errorf("begin conversation completion: %w", err)
@@ -558,6 +598,10 @@ WHERE id = $6::uuid`, deliveryID, assistant.ObservationID, answer, conversationC
 }
 
 func (s *Store) FailConversationTurn(ctx context.Context, tenantID, turnID, failureCode, failureMessage string) (ChatTurnReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return ChatTurnReceipt{}, fmt.Errorf("begin failed conversation turn: %w", err)

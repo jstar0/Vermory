@@ -10,12 +10,16 @@ import (
 )
 
 func (s *Store) EnsureGlobalDefaultsContinuity(ctx context.Context, tenantID string) (string, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return "", err
+	}
 	tenantID = strings.TrimSpace(tenantID)
 	if tenantID == "" {
 		return "", fmt.Errorf("tenant_id is required")
 	}
 	var continuityID string
-	err := s.pool.QueryRow(ctx, `
+	err = s.pool.QueryRow(ctx, `
 INSERT INTO continuity_spaces (tenant_id, continuity_line, state)
 VALUES ($1, 'global_defaults', 'active')
 ON CONFLICT (tenant_id)
@@ -38,6 +42,10 @@ WHERE tenant_id = $1 AND continuity_line = 'global_defaults' AND state = 'active
 }
 
 func (s *Store) ListActiveGlobalDefaults(ctx context.Context, tenantID string) ([]Memory, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
 	continuityID, err := s.EnsureGlobalDefaultsContinuity(ctx, tenantID)
 	if err != nil {
 		return nil, err
@@ -67,6 +75,10 @@ ORDER BY memory_key ASC, created_at ASC`, tenantID, continuityID)
 }
 
 func (s *Store) ListGlobalDefaults(ctx context.Context, tenantID string) (string, []GovernedMemory, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return "", nil, err
+	}
 	continuityID, err := s.EnsureGlobalDefaultsContinuity(ctx, tenantID)
 	if err != nil {
 		return "", nil, err
@@ -79,6 +91,10 @@ func (s *Store) ListGlobalDefaults(ctx context.Context, tenantID string) (string
 }
 
 func (s *Store) SetGlobalDefault(ctx context.Context, tenantID, operationID, memoryKey, content string) (GovernedObservationReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return GovernedObservationReceipt{}, err
+	}
 	continuityID, err := s.EnsureGlobalDefaultsContinuity(ctx, tenantID)
 	if err != nil {
 		return GovernedObservationReceipt{}, err
@@ -137,6 +153,10 @@ SELECT EXISTS (
 }
 
 func (s *Store) CorrectGlobalDefault(ctx context.Context, tenantID, operationID, memoryID, content string) (GovernedObservationReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return GovernedObservationReceipt{}, err
+	}
 	continuityID, err := s.EnsureGlobalDefaultsContinuity(ctx, tenantID)
 	if err != nil {
 		return GovernedObservationReceipt{}, err
@@ -206,6 +226,10 @@ WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid
 }
 
 func (s *Store) ForgetGlobalDefault(ctx context.Context, tenantID, operationID, memoryID string) (GovernedObservationReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return GovernedObservationReceipt{}, err
+	}
 	continuityID, err := s.EnsureGlobalDefaultsContinuity(ctx, tenantID)
 	if err != nil {
 		return GovernedObservationReceipt{}, err

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -69,11 +70,54 @@ type Store struct {
 	databaseURL string
 }
 
+type StoreOptions struct {
+	EnforceTenantContext bool
+}
+
 func OpenStore(ctx context.Context, databaseURL string) (*Store, error) {
+	return OpenStoreWithOptions(ctx, databaseURL, StoreOptions{})
+}
+
+func OpenStoreWithOptions(ctx context.Context, databaseURL string, options StoreOptions) (*Store, error) {
 	if strings.TrimSpace(databaseURL) == "" {
 		return nil, errors.New("runtime store: database URL is required")
 	}
-	pool, err := pgxpool.New(ctx, databaseURL)
+	config, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("open runtime store: %w", err)
+	}
+	if options.EnforceTenantContext {
+		previousPrepare := config.PrepareConn
+		config.PrepareConn = func(acquireCtx context.Context, conn *pgx.Conn) (bool, error) {
+			if previousPrepare != nil {
+				valid, err := previousPrepare(acquireCtx, conn)
+				if !valid || err != nil {
+					return valid, err
+				}
+			}
+			tenantID, ok := tenantFromContext(acquireCtx)
+			if !ok {
+				if _, err := conn.Exec(acquireCtx, `SELECT set_config('vermory.tenant_id', '', false)`); err != nil {
+					return false, err
+				}
+				return true, ErrTenantContextRequired
+			}
+			if _, err := conn.Exec(acquireCtx, `SELECT set_config('vermory.tenant_id', $1, false)`, tenantID); err != nil {
+				return false, err
+			}
+			return true, nil
+		}
+		previousRelease := config.AfterRelease
+		config.AfterRelease = func(conn *pgx.Conn) bool {
+			resetCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			if _, err := conn.Exec(resetCtx, `SELECT set_config('vermory.tenant_id', '', false)`); err != nil {
+				return false
+			}
+			return previousRelease == nil || previousRelease(conn)
+		}
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("open runtime store: %w", err)
 	}
@@ -109,7 +153,11 @@ TRUNCATE vermory_auth.api_tokens,
 }
 
 func (s *Store) ResolveWorkspace(ctx context.Context, tenantID string, anchor WorkspaceAnchor) (WorkspaceResolution, error) {
-	anchor, err := anchor.Normalized()
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return WorkspaceResolution{}, err
+	}
+	anchor, err = anchor.Normalized()
 	if err != nil {
 		return WorkspaceResolution{}, err
 	}
@@ -143,7 +191,67 @@ WHERE b.tenant_id = $1 AND b.repo_root = $2 AND b.binding_state = 'confirmed'
 	return WorkspaceResolution{}, fmt.Errorf("resolve workspace binding: %w", err)
 }
 
+func (s *Store) ValidateRuntimeRole(ctx context.Context) error {
+	validationCtx, err := withTenantContext(ctx, "__runtime_validation__")
+	if err != nil {
+		return ErrUnsafeRuntimeRole
+	}
+	var canLogin, superuser, bypassRLS bool
+	if err := s.pool.QueryRow(validationCtx, `
+SELECT rolcanlogin, rolsuper, rolbypassrls
+FROM pg_roles
+WHERE rolname = current_user`).Scan(&canLogin, &superuser, &bypassRLS); err != nil {
+		return fmt.Errorf("validate runtime database role: %w", err)
+	}
+	if !canLogin || superuser || bypassRLS {
+		return ErrUnsafeRuntimeRole
+	}
+	tables := []string{
+		"continuity_spaces", "continuity_bindings", "conversation_bindings", "observations",
+		"governed_memories", "memory_deliveries", "memory_search_documents", "conversation_turns",
+		"bridge_operations", "bridge_events", "bridge_memory_effects", "conversation_links",
+	}
+	var ownedTables int
+	if err := s.pool.QueryRow(validationCtx, `
+SELECT count(*)
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public'
+  AND c.relname = ANY($1::text[])
+  AND c.relowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)`, tables).Scan(&ownedTables); err != nil {
+		return fmt.Errorf("validate runtime table ownership: %w", err)
+	}
+	if ownedTables != 0 {
+		return ErrUnsafeRuntimeRole
+	}
+	forbiddenTables := []string{
+		"vermory_auth.api_tokens",
+		"public.projects", "public.sources", "public.source_versions", "public.claims",
+		"public.capsules", "public.capsule_claims", "public.packets", "public.audit_logs", "public.wcef_runs",
+	}
+	var hasForbiddenPrivileges bool
+	if err := s.pool.QueryRow(validationCtx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM unnest($1::text[]) AS forbidden(table_name)
+  WHERE has_table_privilege(current_user, forbidden.table_name, 'SELECT')
+     OR has_table_privilege(current_user, forbidden.table_name, 'INSERT')
+     OR has_table_privilege(current_user, forbidden.table_name, 'UPDATE')
+     OR has_table_privilege(current_user, forbidden.table_name, 'DELETE')
+)`, forbiddenTables).Scan(&hasForbiddenPrivileges); err != nil {
+		return fmt.Errorf("validate runtime privilege boundary: %w", err)
+	}
+	if hasForbiddenPrivileges {
+		return ErrUnsafeRuntimeRole
+	}
+	return nil
+}
+
 func (s *Store) ConfirmWorkspaceBinding(ctx context.Context, tenantID, repoRoot string) (string, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return "", err
+	}
 	anchor, err := (WorkspaceAnchor{RepoRoot: repoRoot}).Normalized()
 	if err != nil {
 		return "", err
@@ -187,6 +295,10 @@ VALUES ($1::uuid, $2, $3, 'confirmed')`, continuityID, tenantID, anchor.RepoRoot
 }
 
 func (s *Store) CommitObservation(ctx context.Context, tenantID, continuityID string, request CommitObservationRequest) (ObservationReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return ObservationReceipt{}, err
+	}
 	if err := request.Validate(); err != nil {
 		return ObservationReceipt{}, err
 	}
@@ -207,6 +319,10 @@ func (s *Store) CommitObservation(ctx context.Context, tenantID, continuityID st
 }
 
 func (s *Store) CommitGovernedObservation(ctx context.Context, tenantID, continuityID string, request CommitObservationRequest) (GovernedObservationReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return GovernedObservationReceipt{}, err
+	}
 	if err := request.Validate(); err != nil {
 		return GovernedObservationReceipt{}, err
 	}
@@ -287,6 +403,10 @@ RETURNING id::text`, tenantID, continuityID, request.OperationID, request.Kind, 
 }
 
 func (s *Store) RecordDelivery(ctx context.Context, tenantID, continuityID, operationID, task, contextBody string) (DeliveryReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return DeliveryReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return DeliveryReceipt{}, fmt.Errorf("begin context delivery: %w", err)
@@ -323,8 +443,12 @@ RETURNING id::text`, tenantID, continuityID, operationID, task, contextBody).Sca
 }
 
 func (s *Store) DeliveryContinuity(ctx context.Context, tenantID, deliveryID string) (string, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return "", err
+	}
 	var continuityID string
-	err := s.pool.QueryRow(ctx, `
+	err = s.pool.QueryRow(ctx, `
 SELECT continuity_id::text
 FROM memory_deliveries
 WHERE id = $1::uuid AND tenant_id = $2`, deliveryID, tenantID).Scan(&continuityID)
@@ -338,6 +462,10 @@ WHERE id = $1::uuid AND tenant_id = $2`, deliveryID, tenantID).Scan(&continuityI
 }
 
 func (s *Store) GovernObservation(ctx context.Context, tenantID, continuityID, observationID string, request CommitObservationRequest) (MemoryReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return MemoryReceipt{}, err
+	}
 	if err := request.Validate(); err != nil {
 		return MemoryReceipt{}, err
 	}
@@ -421,6 +549,10 @@ VALUES ($1::uuid, $2, $3::uuid, $4, to_tsvector('simple', $4))`, memoryID, tenan
 }
 
 func (s *Store) DeleteMemory(ctx context.Context, tenantID, continuityID, memoryID string) error {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin delete governed memory: %w", err)
@@ -529,6 +661,10 @@ WHERE tenant_id = $1
 }
 
 func (s *Store) RebuildProjection(ctx context.Context, tenantID, continuityID string) error {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin projection rebuild: %w", err)
@@ -553,6 +689,10 @@ WHERE tenant_id = $1 AND continuity_id = $2::uuid AND lifecycle_status = 'active
 }
 
 func (s *Store) ListGovernedMemories(ctx context.Context, tenantID, continuityID string) ([]GovernedMemory, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := s.pool.Query(ctx, `
 SELECT id::text, memory_key, lifecycle_status, content, COALESCE(supersedes_memory_id::text, '')
 FROM governed_memories
@@ -578,6 +718,10 @@ ORDER BY created_at ASC, id ASC`, tenantID, continuityID)
 }
 
 func (s *Store) SearchActiveMemory(ctx context.Context, tenantID, continuityID, query string, limit int) ([]Memory, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("search query is required")

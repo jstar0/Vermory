@@ -15,10 +15,14 @@ type selectedBridgeMemory struct {
 }
 
 func (s *Store) ReplayBridgeOperation(ctx context.Context, tenantID, operationID string, action BridgeAction, fingerprint string) (BridgeReceipt, bool, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return BridgeReceipt{}, false, err
+	}
 	var bridgeID string
 	var existingAction BridgeAction
 	var existingFingerprint string
-	err := s.pool.QueryRow(ctx, `
+	err = s.pool.QueryRow(ctx, `
 SELECT id::text, action, request_fingerprint
 FROM bridge_operations
 WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(&bridgeID, &existingAction, &existingFingerprint)
@@ -40,6 +44,10 @@ WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(&bridge
 }
 
 func (s *Store) PromoteConversationMemory(ctx context.Context, tenantID, operationID, sourceContinuityID, targetContinuityID, sourceAnchor, targetAnchor string, memoryIDs []string) (BridgeReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return BridgeReceipt{}, fmt.Errorf("begin bridge promotion: %w", err)
@@ -107,6 +115,10 @@ VALUES ($1::uuid, $2, 'promote', $3::uuid, $4::uuid, $5)`, operation.ID, tenantI
 }
 
 func (s *Store) ExportWorkspaceMemory(ctx context.Context, tenantID, operationID, sourceContinuityID, sourceAnchor string, memoryIDs []string, title, targetProfile string) (BridgeReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return BridgeReceipt{}, fmt.Errorf("begin bridge export: %w", err)
@@ -155,6 +167,10 @@ VALUES ($1::uuid, $2, 'export', $3::uuid, $4)`, operation.ID, tenantID, memory.I
 }
 
 func (s *Store) LinkConversationContinuities(ctx context.Context, tenantID, operationID, primaryContinuityID, linkedContinuityID, primaryAnchor, linkedAnchor string) (BridgeReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return BridgeReceipt{}, fmt.Errorf("begin conversation link: %w", err)
@@ -220,6 +236,10 @@ VALUES ($1::uuid, $2, $3::uuid, $4::uuid, 'active')`, operation.ID, tenantID, pr
 }
 
 func (s *Store) AdoptWorkspaceBinding(ctx context.Context, tenantID, operationID, continuityID, existingRoot, newRoot string) (BridgeReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return BridgeReceipt{}, fmt.Errorf("begin workspace adopt: %w", err)
@@ -260,6 +280,10 @@ VALUES ($1::uuid, $2, $3, 'confirmed')`, continuityID, tenantID, newRoot); err !
 }
 
 func (s *Store) RebindWorkspaceBinding(ctx context.Context, tenantID, operationID, continuityID, oldRoot, newRoot string) (BridgeReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return BridgeReceipt{}, fmt.Errorf("begin workspace rebind: %w", err)
@@ -305,6 +329,10 @@ VALUES ($1::uuid, $2, $3, 'confirmed')`, continuityID, tenantID, newRoot); err !
 }
 
 func (s *Store) ReverseBridge(ctx context.Context, tenantID, operationID, bridgeID string) (BridgeReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return BridgeReceipt{}, fmt.Errorf("begin bridge reversal: %w", err)
@@ -633,10 +661,14 @@ VALUES ($1, $2::uuid, $3, $4)`, tenantID, bridgeID, eventType, operationID); err
 }
 
 func (s *Store) InspectBridge(ctx context.Context, tenantID, bridgeID string) (BridgeReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
 	tenantID = strings.TrimSpace(tenantID)
 	bridgeID = strings.TrimSpace(bridgeID)
 	var receipt BridgeReceipt
-	err := s.pool.QueryRow(ctx, `
+	err = s.pool.QueryRow(ctx, `
 SELECT id::text, operation_id, action, status,
        COALESCE(source_continuity_id::text, ''), COALESCE(target_continuity_id::text, ''),
        source_anchor, target_anchor, target_profile, title, export_body, reverse_operation_id

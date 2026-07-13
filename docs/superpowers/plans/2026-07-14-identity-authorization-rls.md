@@ -245,7 +245,7 @@ func OpenStoreWithOptions(context.Context, string, StoreOptions) (*Store, error)
 func (s *Store) ValidateRuntimeRole(context.Context) error
 ```
 
-- [ ] **Step 1: Write failing pool/RLS tests**
+- [x] **Step 1: Write failing pool/RLS tests**
 
 Create a non-owner test role, grant runtime privileges, then prove:
 
@@ -255,26 +255,26 @@ Create a non-owner test role, grant runtime privileges, then prove:
 - A/B/A/B pool reuse and concurrency never carry stale tenant settings;
 - `ValidateRuntimeRole` rejects superuser, `BYPASSRLS`, and table owner identities.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime -run 'TestTenantPool|TestRuntimeRole' -v
 ```
 
-- [ ] **Step 3: Implement tenant context and pool hooks**
+- [x] **Step 3: Implement tenant context and pool hooks**
 
 `BeforeAcquire` sets the server-derived tenant GUC. `AfterRelease` resets it with a bounded context and discards the connection if reset fails. Missing tenant context fails closed.
 
-- [ ] **Step 4: Scope every tenant-bearing store entry point**
+- [x] **Step 4: Scope every tenant-bearing store entry point**
 
 At the beginning of every public store method that accepts `tenantID`, attach the normalized tenant to the context before any pool operation. Private helpers preserve that context. Migration/reset methods remain admin-only and do not use the enforced pool.
 
-- [ ] **Step 5: Implement runtime-role validation**
+- [x] **Step 5: Implement runtime-role validation**
 
 Check `current_user`, `rolsuper`, `rolbypassrls`, and ownership of served tables. Return a safe startup error without connection strings or role passwords.
 
-- [ ] **Step 6: Verify all runtime tests and commit**
+- [x] **Step 6: Verify all runtime tests and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
