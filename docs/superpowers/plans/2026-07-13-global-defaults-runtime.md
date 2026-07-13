@@ -245,15 +245,15 @@ git commit -m "test: prove global defaults runtime hard gates"
 - Consumes: built `vermory` binary, PostgreSQL, loopback Web Chat, and authenticated local Grok CLI.
 - Produces: redacted, reproducible real-provider evidence and a completed checklist.
 
-- [ ] **Step 1: Build and start the real runtime**
+- [x] **Step 1: Build and start the real runtime**
 
 Use a temporary tenant and local database. Set the Chinese default through the explicit management API or CLI, then run the loopback Web Chat with `--provider grok-cli`.
 
-- [ ] **Step 2: Execute the G01 replay**
+- [x] **Step 2: Execute the G01 replay**
 
 Capture durable receipts for Chinese default behavior, English task-local override, later unrelated Chinese behavior, unchanged inspection, workspace injection, correction/deletion, and post-delete absence. Do not record credentials or deleted sensitive content.
 
-- [ ] **Step 3: Run release verification**
+- [x] **Step 3: Run release verification**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
@@ -265,7 +265,7 @@ go build ./cmd/vermory
 git diff --check
 ```
 
-- [ ] **Step 4: Write evidence and complete every checklist item**
+- [x] **Step 4: Write evidence and complete every checklist item**
 
 Evidence must distinguish deterministic assertions from real-model behavior and include commands, provider/model identity, durable receipt IDs, lifecycle results, and redaction-safe excerpts.
 
