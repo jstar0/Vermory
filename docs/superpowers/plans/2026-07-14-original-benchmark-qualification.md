@@ -79,11 +79,11 @@ git commit -m "feat: qualify official benchmark evidence"
 - Produces: `benchmark.RetrieveSessions(record LongMemEvalRecord, limit int) []LongMemEvalSession`
 - Produces: `benchmark.ScoreAnswer(record LongMemEvalRecord, response string) DeterministicScore`
 
-- [ ] **Step 1: Write failing loader and scorer tests**
+- [x] **Step 1: Write failing loader and scorer tests**
 
 Cover duplicate/missing IDs, malformed parallel session arrays, stable frozen selection order, lexical retrieval determinism, normalized exact match, token F1, answer-token recall, and abstention detection.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -93,15 +93,15 @@ go test ./internal/benchmark -run 'TestLongMemEval|TestSelect|TestRetrieve|TestS
 
 Expected: FAIL because the loader and scorer do not exist.
 
-- [ ] **Step 3: Implement minimal loader and scorer**
+- [x] **Step 3: Implement minimal loader and scorer**
 
 Use Go standard-library JSON parsing and Unicode-aware token normalization. Keep scores numeric and retain raw responses; do not convert the custom deterministic metrics into an official LongMemEval accuracy.
 
-- [ ] **Step 4: Derive and verify the fixture**
+- [x] **Step 4: Derive and verify the fixture**
 
 Extract only the frozen record IDs from the verified `821a2034...` oracle artifact. Verify fixture IDs, source digest metadata, and a committed fixture SHA-256 recorded in the execution manifest.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 Run the focused tests, then:
 

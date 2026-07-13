@@ -73,6 +73,15 @@ func TestExecutionRejectsDatasetDigestMismatch(t *testing.T) {
 	}
 }
 
+func TestExecutionRequiresFrozenSampleFixture(t *testing.T) {
+	manifest := validExecution()
+	manifest.FixturePath = ""
+	manifest.FixtureSHA256 = ""
+	if err := ValidateExecution(validQualification(), manifest); err == nil || !strings.Contains(err.Error(), "sample execution requires a frozen fixture") {
+		t.Fatalf("expected frozen-fixture rejection, got %v", err)
+	}
+}
+
 func TestExecutionAcceptsQualifiedDatasetSample(t *testing.T) {
 	if err := ValidateExecution(validQualification(), validExecution()); err != nil {
 		t.Fatalf("expected valid sample execution, got %v", err)
@@ -116,6 +125,8 @@ func validExecution() ExecutionManifest {
 		ExecutionScope:    ExecutionScopeSample,
 		ClaimScope:        ClaimScopeDatasetSample,
 		SamplingRule:      "frozen factual records selected before provider execution",
+		FixturePath:       "casebook/benchmarks/fixtures/longmemeval-oracle-sample.json",
+		FixtureSHA256:     "bfd60ccc2f577a1f4e0596797a5143c4b6cf1169d18ace4b349c7ef87142a3f2",
 		SelectedRecordIDs: []string{
 			"record-a",
 			"record-b",

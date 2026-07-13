@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -91,6 +92,8 @@ type ExecutionManifest struct {
 	ExecutionScope    ExecutionScope    `json:"execution_scope"`
 	ClaimScope        ClaimScope        `json:"claim_scope"`
 	SamplingRule      string            `json:"sampling_rule,omitempty"`
+	FixturePath       string            `json:"fixture_path,omitempty"`
+	FixtureSHA256     string            `json:"fixture_sha256,omitempty"`
 	SelectedRecordIDs []string          `json:"selected_record_ids,omitempty"`
 	HardFactual       bool              `json:"hard_factual"`
 	Scorers           []ExecutionScorer `json:"scorers,omitempty"`
@@ -120,6 +123,26 @@ func LoadExecution(path string) (ExecutionManifest, error) {
 		return ExecutionManifest{}, err
 	}
 	return manifest, nil
+}
+
+func VerifyFileSHA256(path, expected string) error {
+	if !sha256Pattern.MatchString(expected) {
+		return fmt.Errorf("expected sha256 must be lowercase SHA-256")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return err
+	}
+	actual := fmt.Sprintf("%x", hash.Sum(nil))
+	if actual != expected {
+		return fmt.Errorf("file sha256 mismatch: got %s, want %s", actual, expected)
+	}
+	return nil
 }
 
 func (q Qualification) Validate() error {
@@ -195,6 +218,9 @@ func ValidateExecution(qualification Qualification, manifest ExecutionManifest) 
 	case ExecutionScopeSample:
 		if strings.TrimSpace(manifest.SamplingRule) == "" || len(manifest.SelectedRecordIDs) == 0 {
 			return fmt.Errorf("sample execution requires sampling_rule and selected_record_ids")
+		}
+		if strings.TrimSpace(manifest.FixturePath) == "" || !sha256Pattern.MatchString(manifest.FixtureSHA256) {
+			return fmt.Errorf("sample execution requires a frozen fixture path and SHA-256")
 		}
 		if manifest.ClaimScope == ClaimScopeBenchmarkWide {
 			return fmt.Errorf("sample execution cannot claim benchmark_wide")
