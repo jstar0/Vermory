@@ -97,7 +97,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 func (s *Store) ResetForTest(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 TRUNCATE memory_search_documents, memory_deliveries, governed_memories,
-  observations, conversation_bindings, continuity_bindings, continuity_spaces CASCADE`)
+  conversation_turns, observations, conversation_bindings, continuity_bindings, continuity_spaces CASCADE`)
 	if err != nil {
 		return fmt.Errorf("reset runtime store: %w", err)
 	}

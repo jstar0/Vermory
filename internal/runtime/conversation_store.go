@@ -8,6 +8,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const conversationUserSourceRef = "conversation:user"
+
 func (s *Store) ResolveOrCreateConversation(ctx context.Context, tenantID string, anchor ConversationAnchor) (ConversationResolution, error) {
 	anchor, err := anchor.Normalized()
 	if err != nil {
@@ -127,4 +129,198 @@ LIMIT $4`, tenantID, continuityID, beforeSequence, limit)
 		observations[len(reversed)-1-i] = reversed[i]
 	}
 	return observations, nil
+}
+
+func (s *Store) BeginConversationTurn(ctx context.Context, tenantID, continuityID string, request ChatTurnRequest) (ChatTurnReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("begin conversation turn: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	existing, found, err := lookupConversationTurnTx(ctx, tx, tenantID, request.OperationID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	if found {
+		var existingMessage string
+		if err := tx.QueryRow(ctx, `
+SELECT content FROM observations
+WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid`,
+			existing.UserObservationID, tenantID, existing.ContinuityID).Scan(&existingMessage); err != nil {
+			return ChatTurnReceipt{}, fmt.Errorf("lookup replayed conversation message: %w", err)
+		}
+		if existing.ContinuityID != continuityID || existingMessage != request.Message {
+			return ChatTurnReceipt{}, fmt.Errorf("operation_id is already bound to another conversation turn")
+		}
+		existing.Replayed = true
+		if err := tx.Commit(ctx); err != nil {
+			return ChatTurnReceipt{}, fmt.Errorf("commit replayed conversation turn: %w", err)
+		}
+		return existing, nil
+	}
+
+	observation, err := commitObservationTx(ctx, tx, tenantID, continuityID, CommitObservationRequest{
+		OperationID: request.OperationID,
+		Kind:        ObservationKindUserMessage,
+		Content:     request.Message,
+		SourceRef:   conversationUserSourceRef,
+	})
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
+
+	var receipt ChatTurnReceipt
+	if err := tx.QueryRow(ctx, `
+INSERT INTO conversation_turns (
+  tenant_id, continuity_id, operation_id, status, user_observation_id
+)
+VALUES ($1, $2::uuid, $3, 'in_progress', $4::uuid)
+RETURNING id::text, operation_id, status, continuity_id::text, user_observation_id::text`,
+		tenantID, continuityID, request.OperationID, observation.ObservationID).Scan(
+		&receipt.ID,
+		&receipt.OperationID,
+		&receipt.Status,
+		&receipt.ContinuityID,
+		&receipt.UserObservationID,
+	); err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("create conversation turn: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("commit conversation turn: %w", err)
+	}
+	return receipt, nil
+}
+
+func (s *Store) CompleteConversationTurn(ctx context.Context, tenantID, turnID, deliveryID, answer, model string) (ChatTurnReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("begin conversation completion: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var operationID, continuityID, status string
+	if err := tx.QueryRow(ctx, `
+SELECT operation_id, continuity_id::text, status
+FROM conversation_turns
+WHERE id = $1::uuid AND tenant_id = $2
+FOR UPDATE`, turnID, tenantID).Scan(&operationID, &continuityID, &status); err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("lock conversation turn: %w", err)
+	}
+	if ChatTurnStatus(status) != ChatTurnInProgress {
+		receipt, found, err := lookupConversationTurnTx(ctx, tx, tenantID, operationID)
+		if err != nil {
+			return ChatTurnReceipt{}, err
+		}
+		if !found {
+			return ChatTurnReceipt{}, fmt.Errorf("conversation turn disappeared during completion")
+		}
+		receipt.Replayed = true
+		if err := tx.Commit(ctx); err != nil {
+			return ChatTurnReceipt{}, fmt.Errorf("commit replayed conversation completion: %w", err)
+		}
+		return receipt, nil
+	}
+
+	var validDelivery bool
+	if err := tx.QueryRow(ctx, `
+SELECT EXISTS (
+  SELECT 1 FROM memory_deliveries
+  WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid
+)`, deliveryID, tenantID, continuityID).Scan(&validDelivery); err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("check conversation delivery: %w", err)
+	}
+	if !validDelivery {
+		return ChatTurnReceipt{}, fmt.Errorf("delivery does not belong to this conversation")
+	}
+
+	assistant, err := commitObservationTx(ctx, tx, tenantID, continuityID, CommitObservationRequest{
+		OperationID: operationID + ":assistant",
+		Kind:        ObservationKindAssistantMessage,
+		Content:     answer,
+		SourceRef:   "provider:" + model,
+	})
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	if _, err := tx.Exec(ctx, `
+UPDATE conversation_turns
+SET status = 'completed', delivery_id = $1::uuid, assistant_observation_id = $2::uuid,
+    answer = $3, provider_model = $4, failure_code = '', failure_message = '', updated_at = now()
+WHERE id = $5::uuid`, deliveryID, assistant.ObservationID, answer, model, turnID); err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("complete conversation turn: %w", err)
+	}
+	receipt, found, err := lookupConversationTurnTx(ctx, tx, tenantID, operationID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	if !found {
+		return ChatTurnReceipt{}, fmt.Errorf("completed conversation turn is missing")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("commit conversation completion: %w", err)
+	}
+	return receipt, nil
+}
+
+func (s *Store) FailConversationTurn(ctx context.Context, tenantID, turnID, failureCode, failureMessage string) (ChatTurnReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("begin failed conversation turn: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var operationID string
+	if err := tx.QueryRow(ctx, `
+UPDATE conversation_turns
+SET status = 'failed', failure_code = $1, failure_message = $2, updated_at = now()
+WHERE id = $3::uuid AND tenant_id = $4 AND status = 'in_progress'
+RETURNING operation_id`, failureCode, failureMessage, turnID, tenantID).Scan(&operationID); err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return ChatTurnReceipt{}, fmt.Errorf("fail conversation turn: %w", err)
+		}
+		if err := tx.QueryRow(ctx, `
+SELECT operation_id FROM conversation_turns WHERE id = $1::uuid AND tenant_id = $2`, turnID, tenantID).Scan(&operationID); err != nil {
+			return ChatTurnReceipt{}, fmt.Errorf("lookup existing failed conversation turn: %w", err)
+		}
+	}
+	receipt, found, err := lookupConversationTurnTx(ctx, tx, tenantID, operationID)
+	if err != nil {
+		return ChatTurnReceipt{}, err
+	}
+	if !found {
+		return ChatTurnReceipt{}, fmt.Errorf("failed conversation turn is missing")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ChatTurnReceipt{}, fmt.Errorf("commit failed conversation turn: %w", err)
+	}
+	return receipt, nil
+}
+
+func lookupConversationTurnTx(ctx context.Context, tx pgx.Tx, tenantID, operationID string) (ChatTurnReceipt, bool, error) {
+	var receipt ChatTurnReceipt
+	err := tx.QueryRow(ctx, `
+SELECT id::text, operation_id, status, continuity_id::text,
+       COALESCE(delivery_id::text, ''), user_observation_id::text,
+       COALESCE(assistant_observation_id::text, ''), answer, provider_model, failure_code
+FROM conversation_turns
+WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(
+		&receipt.ID,
+		&receipt.OperationID,
+		&receipt.Status,
+		&receipt.ContinuityID,
+		&receipt.DeliveryID,
+		&receipt.UserObservationID,
+		&receipt.AssistantObservationID,
+		&receipt.Answer,
+		&receipt.Model,
+		&receipt.FailureCode,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ChatTurnReceipt{}, false, nil
+	}
+	if err != nil {
+		return ChatTurnReceipt{}, false, fmt.Errorf("lookup conversation turn: %w", err)
+	}
+	return receipt, true, nil
 }

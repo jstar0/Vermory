@@ -151,7 +151,7 @@ git commit -m "feat: add conversation authority storage"
 - Consumes: exact conversation binding and recent observations from Task 1.
 - Produces: `NewConversationService(store, tenantID, provider, model, config)`, `ConversationService.Chat(ctx, ChatTurnRequest)`, and `ChatTurnReceipt`.
 
-- [ ] **Step 1: Write failing persistence, context, and provider-idempotency tests**
+- [x] **Step 1: Write failing persistence, context, and provider-idempotency tests**
 
 Use a counting provider that records requests:
 
@@ -179,7 +179,7 @@ Tests must prove:
 - a provider failure persists the user observation and no assistant observation;
 - redacted observations are absent from context.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./internal/runtime -run 'TestConversationService' -count=1
@@ -187,7 +187,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./inter
 
 Expected: compile failure because `ConversationService` and chat-turn persistence do not exist.
 
-- [ ] **Step 3: Add durable `conversation_turns` receipts**
+- [x] **Step 3: Add durable `conversation_turns` receipts**
 
 Create `00005_conversation_turns.sql` with:
 
@@ -212,7 +212,7 @@ CREATE TABLE conversation_turns (
 
 Implement begin, complete, fail, and lookup methods. `BeginConversationTurn` inserts the user observation and `in_progress` receipt transactionally. `CompleteConversationTurn` inserts the assistant observation and updates the receipt in one transaction.
 
-- [ ] **Step 4: Implement minimal orchestration and semantic context formatting**
+- [x] **Step 4: Implement minimal orchestration and semantic context formatting**
 
 `Chat` must:
 
@@ -233,7 +233,7 @@ generated, err := llm.Generate(ctx, provider.GenerateRequest{
 
 On provider error, persist `failed`; on success, persist the assistant observation and completed response. The model-facing packet must contain only `Governed memory:` and `Recent conversation:` semantic sections.
 
-- [ ] **Step 5: Run focused and package tests and verify GREEN**
+- [x] **Step 5: Run focused and package tests and verify GREEN**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./internal/runtime -count=1
@@ -241,7 +241,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./inter
 
 Expected: PASS with exactly one provider call for an idempotent replay.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/store/postgres/migrations/00005_conversation_turns.sql internal/runtime/conversation_types.go internal/runtime/conversation_store.go internal/runtime/conversation_service.go internal/runtime/conversation_service_test.go
