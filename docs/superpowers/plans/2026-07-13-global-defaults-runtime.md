@@ -269,7 +269,7 @@ git diff --check
 
 Evidence must distinguish deterministic assertions from real-model behavior and include commands, provider/model identity, durable receipt IDs, lifecycle results, and redaction-safe excerpts.
 
-- [ ] **Step 5: Commit, push, and update the Draft PR**
+- [x] **Step 5: Commit, push, and update the Draft PR**
 
 ```bash
 git add docs/evidence/2026-07-13-grok-global-defaults-runtime.md docs/superpowers/plans/2026-07-13-global-defaults-runtime.md
