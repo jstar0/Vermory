@@ -40,15 +40,15 @@
 - Consumes: existing frozen reality case format and fixture-lock validation.
 - Produces: immutable identities, role actions, forbidden outcomes, RLS attacks, pool-reuse order, and authenticated OpenClaw replay checks used by later acceptance.
 
-- [ ] **Step 1: Write the I01 trajectory**
+- [x] **Step 1: Write the I01 trajectory**
 
 Use tenants `identity-a` and `identity-b`, subjects `alice-client`, `alice-operator`, and `bob-operator`, the same conversation anchor under both tenants, one A-only memory, one revoked OpenClaw client token, and explicit filter-omission/cross-tenant-FK attack events.
 
-- [ ] **Step 2: Add failing reality validation**
+- [x] **Step 2: Add failing reality validation**
 
 Assert pressures include `token_expiry`, `token_revocation`, `role_denial`, `same_anchor_cross_tenant`, `filter_omission`, `cross_tenant_foreign_key`, `pool_reuse`, and `authenticated_openclaw`.
 
-- [ ] **Step 3: Verify RED**
+- [x] **Step 3: Verify RED**
 
 ```bash
 go test -count=1 ./internal/reality -run 'Test.*I01'
@@ -56,11 +56,11 @@ go test -count=1 ./internal/reality -run 'Test.*I01'
 
 Expected: FAIL because I01 and its lock are absent.
 
-- [ ] **Step 4: Freeze exact fixture hashes**
+- [x] **Step 4: Freeze exact fixture hashes**
 
 Use SHA-256 plus byte counts in the existing format. Keep token values synthetic labels only; never freeze a real credential.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 go test -count=1 ./internal/reality

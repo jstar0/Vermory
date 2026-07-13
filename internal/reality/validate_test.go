@@ -181,6 +181,54 @@ func TestO01OpenClawCaseIsFrozen(t *testing.T) {
 	}
 }
 
+func TestI01AuthenticatedMultiTenantCaseIsFrozen(t *testing.T) {
+	c, err := LoadCase("../../reality/cases/I01-authenticated-multitenant-rls")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ValidateCase(c); len(got) != 0 {
+		t.Fatalf("expected valid I01 case, got violations: %#v", got)
+	}
+
+	for _, expected := range []ContinuityLine{LineConversation, LineGlobalDefaults, LineBridge, LineSecurity} {
+		found := false
+		for _, line := range c.Manifest.ContinuityLines {
+			if line == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("I01 does not declare continuity line %q: %#v", expected, c.Manifest.ContinuityLines)
+		}
+	}
+	requireStrings(t, c.Manifest.Pressures,
+		"token_expiry",
+		"token_revocation",
+		"role_denial",
+		"same_anchor_cross_tenant",
+		"filter_omission",
+		"cross_tenant_foreign_key",
+		"pool_reuse",
+		"authenticated_openclaw",
+	)
+	for _, anchor := range []string{
+		"identity-a/openclaw/agent:main:shared-anchor",
+		"identity-b/openclaw/agent:main:shared-anchor",
+	} {
+		found := false
+		for _, candidate := range c.Manifest.Anchors {
+			if candidate.Value == anchor && !candidate.Ambiguous {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("missing unambiguous I01 anchor %q", anchor)
+		}
+	}
+}
+
 func loadValidCase(t *testing.T) Case {
 	t.Helper()
 	c, err := LoadCase("../../reality/testdata/valid-public")

@@ -17,28 +17,31 @@ func TestBuildExperiment0ReportsFrozenPublicCoverage(t *testing.T) {
 	if !report.Pass || !report.PublicValidation.Pass {
 		t.Fatalf("expected public evidence to pass: %#v", report)
 	}
-	if len(report.PublicValidation.Results) != 7 {
-		t.Fatalf("expected seven cases, got %d", len(report.PublicValidation.Results))
+	if len(report.PublicValidation.Results) != 8 {
+		t.Fatalf("expected eight cases, got %d", len(report.PublicValidation.Results))
 	}
 	for _, result := range report.PublicValidation.Results {
 		if result.LockSHA256 == "" {
 			t.Fatalf("case %s has no fixture lock hash", result.CaseID)
 		}
 	}
-	if len(report.ContinuityCoverage[string(LineWorkspace)]) != 3 || len(report.ContinuityCoverage[string(LineConversation)]) != 5 {
+	if len(report.ContinuityCoverage[string(LineWorkspace)]) != 3 || len(report.ContinuityCoverage[string(LineConversation)]) != 6 {
 		t.Fatalf("unexpected continuity coverage: %#v", report.ContinuityCoverage)
 	}
-	if len(report.ContinuityCoverage[string(LineBridge)]) != 3 {
-		t.Fatalf("expected three bridge cases, got %#v", report.ContinuityCoverage)
+	if len(report.ContinuityCoverage[string(LineBridge)]) != 4 {
+		t.Fatalf("expected four bridge cases, got %#v", report.ContinuityCoverage)
 	}
 	if len(report.PressureCoverage["explicit_deletion"]) != 1 {
 		t.Fatalf("expected deletion pressure coverage: %#v", report.PressureCoverage)
 	}
-	if report.EvidenceLevels[string(EvidencePublic)] != 7 || report.SealedStatus != "unavailable" {
+	if report.EvidenceLevels[string(EvidencePublic)] != 8 || report.SealedStatus != "unavailable" {
 		t.Fatalf("unexpected evidence status: levels=%#v sealed=%q", report.EvidenceLevels, report.SealedStatus)
 	}
 	if !containsText(report.Limitations, "target discovery coverage remains incomplete") {
 		t.Fatalf("expected incomplete-target limitation: %#v", report.Limitations)
+	}
+	if got := report.HypothesisSignals["H-013"]; len(got) != 1 || got[0] != "I01-authenticated-multitenant-rls" {
+		t.Fatalf("unexpected RLS hypothesis signal: %#v", got)
 	}
 }
 
