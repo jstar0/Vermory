@@ -52,10 +52,10 @@ Experiment 0 已完成，当前仓库已经具备：
 - 确定性的 `fixture-lock.json` 与冻结后变更检测；
 - `public` 和 `withheld_local` 证据等级，并拒绝把本地可读目录伪装成 sealed；
 - 外部 sealed evaluator 的 Ed25519 attestation 验签能力；
-- 8 个覆盖 workspace、conversation、Global Defaults、删除、source injection、durable bridge、OpenClaw 日常事务连续性与 authenticated multi-tenant RLS 的公开冻结案例；
+- 9 个覆盖 workspace、conversation、Global Defaults、删除、source injection、durable bridge、OpenClaw 日常事务连续性、authenticated multi-tenant RLS 与 PostgreSQL 运维恢复的公开冻结案例；
 - JSON 和 Markdown 实验报告。
 
-仓库同时已经包含 workspace、conversation、Global Defaults、durable bridge、OpenClaw external-turn lifecycle 和 authenticated multi-tenant HTTP profile 的生产形态运行切片。认证 profile 使用服务端发行且只保存 digest 的 token、角色路由、非 owner PostgreSQL runtime identity、tenant-aware foreign keys，以及覆盖当前 continuity graph 的 RLS。每份证据只对实际执行过的客户端、模型、故障条件和确定性硬门负责，任何单一切片都不被当成“整个平台已经完成”的证明。
+仓库同时已经包含 workspace、conversation、Global Defaults、durable bridge、OpenClaw external-turn lifecycle、authenticated multi-tenant HTTP profile 和原生 PostgreSQL 恢复的生产形态运行切片。认证 profile 使用服务端发行且只保存 digest 的 token、角色路由、非 owner PostgreSQL runtime identity、tenant-aware foreign keys，以及覆盖当前 continuity graph 的 RLS。恢复证据覆盖迁移重放、原生 dump/restore、投影重建、runtime role 重建和有界数据库中断恢复。每份证据只对实际执行过的客户端、模型、故障条件和确定性硬门负责，任何单一切片都不被当成“整个平台已经完成”的证明。
 
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
@@ -112,7 +112,7 @@ PATH="/opt/homebrew/opt/node@24/bin:$PATH" \
 
 loopback 部署、OpenClaw trust 配置、runtime inspection、确认/纠正/删除、显式 link、故障语义、隔离状态重放和卸载步骤见 [OpenClaw 运行接入指南](docs/integrations/openclaw-runtime.md)。
 
-authenticated 部署、token 生命周期、runtime role 授权、TLS 规则、RLS 验证、备份与撤销边界见[身份授权与 PostgreSQL RLS 指南](docs/integrations/identity-authorization-rls.md)。对应的[实证报告](docs/evidence/2026-07-14-identity-authorization-rls.md)包含确定性租户隔离硬门和真实 OpenClaw/Grok 认证回放。
+authenticated 部署、token 生命周期、runtime role 授权、TLS 规则、RLS 验证、备份、恢复、投影重建与撤销边界见[身份授权与 PostgreSQL RLS 指南](docs/integrations/identity-authorization-rls.md)。[身份授权实证](docs/evidence/2026-07-14-identity-authorization-rls.md)包含确定性租户隔离硬门和真实 OpenClaw/Grok 认证回放；[PostgreSQL 运维恢复实证](docs/evidence/2026-07-14-postgresql-operations-recovery.md)记录原生 dump/restore、投影丢失与重建、数据库中断恢复。
 
 ## 开发原则
 

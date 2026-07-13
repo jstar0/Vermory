@@ -56,10 +56,10 @@ Experiment 0 is complete. It provides:
 - deterministic `fixture-lock.json` generation and mutation detection;
 - public and `withheld_local` evidence levels without fake local sealing;
 - Ed25519 verification for attestations received from an external sealed evaluator;
-- eight frozen public cases covering workspace continuity, conversation continuity, Global Defaults, deletion, source injection, durable bridges, OpenClaw everyday-use continuity, and authenticated multi-tenant RLS;
+- nine frozen public cases covering workspace continuity, conversation continuity, Global Defaults, deletion, source injection, durable bridges, OpenClaw everyday-use continuity, authenticated multi-tenant RLS, and PostgreSQL operations recovery;
 - JSON and Markdown Experiment 0 reports.
 
-The repository also contains production-shaped runtime slices for workspace and conversation continuity, Global Defaults, durable bridges, the OpenClaw external-turn lifecycle, and an authenticated multi-tenant HTTP profile. The authenticated profile uses server-issued digest-only tokens, role-gated routes, a non-owner PostgreSQL runtime identity, tenant-aware foreign keys, and RLS on the served continuity graph. Each evidence document is scoped to the exact client, model, failure mode, and deterministic hard gates it executed; no individual slice is treated as proof that the complete platform is finished.
+The repository also contains production-shaped runtime slices for workspace and conversation continuity, Global Defaults, durable bridges, the OpenClaw external-turn lifecycle, an authenticated multi-tenant HTTP profile, and native PostgreSQL recovery. The authenticated profile uses server-issued digest-only tokens, role-gated routes, a non-owner PostgreSQL runtime identity, tenant-aware foreign keys, and RLS on the served continuity graph. Recovery evidence covers migration replay, native dump/restore, projection rebuild, runtime-role re-provisioning, and bounded database outage recovery. Each evidence document is scoped to the exact client, model, failure mode, and deterministic hard gates it executed; no individual slice is treated as proof that the complete platform is finished.
 
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
@@ -136,7 +136,7 @@ PATH="/opt/homebrew/opt/node@24/bin:$PATH" \
 
 See the [OpenClaw runtime integration guide](docs/integrations/openclaw-runtime.md) for loopback deployment, trust configuration, runtime inspection, governance actions, failure behavior, isolated-state replay, and uninstall steps.
 
-For authenticated deployment, token lifecycle, runtime-role provisioning, TLS rules, RLS verification, backup, and revocation, see [Identity, Authorization, And PostgreSQL RLS](docs/integrations/identity-authorization-rls.md). The corresponding [evidence report](docs/evidence/2026-07-14-identity-authorization-rls.md) includes deterministic tenant-isolation gates and a real authenticated OpenClaw/Grok replay.
+For authenticated deployment, token lifecycle, runtime-role provisioning, TLS rules, RLS verification, backup, restore, projection rebuild, and revocation, see [Identity, Authorization, And PostgreSQL RLS](docs/integrations/identity-authorization-rls.md). The [identity evidence](docs/evidence/2026-07-14-identity-authorization-rls.md) includes deterministic tenant-isolation gates and a real authenticated OpenClaw/Grok replay; the [operations recovery evidence](docs/evidence/2026-07-14-postgresql-operations-recovery.md) records native dump/restore, projection loss/rebuild, and database outage recovery.
 
 ## Repository Layout
 

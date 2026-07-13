@@ -119,35 +119,35 @@ git commit -m "test: prove runtime recovery invariants"
 - Consumes: a dedicated PostgreSQL source database, `pg_dump`, `pg_restore`, current runtime binary, and Task 2 assertions.
 - Produces: safe restore transcript, source/target fingerprints, token/RLS/projection checks, and operator instructions.
 
-- [ ] **Step 1: Prepare dedicated source and target databases**
+- [x] **Step 1: Prepare dedicated source and target databases**
 
 Use names under `vermory_ops_i02_*` only. Create separate admin/runtime roles, apply migrations through `database migrate`, and never use the repository test database as the restore target.
 
-- [ ] **Step 2: Capture custom dump**
+- [x] **Step 2: Capture custom dump**
 
 ```bash
-pg_dump --format=custom --no-owner --file=/tmp/vermory-ops-i02.dump "$SOURCE_ADMIN_DATABASE_URL"
+pg_dump --format=custom --no-owner --no-acl --file=/tmp/vermory-ops-i02.dump "$SOURCE_ADMIN_DATABASE_URL"
 ```
 
 Do not print the DSN or dump contents. Record only command status, byte size, and SHA-256.
 
-- [ ] **Step 3: Restore into empty target and reprovision runtime role**
+- [x] **Step 3: Restore into empty target and reprovision runtime role**
 
 ```bash
 createdb --maintenance-db="$TARGET_ADMIN_MAINTENANCE_URL" "$TARGET_DATABASE_NAME"
-pg_restore --exit-on-error --no-owner --dbname="$TARGET_ADMIN_DATABASE_URL" /tmp/vermory-ops-i02.dump
+pg_restore --exit-on-error --no-owner --no-acl --dbname="$TARGET_ADMIN_DATABASE_URL" /tmp/vermory-ops-i02.dump
 ./bin/vermory database grant-runtime --database-url "$TARGET_ADMIN_DATABASE_URL" --role vermory_ops_i02_runtime
 ```
 
-- [ ] **Step 4: Run source/target deterministic comparisons**
+- [x] **Step 4: Run source/target deterministic comparisons**
 
 Compare migration version, authoritative row fingerprints, token status counts, RLS policy inventory, role attributes, projection rebuild counts, exact active recall, deleted-fact absence, and cross-tenant FK rejection.
 
-- [ ] **Step 5: Document backup sensitivity and removal boundary**
+- [x] **Step 5: Document backup sensitivity and removal boundary**
 
 State that token digests are sensitive authentication material, raw secrets are unrecoverable, roles may require separate cluster bootstrap, and uninstall does not delete the database implicitly.
 
-- [ ] **Step 6: Commit evidence**
+- [x] **Step 6: Commit evidence**
 
 ```bash
 git diff --check

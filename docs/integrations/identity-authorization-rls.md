@@ -195,14 +195,59 @@ PostgreSQL is authoritative. Back up the complete database, including `vermory_a
 
 Token digests are authentication material even though raw secrets cannot be recovered from them. Encrypt backups, limit restore access, and treat an exposed backup as a reason to revoke and reissue affected tokens.
 
+Create a native custom-format dump without copying source ownership or source-role ACLs:
+
+```bash
+pg_dump \
+  --format=custom \
+  --no-owner \
+  --no-acl \
+  --file=/secure/path/vermory.dump \
+  "$VERMORY_ADMIN_DATABASE_URL"
+```
+
+PostgreSQL custom format is not encryption. Encrypt and access-control the dump during storage and transfer.
+
+Restore into a newly created empty database with an admin identity:
+
+```bash
+createdb \
+  --maintenance-db="$POSTGRES_ADMIN_MAINTENANCE_URL" \
+  "$VERMORY_TARGET_DATABASE_NAME"
+
+pg_restore \
+  --exit-on-error \
+  --no-owner \
+  --no-acl \
+  --dbname="$VERMORY_TARGET_ADMIN_DATABASE_URL" \
+  /secure/path/vermory.dump
+```
+
 PostgreSQL roles and passwords are cluster-level objects and may require separate role/bootstrap automation. After restore:
 
-1. apply any newer migrations with the admin connection;
+1. apply any newer migrations with `database migrate` and the admin connection;
 2. recreate the restricted runtime login if needed;
 3. rerun `database grant-runtime`;
-4. run startup role validation through `serve`;
-5. verify missing-context and filter-omission RLS queries;
-6. verify active/revoked token counts before accepting traffic.
+4. rebuild disposable search state with `database rebuild-projections`;
+5. run startup role validation through `serve`;
+6. verify missing-context and filter-omission RLS queries;
+7. verify active/revoked token behavior before accepting traffic.
+
+```bash
+./bin/vermory database migrate \
+  --database-url "$VERMORY_TARGET_ADMIN_DATABASE_URL"
+
+./bin/vermory database grant-runtime \
+  --database-url "$VERMORY_TARGET_ADMIN_DATABASE_URL" \
+  --role vermory_runtime
+
+./bin/vermory database rebuild-projections \
+  --database-url "$VERMORY_TARGET_ADMIN_DATABASE_URL"
+```
+
+The projection rebuild runs in one transaction and inserts only active governed memories. Deleted and superseded content must remain absent from exact and related recall after rebuild.
+
+The reproducible local restore evidence is recorded in [PostgreSQL Operations And Recovery Evidence](../evidence/2026-07-14-postgresql-operations-recovery.md).
 
 ## Shutdown And Removal
 
@@ -217,4 +262,3 @@ For access removal:
 5. retain, archive, or delete the Vermory database according to the operator's data-governance policy.
 
 Deleting the database is separate from revoking runtime access and must never be an implicit uninstall action.
-
