@@ -11,6 +11,7 @@ import (
 	"runtime/debug"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"vermory/internal/artifact"
 	"vermory/internal/benchmark"
@@ -369,7 +370,7 @@ func runLongMemEvalCondition(
 				OperationID:    operationID,
 				Anchor:         anchor,
 				FailureCode:    "provider_error",
-				FailureMessage: generateErr.Error(),
+				FailureMessage: truncateLongMemEvalFailure(generateErr.Error()),
 			})
 			if err != nil {
 				return LongMemEvalConditionResult{}, err
@@ -598,4 +599,16 @@ func buildVCSRevision() string {
 
 func roundBenchmarkMetric(value float64) float64 {
 	return float64(int(value*10000+0.5)) / 10000
+}
+
+func truncateLongMemEvalFailure(message string) string {
+	message = strings.TrimSpace(message)
+	if len(message) <= 512 {
+		return message
+	}
+	limit := 512
+	for limit > 0 && !utf8.ValidString(message[:limit]) {
+		limit--
+	}
+	return message[:limit]
 }

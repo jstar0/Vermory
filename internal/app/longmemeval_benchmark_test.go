@@ -93,7 +93,8 @@ func TestLongMemEvalRunnerRetainsProviderFailures(t *testing.T) {
 	for _, record := range records {
 		answers[record.Question] = record.Answer
 	}
-	llm := &recordingBenchmarkProvider{answers: answers, failAt: 3}
+	longFailure := "planned provider failure: " + strings.Repeat("x", 700)
+	llm := &recordingBenchmarkProvider{answers: answers, failAt: 3, failureMessage: longFailure}
 
 	report, err := RunLongMemEvalSample(context.Background(), LongMemEvalOptions{
 		QualificationPath: paths.qualification,
@@ -114,7 +115,7 @@ func TestLongMemEvalRunnerRetainsProviderFailures(t *testing.T) {
 	for _, result := range report.Results {
 		if result.Status == "failed" {
 			failed++
-			if !strings.Contains(result.Error, "planned provider failure") {
+			if result.Error != longFailure {
 				t.Fatalf("failure reason was not retained: %#v", result)
 			}
 		}
@@ -284,16 +285,21 @@ WHERE delivery.tenant_id = $1
 }
 
 type recordingBenchmarkProvider struct {
-	answers map[string]string
-	calls   []provider.GenerateRequest
-	failAt  int
+	answers        map[string]string
+	calls          []provider.GenerateRequest
+	failAt         int
+	failureMessage string
 }
 
 func (p *recordingBenchmarkProvider) Generate(_ context.Context, request provider.GenerateRequest) (provider.GenerateResponse, error) {
 	callIndex := len(p.calls)
 	p.calls = append(p.calls, request)
 	if callIndex == p.failAt {
-		return provider.GenerateResponse{}, errors.New("planned provider failure")
+		message := p.failureMessage
+		if message == "" {
+			message = "planned provider failure"
+		}
+		return provider.GenerateResponse{}, errors.New(message)
 	}
 	answer := p.answers[request.Prompt]
 	return provider.GenerateResponse{Output: answer, Model: request.Model, RawArtifact: []byte(`{"test":true}`)}, nil
