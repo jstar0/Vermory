@@ -236,6 +236,6 @@ go build -o /tmp/vermory-bridges-release ./cmd/vermory
 git diff --check
 ```
 
-- [ ] **Step 5: Complete checklist, commit, push, and update Draft PR**
+- [x] **Step 5: Complete checklist, commit, push, and update Draft PR**
 
 Evidence must separate deterministic authority from model behavior and preserve failed probes. Keep PR 1 Draft and keep the overall project goal active.
