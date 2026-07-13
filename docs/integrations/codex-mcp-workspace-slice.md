@@ -80,3 +80,7 @@ failure instead of replacing it with a scripted pass.
 `source_ref` is audit-only. Keep it to an approved opaque fixture reference or
 repository-relative identifier; do not send absolute personal paths, raw source
 content, tokens, or credentials into the tool.
+
+## Executed Evidence
+
+The official Codex CLI completed this contract against the W04 disposable workspace after the MCP server's non-interactive tool approval was explicitly scoped to `approve`. The run preserved two earlier approval-cancelled failures and the final successful `prepare_context -> file -> grep -> commit_observation` sequence. See [Codex MCP Real-Client Evidence](../evidence/2026-07-14-codex-mcp-real-client.md).

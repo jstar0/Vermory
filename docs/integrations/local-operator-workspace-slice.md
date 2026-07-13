@@ -116,10 +116,12 @@ and verification output, then call `commit_observation` with the delivery
 receipt. Its write-back must remain `proposed`. Preserve a redacted delivery
 and observation ledger under ignored `artifacts/runtime/W03/`.
 
-The Go tests in this repository prove the command and lifecycle contract, not
-that a model invoked the MCP tools. A Codex replay remains unavailable when
-the official Codex account is out of quota; do not replace that unavailable
-evidence with a scripted pass or a Grok result.
+The Go tests in this repository prove the command and lifecycle contract, but
+a qualifying client replay must still show the client tool calls and the
+corresponding PostgreSQL ledger. A successful Codex replay is recorded in
+[Codex MCP Real-Client Evidence](../evidence/2026-07-14-codex-mcp-real-client.md);
+a failed client attempt remains failure evidence and must not be replaced by a
+scripted pass or a Grok result.
 
 After a temporary replay, remove the user-local server if it is no longer
 needed:

@@ -123,6 +123,8 @@ Generated artifacts are written below `artifacts/` and are intentionally not com
 
 ## OpenClaw Integration
 
+The local workspace MCP path has also been executed by the official Codex CLI. Codex called `prepare_context`, created and verified a repository artifact from the governed current fact, and called `commit_observation`; PostgreSQL retained the write-back as `proposed`. See [Codex MCP Real-Client Evidence](docs/evidence/2026-07-14-codex-mcp-real-client.md).
+
 The `@vermory/openclaw` lifecycle plugin uses OpenClaw's canonical `sessionKey` and `runId`, injects governed semantic context during `before_prompt_build`, and records the final turn lifecycle during `agent_end`. It does not replace OpenClaw transcript storage, memory slots, channels, or model routing.
 
 Build and check the plugin:

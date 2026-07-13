@@ -97,7 +97,7 @@ go run ./cmd/vermory experiment-0 \
 
 ## 本地工作区治理
 
-普通 AI 客户端只通过 MCP 获取已确认工作区的有效上下文，并把任务结果写回为待确认观察。工作区确认、来源事实记录、指定事实纠正和指定事实遗忘由本机操作者显式执行，不作为模型工具开放。完整命令、JSON 回执和 Grok 本地重放边界见[本地工作区治理指南](docs/integrations/local-operator-workspace-slice.md)。
+普通 AI 客户端只通过 MCP 获取已确认工作区的有效上下文，并把任务结果写回为待确认观察。工作区确认、来源事实记录、指定事实纠正和指定事实遗忘由本机操作者显式执行，不作为模型工具开放。完整命令与边界见[本地工作区治理指南](docs/integrations/local-operator-workspace-slice.md)；[Codex MCP 真实客户端实证](docs/evidence/2026-07-14-codex-mcp-real-client.md)记录了 Codex 自行调用 `prepare_context`、生成并验证文件、调用 `commit_observation`，以及 PostgreSQL 将结果保持为 `proposed` 的完整链路。
 
 ## OpenClaw 接入
 
