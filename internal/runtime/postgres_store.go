@@ -478,14 +478,16 @@ UPDATE memory_deliveries
 SET context_body = replace(context_body, $3, '[redacted]')
 WHERE tenant_id = $1 AND continuity_id = $2::uuid
 	  AND position($3 IN context_body) > 0`
+		arguments := []any{tenantID, continuityID, memoryContent}
 		if continuityLine == "global_defaults" {
 			query = `
 UPDATE memory_deliveries
-SET context_body = replace(context_body, $3, '[redacted]')
+SET context_body = replace(context_body, $2, '[redacted]')
 WHERE tenant_id = $1
-  AND position($3 IN context_body) > 0`
+	  AND position($2 IN context_body) > 0`
+			arguments = []any{tenantID, memoryContent}
 		}
-		if _, err := tx.Exec(ctx, query, tenantID, continuityID, memoryContent); err != nil {
+		if _, err := tx.Exec(ctx, query, arguments...); err != nil {
 			return fmt.Errorf("redact memory from delivery history: %w", err)
 		}
 	}
