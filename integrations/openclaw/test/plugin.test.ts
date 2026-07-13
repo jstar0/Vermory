@@ -126,6 +126,37 @@ describe("Vermory OpenClaw plugin", () => {
     });
   });
 
+  it("uses model metadata from the visible assistant message when hook context omits it", async () => {
+    const fetchMock = vi.fn(async (_input: unknown, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      return jsonResponse(completedReceipt(body.operation_id));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const harness = registerPlugin();
+
+    await harness.agentEnd(
+      {
+        success: true,
+        messages: [
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "NO_GOVERNED_MEMORY_YET" }],
+            api: "cli",
+            provider: "grok-cli",
+            model: "grok-4.5",
+          },
+        ],
+      },
+      {
+        sessionKey: "agent:main:home-maintenance-a",
+        runId: "311d7e80-9443-4ec6-9143-936dde1746ad",
+      },
+    );
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(JSON.parse(String(init?.body)).model).toBe("grok-cli/grok-4.5");
+  });
+
   it.each([
     [false, [{ role: "assistant", content: "partial answer" }], "openclaw_agent_error"],
     [true, [{ role: "assistant", content: [{ type: "tool_call", name: "calendar" }] }], "openclaw_empty_output"],

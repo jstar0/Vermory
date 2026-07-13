@@ -1,4 +1,11 @@
-export function extractLatestAssistantText(messages: unknown[]): string | undefined {
+export type VisibleAssistantOutput = {
+  text: string;
+  model?: string;
+};
+
+export function extractLatestAssistantOutput(
+  messages: unknown[],
+): VisibleAssistantOutput | undefined {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
     if (!isRecord(message) || message.role !== "assistant") {
@@ -7,11 +14,19 @@ export function extractLatestAssistantText(messages: unknown[]): string | undefi
 
     const text = extractVisibleContent(message.content);
     if (text) {
-      return text;
+      const model = extractModelLabel(message);
+      return {
+        text,
+        ...(model ? { model } : {}),
+      };
     }
   }
 
   return undefined;
+}
+
+export function extractLatestAssistantText(messages: unknown[]): string | undefined {
+  return extractLatestAssistantOutput(messages)?.text;
 }
 
 function extractVisibleContent(content: unknown): string | undefined {
@@ -36,4 +51,13 @@ function extractVisibleContent(content: unknown): string | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function extractModelLabel(message: Record<string, unknown>): string | undefined {
+  const provider = typeof message.provider === "string" ? message.provider.trim() : "";
+  const model = typeof message.model === "string" ? message.model.trim() : "";
+  if (provider && model) {
+    return `${provider}/${model}`;
+  }
+  return model || provider || undefined;
 }

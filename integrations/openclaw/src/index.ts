@@ -3,7 +3,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { VermoryClient } from "./client.js";
 import { normalizePluginConfig } from "./config.js";
 import { resolveTurnIdentity } from "./identity.js";
-import { extractLatestAssistantText } from "./messages.js";
+import { extractLatestAssistantOutput } from "./messages.js";
 
 const REFERENCE_CONTEXT_PREFIX = [
   "Vermory reference data follows.",
@@ -67,7 +67,7 @@ const plugin: ReturnType<typeof definePluginEntry> = definePluginEntry({
         }
 
         try {
-          const answer = extractLatestAssistantText(event.messages);
+          const output = extractLatestAssistantOutput(event.messages);
           if (!event.success) {
             await client.fail({
               ...identity,
@@ -76,7 +76,7 @@ const plugin: ReturnType<typeof definePluginEntry> = definePluginEntry({
             });
             return;
           }
-          if (!answer) {
+          if (!output) {
             await client.fail({
               ...identity,
               failureCode: "openclaw_empty_output",
@@ -87,8 +87,8 @@ const plugin: ReturnType<typeof definePluginEntry> = definePluginEntry({
 
           await client.complete({
             ...identity,
-            answer,
-            model: resolveModelLabel(context),
+            answer: output.text,
+            model: resolveModelLabel(context, output.model),
           });
         } catch {
           api.logger.warn(
@@ -106,7 +106,10 @@ export default plugin;
 function resolveModelLabel(context: {
   modelProviderId?: string;
   modelId?: string;
-}): string {
+}, assistantModel?: string): string {
+  if (assistantModel) {
+    return assistantModel;
+  }
   const provider = context.modelProviderId?.trim();
   const model = context.modelId?.trim();
   if (provider && model) {
