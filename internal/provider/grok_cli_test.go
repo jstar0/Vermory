@@ -44,13 +44,24 @@ func TestGrokCLIProviderRunsIsolatedSingleTurnAndCapturesJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read captured arguments: %v", err)
 	}
+	lines := strings.Split(strings.TrimSpace(string(arguments)), "\n")
+	for index, line := range lines {
+		if line == "--max-turns" {
+			if index+1 >= len(lines) || lines[index+1] != "2" {
+				t.Fatalf("expected Grok max turns 2, got %q", strings.Join(lines, " "))
+			}
+			break
+		}
+		if index == len(lines)-1 {
+			t.Fatalf("expected --max-turns in Grok arguments: %q", strings.Join(lines, " "))
+		}
+	}
 	for _, want := range []string{
 		"--no-memory",
 		"--disable-web-search",
 		"--no-plan",
 		"--no-subagents",
 		"--max-turns",
-		"1",
 		"--permission-mode",
 		"dontAsk",
 		"--output-format",
