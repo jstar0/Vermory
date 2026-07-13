@@ -165,7 +165,7 @@ git commit -m "docs: record PostgreSQL recovery evidence"
 - Consumes: `cmd/vermory`, current Go module, available Linux runtime, and `serve` configuration validation.
 - Produces: architecture-specific ELF artifacts and startup evidence without credentials.
 
-- [ ] **Step 1: Build both artifacts**
+- [x] **Step 1: Build both artifacts**
 
 ```bash
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o artifacts/release/2026-07-14/vermory-linux-amd64 ./cmd/vermory
@@ -173,15 +173,15 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o artifacts/release/2026-07-14/v
 file artifacts/release/2026-07-14/vermory-linux-amd64 artifacts/release/2026-07-14/vermory-linux-arm64
 ```
 
-- [ ] **Step 2: Run Linux startup probes**
+- [x] **Step 2: Run Linux startup probes**
 
 Run `--help` and unsafe `serve` configuration probes on a real Linux runtime. If Colima/Lima emulation is used, record architecture and emulation explicitly.
 
-- [ ] **Step 3: Write checksummed manifest and evidence**
+- [x] **Step 3: Write checksummed manifest and evidence**
 
 The manifest records only paths, architecture, size, SHA-256, Go version, kernel/runtime architecture, and exit status.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git diff --check
