@@ -98,6 +98,8 @@ type ChatTurnReceipt struct {
 	FailureCode            string         `json:"failure_code,omitempty"`
 	FailureMessage         string         `json:"-"`
 	Replayed               bool           `json:"replayed"`
+	RequestFingerprint     string         `json:"-"`
+	AnswerFingerprint      string         `json:"-"`
 }
 
 type ExternalConversationTurnRequest struct {

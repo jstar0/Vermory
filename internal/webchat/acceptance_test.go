@@ -255,6 +255,176 @@ func TestB02LinkedConversationsWorkspaceRebindAcceptance(t *testing.T) {
 	}
 }
 
+func TestO01OpenClawContinuityAcceptance(t *testing.T) {
+	caseDir := filepath.Join("..", "..", "reality", "cases", "O01-openclaw-home-maintenance")
+	manifest := loadFrozenManifest(t, filepath.Join(caseDir, "manifest.json"))
+	events := loadFrozenEvents(t, filepath.Join(caseDir, "events.jsonl"))
+	if manifest.ID != "O01-openclaw-home-maintenance" {
+		t.Fatalf("unexpected O01 manifest: %#v", manifest)
+	}
+
+	const (
+		tenantID        = "o01"
+		model           = "grok-cli/grok-4.5"
+		accessCode      = "CEDAR-4826"
+		appointmentOld  = "The plumbing inspection is Friday at 15:30."
+		appointmentNew  = "The plumbing inspection is Saturday at 10:00."
+		concierge       = "The technician must check in with the concierge."
+		languageDefault = "默认使用中文回答，除非当前任务明确要求其他语言。"
+	)
+	ctx := context.Background()
+	anchorA := runtime.ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:home-maintenance-a"}
+	anchorB := runtime.ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:home-maintenance-b"}
+	anchorC := runtime.ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:unrelated-c"}
+
+	store := openAcceptanceStore(t, true)
+	service := runtime.NewConversationService(store, tenantID, nil, "", runtime.ConversationServiceConfig{})
+	defaults := runtime.NewGlobalDefaultsService(store, tenantID)
+	bridges := runtime.NewBridgeService(store, tenantID)
+	handler := NewHandlerWithGovernance(service, defaults, bridges)
+
+	appointmentTurn := runOpenClawTurn(t, handler, "o01-appointment", anchorA.ThreadID, events[1], appointmentOld, model)
+	appointmentMemory := confirmObservation(t, handler, "o01-confirm-appointment", conversationInput{Channel: anchorA.Channel, ThreadID: anchorA.ThreadID}, appointmentTurn.AssistantObservationID)
+	conciergeTurn := runOpenClawTurn(t, handler, "o01-concierge", anchorA.ThreadID, events[2], concierge, model)
+	_ = confirmObservation(t, handler, "o01-confirm-concierge", conversationInput{Channel: anchorA.Channel, ThreadID: anchorA.ThreadID}, conciergeTurn.AssistantObservationID)
+	codeTurn := runOpenClawTurn(t, handler, "o01-code", anchorA.ThreadID, events[3], "The temporary access code is "+accessCode+".", model)
+	codeMemory := confirmObservation(t, handler, "o01-confirm-code", conversationInput{Channel: anchorA.Channel, ThreadID: anchorA.ThreadID}, codeTurn.AssistantObservationID)
+	_ = runOpenClawTurn(t, handler, "o01-raw", anchorA.ThreadID, "A_RAW_CHATTER about rain must remain in OpenClaw history only.", "Acknowledged.", model)
+
+	store.Close()
+	store = openAcceptanceStore(t, false)
+	service = runtime.NewConversationService(store, tenantID, nil, "", runtime.ConversationServiceConfig{})
+	defaults = runtime.NewGlobalDefaultsService(store, tenantID)
+	bridges = runtime.NewBridgeService(store, tenantID)
+	handler = NewHandlerWithGovernance(service, defaults, bridges)
+
+	_ = runOpenClawTurn(t, handler, "o01-b-establish", anchorB.ThreadID, "Start this separate maintenance chat entry.", "Session B is established and remains separate until explicitly linked.", model)
+	linked, err := bridges.LinkConversations(ctx, runtime.LinkConversationsRequest{
+		OperationID: "o01-link-a-b",
+		Primary:     anchorA,
+		Linked:      anchorB,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	linkedDelivery := prepareOpenClawTurn(t, handler, "o01-b-linked", anchorB.ThreadID, events[9])
+	for _, required := range []string{"Friday at 15:30", "concierge", accessCode} {
+		if !strings.Contains(linkedDelivery.Context, required) {
+			t.Fatalf("O01 linked delivery missing %q: %s", required, linkedDelivery.Context)
+		}
+	}
+	for _, forbidden := range []string{"Recent conversation:", "A_RAW_CHATTER", "rain"} {
+		if strings.Contains(linkedDelivery.Context, forbidden) {
+			t.Fatalf("O01 linked delivery pooled raw history %q: %s", forbidden, linkedDelivery.Context)
+		}
+	}
+
+	unrelated := prepareOpenClawTurn(t, handler, "o01-c-unrelated", anchorC.ThreadID, events[10])
+	for _, forbidden := range []string{"Friday at 15:30", "concierge", accessCode} {
+		if strings.Contains(unrelated.Context, forbidden) {
+			t.Fatalf("O01 unrelated session leaked %q: %s", forbidden, unrelated.Context)
+		}
+	}
+
+	corrected, err := service.Correct(ctx, runtime.CorrectConversationMemoryRequest{
+		OperationID: "o01-correct-appointment",
+		Anchor:      anchorA,
+		MemoryID:    appointmentMemory.MemoryID,
+		Content:     appointmentNew,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if corrected.Memory.Status != "active" {
+		t.Fatalf("O01 correction did not create active memory: %#v", corrected)
+	}
+	forgotten, err := service.Forget(ctx, runtime.ForgetConversationMemoryRequest{
+		OperationID: "o01-forget-code",
+		Anchor:      anchorA,
+		MemoryID:    codeMemory.MemoryID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if forgotten.Memory.Status != "deleted" {
+		t.Fatalf("O01 code was not deleted: %#v", forgotten)
+	}
+	resolutionA, err := store.ResolveConversation(ctx, tenantID, anchorA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RebuildProjection(ctx, tenantID, resolutionA.ContinuityID); err != nil {
+		t.Fatal(err)
+	}
+	assertSecretAbsentFromAuthority(t, tenantID, resolutionA.ContinuityID, accessCode)
+	assertSecretAbsentFromTenantDeliveries(t, tenantID, accessCode)
+	for _, query := range []string{accessCode, "old cedar-style access sequence"} {
+		matches, err := store.SearchActiveConversationMemory(ctx, tenantID, resolutionA.ContinuityID, query, 5)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(matches) != 0 {
+			t.Fatalf("O01 deleted code matched %q after rebuild: %#v", query, matches)
+		}
+	}
+
+	createdDefault, err := defaults.Set(ctx, runtime.SetGlobalDefaultRequest{
+		OperationID: "o01-default-chinese",
+		Key:         "reply_language",
+		Content:     languageDefault,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	override := prepareOpenClawTurn(t, handler, "o01-english-override", anchorA.ThreadID, events[15])
+	assertSemanticDefaultPacket(t, override.Context, languageDefault, createdDefault.MemoryID)
+	_ = completeOpenClawTurn(t, handler, "o01-english-override", anchorA.ThreadID, "The current visit is Saturday at 10:00.", model)
+	inspection := inspectDefaults(t, handler)
+	if len(inspection.Defaults) != 1 || inspection.Defaults[0].ID != createdDefault.MemoryID || inspection.Defaults[0].Content != languageDefault || inspection.Defaults[0].LifecycleStatus != "active" {
+		t.Fatalf("O01 task-local override mutated Global Defaults: %#v", inspection)
+	}
+
+	store.Close()
+	store = openAcceptanceStore(t, false)
+	service = runtime.NewConversationService(store, tenantID, nil, "", runtime.ConversationServiceConfig{})
+	defaults = runtime.NewGlobalDefaultsService(store, tenantID)
+	bridges = runtime.NewBridgeService(store, tenantID)
+	handler = NewHandlerWithGovernance(service, defaults, bridges)
+
+	finalA := prepareOpenClawTurn(t, handler, "o01-a-after-restart", anchorA.ThreadID, events[16])
+	assertSemanticDefaultPacket(t, finalA.Context, languageDefault, createdDefault.MemoryID)
+	for _, check := range manifest.Task.DeterministicChecks {
+		assertFrozenCheck(t, finalA.Context, check)
+	}
+	for _, forbidden := range []string{"Recent conversation:", "A_RAW_CHATTER", "lunch"} {
+		if strings.Contains(finalA.Context, forbidden) {
+			t.Fatalf("O01 restarted delivery exposed %q: %s", forbidden, finalA.Context)
+		}
+	}
+
+	linkedAfterGovernance := prepareOpenClawTurn(t, handler, "o01-b-current", anchorB.ThreadID, events[13])
+	for _, required := range []string{"Saturday at 10:00", "concierge"} {
+		if !strings.Contains(linkedAfterGovernance.Context, required) {
+			t.Fatalf("O01 linked current delivery missing %q: %s", required, linkedAfterGovernance.Context)
+		}
+	}
+	for _, forbidden := range []string{"Friday at 15:30", accessCode, "A_RAW_CHATTER"} {
+		if strings.Contains(linkedAfterGovernance.Context, forbidden) {
+			t.Fatalf("O01 linked current delivery retained %q: %s", forbidden, linkedAfterGovernance.Context)
+		}
+	}
+
+	if _, err := bridges.Reverse(ctx, runtime.ReverseBridgeRequest{OperationID: "o01-reverse-a-b", BridgeID: linked.ID}); err != nil {
+		t.Fatal(err)
+	}
+	separatedB := prepareOpenClawTurn(t, handler, "o01-b-separated", anchorB.ThreadID, events[18])
+	for _, forbidden := range []string{"Saturday at 10:00", "concierge", "Friday at 15:30", accessCode} {
+		if strings.Contains(separatedB.Context, forbidden) {
+			t.Fatalf("O01 reversed link still delivered %q: %s", forbidden, separatedB.Context)
+		}
+	}
+}
+
 type frozenManifest struct {
 	ID   string `json:"id"`
 	Task struct {
@@ -482,6 +652,51 @@ func postChatTurn(t *testing.T, handler http.Handler, operationID string, anchor
 	return receipt
 }
 
+func runOpenClawTurn(t *testing.T, handler http.Handler, operationID, sessionKey, message, answer, model string) runtime.ChatTurnReceipt {
+	t.Helper()
+	_ = prepareOpenClawTurn(t, handler, operationID, sessionKey, message)
+	return completeOpenClawTurn(t, handler, operationID, sessionKey, answer, model)
+}
+
+func prepareOpenClawTurn(t *testing.T, handler http.Handler, operationID, sessionKey, message string) runtime.PreparedConversationTurn {
+	t.Helper()
+	payload, err := json.Marshal(map[string]string{
+		"operation_id": operationID,
+		"session_key":  sessionKey,
+		"message":      message,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := performJSON(t, handler, http.MethodPost, "/v1/integrations/openclaw/turns/prepare", string(payload))
+	if response.Code != http.StatusOK {
+		t.Fatalf("OpenClaw prepare %s failed: %d %s", operationID, response.Code, response.Body.String())
+	}
+	var receipt runtime.PreparedConversationTurn
+	decodeResponse(t, response, &receipt)
+	return receipt
+}
+
+func completeOpenClawTurn(t *testing.T, handler http.Handler, operationID, sessionKey, answer, model string) runtime.ChatTurnReceipt {
+	t.Helper()
+	payload, err := json.Marshal(map[string]string{
+		"operation_id": operationID,
+		"session_key":  sessionKey,
+		"answer":       answer,
+		"model":        model,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := performJSON(t, handler, http.MethodPost, "/v1/integrations/openclaw/turns/complete", string(payload))
+	if response.Code != http.StatusOK {
+		t.Fatalf("OpenClaw complete %s failed: %d %s", operationID, response.Code, response.Body.String())
+	}
+	var receipt runtime.ChatTurnReceipt
+	decodeResponse(t, response, &receipt)
+	return receipt
+}
+
 func confirmObservation(t *testing.T, handler http.Handler, operationID string, anchor conversationInput, observationID string) runtime.MemoryReceipt {
 	t.Helper()
 	payload, err := json.Marshal(map[string]string{
@@ -632,6 +847,24 @@ func assertSecretAbsentFromAuthority(t *testing.T, tenantID, continuityID, secre
 		if count != 0 {
 			t.Fatalf("deleted secret remains in authority query %q: count=%d", query, count)
 		}
+	}
+}
+
+func assertSecretAbsentFromTenantDeliveries(t *testing.T, tenantID, secret string) {
+	t.Helper()
+	pool, err := pgxpool.New(context.Background(), os.Getenv("VERMORY_TEST_DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	var count int
+	if err := pool.QueryRow(context.Background(), `
+SELECT count(*) FROM memory_deliveries
+WHERE tenant_id = $1 AND context_body LIKE '%' || $2 || '%'`, tenantID, secret).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("deleted secret remains in tenant delivery history: count=%d", count)
 	}
 }
 

@@ -435,14 +435,13 @@ func (s *Store) DeleteMemory(ctx context.Context, tenantID, continuityID, memory
 }
 
 func deleteMemoryTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, memoryID string) error {
-	var lifecycleStatus, continuityLine string
+	var lifecycleStatus string
 	var originObservationID *string
 	var memoryContent string
 	err := tx.QueryRow(ctx, `
-SELECT memory.lifecycle_status, memory.origin_observation_id::text, memory.content, continuity.continuity_line
+SELECT lifecycle_status, origin_observation_id::text, content
 FROM governed_memories memory
-JOIN continuity_spaces continuity ON continuity.id = memory.continuity_id
-WHERE memory.id = $1::uuid AND memory.tenant_id = $2 AND memory.continuity_id = $3::uuid`, memoryID, tenantID, continuityID).Scan(&lifecycleStatus, &originObservationID, &memoryContent, &continuityLine)
+WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid`, memoryID, tenantID, continuityID).Scan(&lifecycleStatus, &originObservationID, &memoryContent)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return fmt.Errorf("memory does not belong to this continuity")
 	}
@@ -462,33 +461,41 @@ WHERE id = $1::uuid`, memoryID); err != nil {
 		return fmt.Errorf("remove deleted search document: %w", err)
 	}
 	if originObservationID != nil {
-		if _, err := tx.Exec(ctx, `UPDATE observations SET content = '[redacted]' WHERE id = $1::uuid`, *originObservationID); err != nil {
-			return fmt.Errorf("redact origin observation: %w", err)
+		if _, err := tx.Exec(ctx, `
+UPDATE observations
+SET content = '[redacted]'
+WHERE tenant_id = $1 AND continuity_id = $2::uuid
+  AND (
+    id = $3::uuid
+    OR id IN (
+      SELECT user_observation_id FROM conversation_turns
+      WHERE tenant_id = $1 AND continuity_id = $2::uuid
+        AND (user_observation_id = $3::uuid OR assistant_observation_id = $3::uuid)
+      UNION
+      SELECT assistant_observation_id FROM conversation_turns
+      WHERE tenant_id = $1 AND continuity_id = $2::uuid
+        AND assistant_observation_id IS NOT NULL
+        AND (user_observation_id = $3::uuid OR assistant_observation_id = $3::uuid)
+    )
+  )`, tenantID, continuityID, *originObservationID); err != nil {
+			return fmt.Errorf("redact origin conversation turn observations: %w", err)
 		}
 		if _, err := tx.Exec(ctx, `
 UPDATE conversation_turns
 SET answer = '[redacted]', updated_at = now()
-WHERE tenant_id = $1 AND continuity_id = $2::uuid AND assistant_observation_id = $3::uuid`,
+WHERE tenant_id = $1 AND continuity_id = $2::uuid
+  AND (user_observation_id = $3::uuid OR assistant_observation_id = $3::uuid)`,
 			tenantID, continuityID, *originObservationID); err != nil {
-			return fmt.Errorf("redact conversation turn answer: %w", err)
+			return fmt.Errorf("redact conversation turn: %w", err)
 		}
 	}
 	if memoryContent != "" && memoryContent != "[redacted]" {
 		query := `
 UPDATE memory_deliveries
-SET context_body = replace(context_body, $3, '[redacted]')
-WHERE tenant_id = $1 AND continuity_id = $2::uuid
-	  AND position($3 IN context_body) > 0`
-		arguments := []any{tenantID, continuityID, memoryContent}
-		if continuityLine == "global_defaults" {
-			query = `
-UPDATE memory_deliveries
 SET context_body = replace(context_body, $2, '[redacted]')
 WHERE tenant_id = $1
 	  AND position($2 IN context_body) > 0`
-			arguments = []any{tenantID, memoryContent}
-		}
-		if _, err := tx.Exec(ctx, query, arguments...); err != nil {
+		if _, err := tx.Exec(ctx, query, tenantID, memoryContent); err != nil {
 			return fmt.Errorf("redact memory from delivery history: %w", err)
 		}
 	}

@@ -2,6 +2,8 @@ package runtime
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -369,14 +371,7 @@ func (s *Store) BeginConversationTurn(ctx context.Context, tenantID, continuityI
 		return ChatTurnReceipt{}, err
 	}
 	if found {
-		var existingMessage string
-		if err := tx.QueryRow(ctx, `
-SELECT content FROM observations
-WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid`,
-			existing.UserObservationID, tenantID, existing.ContinuityID).Scan(&existingMessage); err != nil {
-			return ChatTurnReceipt{}, fmt.Errorf("lookup replayed conversation message: %w", err)
-		}
-		if existing.ContinuityID != continuityID || existingMessage != request.Message {
+		if existing.ContinuityID != continuityID || existing.RequestFingerprint != conversationContentFingerprint(request.Message) {
 			return ChatTurnReceipt{}, fmt.Errorf("operation_id is already bound to another conversation turn")
 		}
 		existing.Replayed = true
@@ -399,11 +394,11 @@ WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid`,
 	var receipt ChatTurnReceipt
 	if err := tx.QueryRow(ctx, `
 INSERT INTO conversation_turns (
-  tenant_id, continuity_id, operation_id, status, user_observation_id
+  tenant_id, continuity_id, operation_id, status, user_observation_id, request_fingerprint
 )
-VALUES ($1, $2::uuid, $3, 'in_progress', $4::uuid)
+VALUES ($1, $2::uuid, $3, 'in_progress', $4::uuid, $5)
 RETURNING id::text, operation_id, status, continuity_id::text, user_observation_id::text`,
-		tenantID, continuityID, request.OperationID, observation.ObservationID).Scan(
+		tenantID, continuityID, request.OperationID, observation.ObservationID, conversationContentFingerprint(request.Message)).Scan(
 		&receipt.ID,
 		&receipt.OperationID,
 		&receipt.Status,
@@ -544,8 +539,9 @@ SELECT EXISTS (
 	if _, err := tx.Exec(ctx, `
 UPDATE conversation_turns
 SET status = 'completed', delivery_id = $1::uuid, assistant_observation_id = $2::uuid,
-    answer = $3, provider_model = $4, failure_code = '', failure_message = '', updated_at = now()
-WHERE id = $5::uuid`, deliveryID, assistant.ObservationID, answer, model, turnID); err != nil {
+    answer = $3, answer_fingerprint = $4, provider_model = $5,
+    failure_code = '', failure_message = '', updated_at = now()
+WHERE id = $6::uuid`, deliveryID, assistant.ObservationID, answer, conversationContentFingerprint(answer), model, turnID); err != nil {
 		return ChatTurnReceipt{}, fmt.Errorf("complete conversation turn: %w", err)
 	}
 	receipt, found, err := lookupConversationTurnTx(ctx, tx, tenantID, operationID)
@@ -601,7 +597,7 @@ func lookupConversationTurnTx(ctx context.Context, tx pgx.Tx, tenantID, operatio
 SELECT id::text, operation_id, status, continuity_id::text,
        COALESCE(delivery_id::text, ''), user_observation_id::text,
        COALESCE(assistant_observation_id::text, ''), answer, provider_model, failure_code,
-       failure_message
+       failure_message, request_fingerprint, answer_fingerprint
 FROM conversation_turns
 WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(
 		&receipt.ID,
@@ -615,6 +611,8 @@ WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(
 		&receipt.Model,
 		&receipt.FailureCode,
 		&receipt.FailureMessage,
+		&receipt.RequestFingerprint,
+		&receipt.AnswerFingerprint,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ChatTurnReceipt{}, false, nil
@@ -623,4 +621,9 @@ WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(
 		return ChatTurnReceipt{}, false, fmt.Errorf("lookup conversation turn: %w", err)
 	}
 	return receipt, true, nil
+}
+
+func conversationContentFingerprint(content string) string {
+	digest := sha256.Sum256([]byte(strings.TrimSpace(content)))
+	return hex.EncodeToString(digest[:])
 }

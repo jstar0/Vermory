@@ -92,7 +92,7 @@ func (s *ConversationService) CompleteExternalTurn(ctx context.Context, request 
 	}
 	switch turn.Status {
 	case ChatTurnCompleted:
-		if turn.Answer != request.Answer || turn.Model != request.Model {
+		if turn.AnswerFingerprint != conversationContentFingerprint(request.Answer) || turn.Model != request.Model {
 			return ChatTurnReceipt{}, fmt.Errorf("operation_id is already bound to another conversation completion")
 		}
 		turn.Replayed = true

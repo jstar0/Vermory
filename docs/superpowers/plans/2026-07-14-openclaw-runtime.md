@@ -317,18 +317,18 @@ git commit -m "feat: add official OpenClaw plugin"
 - Consumes: frozen O01, external-turn API, existing confirmation/correction/forget/default/link services, and plugin package.
 - Produces: deterministic server-side proof independent of model wording plus operator installation/configuration instructions.
 
-- [ ] **Step 1: Write failing O01 acceptance test**
+- [x] **Step 1: Write failing O01 acceptance test**
 
 Drive session A through external prepare/complete, confirm selected observations, restart the store/handler, seed the Chinese Global Default, link B, leave C unrelated, correct the appointment, delete `CEDAR-4826`, rebuild projection, reverse link, and inspect recorded deliveries.
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/webchat -run 'TestO01OpenClaw'
 ```
 
-- [ ] **Step 3: Complete deterministic assertions**
+- [x] **Step 3: Complete deterministic assertions**
 
 Assert from PostgreSQL/service receipts:
 
@@ -340,7 +340,7 @@ Assert from PostgreSQL/service receipts:
 - task-local English input does not change stored defaults;
 - post-reversal B delivery excludes A's governed facts.
 
-- [ ] **Step 4: Write installation and operational runbook**
+- [x] **Step 4: Write installation and operational runbook**
 
 Document:
 
@@ -362,7 +362,7 @@ plugins: {
 
 Include `pnpm -C integrations/openclaw build`, `openclaw plugins install --link`, runtime inspection, isolated-state commands, server startup with `--provider external`, governance boundaries, fail-open behavior, and uninstall steps.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \

@@ -52,10 +52,10 @@ Experiment 0 已完成，当前仓库已经具备：
 - 确定性的 `fixture-lock.json` 与冻结后变更检测；
 - `public` 和 `withheld_local` 证据等级，并拒绝把本地可读目录伪装成 sealed；
 - 外部 sealed evaluator 的 Ed25519 attestation 验签能力；
-- 首批 4 个 workspace、conversation、Global Defaults、删除与 source injection 案例；
+- 7 个覆盖 workspace、conversation、Global Defaults、删除、source injection、durable bridge 与 OpenClaw 日常事务连续性的公开冻结案例；
 - JSON 和 Markdown 实验报告。
 
-当前的 `pass=true` 只代表首批证据有效且已经冻结，不代表完整生产记忆内核已经通过这些案例。Experiment 1 将开始让生产形态的记忆切片和真实 AI 客户端消费这些轨迹。
+仓库同时已经包含 workspace、conversation、Global Defaults、durable bridge 和 OpenClaw external-turn lifecycle 的生产形态运行切片。每份证据只对实际执行过的客户端、模型、故障条件和确定性硬门负责，任何单一切片都不被当成“整个平台已经完成”的证明。
 
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
@@ -98,6 +98,19 @@ go run ./cmd/vermory experiment-0 \
 ## 本地工作区治理
 
 普通 AI 客户端只通过 MCP 获取已确认工作区的有效上下文，并把任务结果写回为待确认观察。工作区确认、来源事实记录、指定事实纠正和指定事实遗忘由本机操作者显式执行，不作为模型工具开放。完整命令、JSON 回执和 Grok 本地重放边界见[本地工作区治理指南](docs/integrations/local-operator-workspace-slice.md)。
+
+## OpenClaw 接入
+
+`@vermory/openclaw` 使用 OpenClaw 的 canonical `sessionKey` 和 `runId`：在 `before_prompt_build` 注入当前有效的语义上下文，在 `agent_end` 记录最终 turn lifecycle。它不替代 OpenClaw 的 transcript、memory slot、渠道或模型路由。
+
+```bash
+PATH="/opt/homebrew/opt/node@24/bin:$PATH" \
+  pnpm -C integrations/openclaw install --frozen-lockfile
+PATH="/opt/homebrew/opt/node@24/bin:$PATH" \
+  pnpm -C integrations/openclaw check
+```
+
+loopback 部署、OpenClaw trust 配置、runtime inspection、确认/纠正/删除、显式 link、故障语义、隔离状态重放和卸载步骤见 [OpenClaw 运行接入指南](docs/integrations/openclaw-runtime.md)。
 
 ## 开发原则
 

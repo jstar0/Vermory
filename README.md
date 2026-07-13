@@ -56,10 +56,10 @@ Experiment 0 is complete. It provides:
 - deterministic `fixture-lock.json` generation and mutation detection;
 - public and `withheld_local` evidence levels without fake local sealing;
 - Ed25519 verification for attestations received from an external sealed evaluator;
-- four frozen first-batch cases covering workspace continuity, conversation continuity, Global Defaults, deletion, and source injection;
+- seven frozen public cases covering workspace continuity, conversation continuity, Global Defaults, deletion, source injection, durable bridges, and OpenClaw everyday-use continuity;
 - JSON and Markdown Experiment 0 reports.
 
-The current `pass=true` result means the first evidence batch is valid and frozen. It does **not** mean a complete production memory engine has already passed those cases. Experiment 1 is responsible for executing the frozen trajectories through a production-shaped memory slice and real AI clients.
+The repository also contains production-shaped runtime slices for workspace and conversation continuity, Global Defaults, durable bridges, and the OpenClaw external-turn lifecycle. Each evidence document is scoped to the exact client, model, failure mode, and deterministic hard gates it executed; no individual slice is treated as proof that the complete platform is finished.
 
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
@@ -120,6 +120,21 @@ go run ./cmd/vermory experiment-0 \
 ```
 
 Generated artifacts are written below `artifacts/` and are intentionally not committed.
+
+## OpenClaw Integration
+
+The `@vermory/openclaw` lifecycle plugin uses OpenClaw's canonical `sessionKey` and `runId`, injects governed semantic context during `before_prompt_build`, and records the final turn lifecycle during `agent_end`. It does not replace OpenClaw transcript storage, memory slots, channels, or model routing.
+
+Build and check the plugin:
+
+```bash
+PATH="/opt/homebrew/opt/node@24/bin:$PATH" \
+  pnpm -C integrations/openclaw install --frozen-lockfile
+PATH="/opt/homebrew/opt/node@24/bin:$PATH" \
+  pnpm -C integrations/openclaw check
+```
+
+See the [OpenClaw runtime integration guide](docs/integrations/openclaw-runtime.md) for loopback deployment, trust configuration, runtime inspection, governance actions, failure behavior, isolated-state replay, and uninstall steps.
 
 ## Repository Layout
 
