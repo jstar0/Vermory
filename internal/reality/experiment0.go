@@ -102,7 +102,7 @@ func BuildExperiment0(options Experiment0Options) Experiment0Report {
 	}
 
 	report.Limitations = []string{
-		"The first six cases are a seed batch; target discovery coverage remains incomplete and is not an automatic pass or fail threshold.",
+		"The public cases are an expanding seed batch; target discovery coverage remains incomplete and is not an automatic pass or fail threshold.",
 		"Experiment 0 freezes evidence only; it does not execute a production memory implementation or a real client integration.",
 		"The new reality cases have not yet run against no-context, full-history, summary, vector-RAG, mem0, and Vermory conditions.",
 		"Legacy ContextMesh scenarios and the MemOS three-client round packs remain inspired cases or translated proxies rather than real executed trajectories.",

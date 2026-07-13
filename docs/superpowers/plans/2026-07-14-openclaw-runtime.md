@@ -34,20 +34,22 @@
 - Create: `reality/cases/O01-openclaw-home-maintenance/fixtures/governance-actions.md`
 - Create: `reality/cases/O01-openclaw-home-maintenance/fixture-lock.json`
 - Modify: `internal/reality/validate_test.go`
+- Modify: `internal/reality/experiment0.go`
+- Modify: `internal/reality/experiment0_test.go`
 
 **Interfaces:**
 - Consumes: existing reality case schema and fixture-lock format.
 - Produces: immutable O01 facts and deterministic checks used by Go acceptance and real OpenClaw replay.
 
-- [ ] **Step 1: Write the O01 manifest and trajectory**
+- [x] **Step 1: Write the O01 manifest and trajectory**
 
 Use stable anchors `agent:main:home-maintenance-a`, `agent:main:home-maintenance-b`, and `agent:main:unrelated-c`. Include the current Saturday 10:00 appointment, obsolete Friday 15:30 appointment, concierge check-in, temporary code `CEDAR-4826`, Chinese reply default, explicit A-B link/reversal, and unrelated C isolation.
 
-- [ ] **Step 2: Add a failing reality validation test**
+- [x] **Step 2: Add a failing reality validation test**
 
 Add a table entry that loads O01 and asserts its continuity line includes `conversation`, its pressures include `restart`, `cross_channel_link`, `correction`, `deletion`, `global_default_override`, and `link_reversal`, and all fixture hashes validate.
 
-- [ ] **Step 3: Run the test and verify RED**
+- [x] **Step 3: Run the test and verify RED**
 
 ```bash
 go test -count=1 ./internal/reality -run 'Test.*O01'
@@ -55,16 +57,16 @@ go test -count=1 ./internal/reality -run 'Test.*O01'
 
 Expected: FAIL because O01 or its fixture lock is absent/incomplete.
 
-- [ ] **Step 4: Generate exact SHA-256 lock values and make the test pass**
+- [x] **Step 4: Generate exact SHA-256 lock values and make the test pass**
 
 Use `shasum -a 256` for the manifest, events, and both fixtures. Store byte counts in the same format as existing public cases.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```bash
 go test -count=1 ./internal/reality
 git diff --check
-git add reality/cases/O01-openclaw-home-maintenance internal/reality/validate_test.go
+git add reality/cases/O01-openclaw-home-maintenance internal/reality/validate_test.go internal/reality/experiment0.go internal/reality/experiment0_test.go
 git commit -m "test: freeze OpenClaw continuity case"
 ```
 

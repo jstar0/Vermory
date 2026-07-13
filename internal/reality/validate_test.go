@@ -136,6 +136,51 @@ func TestRejectsFactDeclaredCurrentAndForbidden(t *testing.T) {
 	assertViolationCode(t, ValidateCase(c), "fact_expectation_conflict")
 }
 
+func TestO01OpenClawCaseIsFrozen(t *testing.T) {
+	c, err := LoadCase("../../reality/cases/O01-openclaw-home-maintenance")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ValidateCase(c); len(got) != 0 {
+		t.Fatalf("expected valid O01 case, got violations: %#v", got)
+	}
+
+	foundConversation := false
+	for _, line := range c.Manifest.ContinuityLines {
+		if line == LineConversation {
+			foundConversation = true
+			break
+		}
+	}
+	if !foundConversation {
+		t.Fatalf("O01 does not declare conversation continuity: %#v", c.Manifest.ContinuityLines)
+	}
+	requireStrings(t, c.Manifest.Pressures,
+		"restart",
+		"cross_channel_link",
+		"correction",
+		"deletion",
+		"global_default_override",
+		"link_reversal",
+	)
+	for _, anchor := range []string{
+		"agent:main:home-maintenance-a",
+		"agent:main:home-maintenance-b",
+		"agent:main:unrelated-c",
+	} {
+		found := false
+		for _, candidate := range c.Manifest.Anchors {
+			if candidate.Value == anchor && !candidate.Ambiguous {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("missing unambiguous O01 anchor %q", anchor)
+		}
+	}
+}
+
 func loadValidCase(t *testing.T) Case {
 	t.Helper()
 	c, err := LoadCase("../../reality/testdata/valid-public")
@@ -153,6 +198,22 @@ func assertViolationCode(t *testing.T, violations []Violation, code string) {
 		}
 	}
 	t.Fatalf("expected violation %q, got %#v", code, violations)
+}
+
+func requireStrings(t *testing.T, values []string, required ...string) {
+	t.Helper()
+	for _, expected := range required {
+		found := false
+		for _, value := range values {
+			if value == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("missing %q in %#v", expected, values)
+		}
+	}
 }
 
 func copyCaseFixture(t *testing.T, source string) string {
