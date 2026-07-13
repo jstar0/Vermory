@@ -430,7 +430,7 @@ git commit -m "test: prove authenticated tenant isolation"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-14-identity-authorization-rls.md`
 
-- [ ] **Step 1: Run release verification**
+- [x] **Step 1: Run release verification**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \

@@ -194,3 +194,40 @@ OpenClaw emitted missing generated-module warnings for bundled `imessage` and `t
 
 All temporary Vermory and OpenClaw listeners were stopped after evidence collection. Ports `8788` and `18790` had no remaining listeners.
 
+## Release Verification
+
+Fresh verification after the authenticated replay passed:
+
+```bash
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+  go test -p 1 -count=1 ./...
+
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+  go test -race -p 1 -count=1 \
+  ./internal/authn ./internal/runtime ./internal/webchat \
+  ./internal/identitycli ./internal/operatorcli ./cmd/vermory ./internal/provider
+
+go vet ./...
+go mod tidy
+git diff --exit-code -- go.mod go.sum
+go build -o /tmp/vermory-identity-release ./cmd/vermory
+
+PATH=/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:/usr/bin:/bin \
+  pnpm -C integrations/openclaw check
+
+PATH=/opt/homebrew/opt/node@24/bin:/opt/homebrew/bin:/usr/bin:/bin \
+  pnpm -C integrations/openclaw pack --dry-run
+
+git diff --check
+```
+
+Results:
+
+- every Go package passed;
+- selected identity/runtime/client packages passed with the race detector;
+- `go vet` passed;
+- `go mod tidy` changed neither `go.mod` nor `go.sum`;
+- the release binary built with SHA-256 `0c1d87655d218547524eab58dc736caa88a86d8346606215a762dd12dfb9aadc`;
+- OpenClaw passed `43/43` tests, strict TypeScript checking, and build;
+- package dry-run contained only `dist`, `openclaw.plugin.json`, and `package.json`;
+- Git whitespace checks passed.
