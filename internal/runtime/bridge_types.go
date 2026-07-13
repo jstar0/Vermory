@@ -107,6 +107,32 @@ type ExportWorkspaceRequest struct {
 	TargetProfile string   `json:"target_profile"`
 }
 
+type LinkConversationsRequest struct {
+	OperationID string             `json:"operation_id"`
+	Primary     ConversationAnchor `json:"primary"`
+	Linked      ConversationAnchor `json:"linked"`
+}
+
+func (r *LinkConversationsRequest) Validate() error {
+	if err := normalizeBridgeOperationID(&r.OperationID); err != nil {
+		return err
+	}
+	primary, err := r.Primary.Normalized()
+	if err != nil {
+		return fmt.Errorf("primary: %w", err)
+	}
+	linked, err := r.Linked.Normalized()
+	if err != nil {
+		return fmt.Errorf("linked: %w", err)
+	}
+	r.Primary = primary
+	r.Linked = linked
+	if primary.Channel == linked.Channel && primary.ThreadID == linked.ThreadID {
+		return fmt.Errorf("primary and linked conversations must be different")
+	}
+	return nil
+}
+
 func (r *ExportWorkspaceRequest) Validate() error {
 	if err := normalizeBridgeOperationID(&r.OperationID); err != nil {
 		return err

@@ -4,9 +4,101 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
+
+func (s *Store) SearchActiveConversationMemory(ctx context.Context, tenantID, continuityID, query string, limit int) ([]Memory, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, fmt.Errorf("search query is required")
+	}
+	if limit <= 0 {
+		limit = defaultContextItems
+	}
+	if limit > maxContextItems {
+		limit = maxContextItems
+	}
+	rows, err := s.pool.Query(ctx, `
+WITH link_root AS (
+  SELECT COALESCE(
+    (
+      SELECT primary_continuity_id
+      FROM conversation_links
+      WHERE tenant_id = $1 AND linked_continuity_id = $2::uuid AND link_state = 'active'
+      LIMIT 1
+    ),
+    $2::uuid
+  ) AS continuity_id
+), scope AS (
+  SELECT continuity_id FROM link_root
+  UNION
+  SELECT link.linked_continuity_id
+  FROM conversation_links link
+  JOIN link_root root ON root.continuity_id = link.primary_continuity_id
+  WHERE link.tenant_id = $1 AND link.link_state = 'active'
+), query_terms AS (
+  SELECT
+    lower($3)::text AS exact_query,
+    plainto_tsquery('simple', $3) AS all_terms,
+    to_tsquery('simple', array_to_string(tsvector_to_array(to_tsvector('simple', $3)), ' | ')) AS any_terms
+), exact_matches AS (
+  SELECT 1
+  FROM memory_search_documents document
+  JOIN governed_memories memory ON memory.id = document.memory_id
+  CROSS JOIN query_terms
+  WHERE document.tenant_id = $1
+    AND document.continuity_id IN (SELECT continuity_id FROM scope)
+    AND memory.tenant_id = $1
+    AND memory.continuity_id = document.continuity_id
+    AND memory.lifecycle_status = 'active'
+    AND position(query_terms.exact_query IN lower(document.content)) > 0
+  LIMIT 1
+)
+SELECT memory.id::text, memory.content
+FROM memory_search_documents document
+JOIN governed_memories memory ON memory.id = document.memory_id
+CROSS JOIN query_terms
+WHERE document.tenant_id = $1
+  AND document.continuity_id IN (SELECT continuity_id FROM scope)
+  AND memory.tenant_id = $1
+  AND memory.continuity_id = document.continuity_id
+  AND memory.lifecycle_status = 'active'
+  AND (
+    position(query_terms.exact_query IN lower(document.content)) > 0
+    OR (
+      NOT EXISTS (SELECT 1 FROM exact_matches)
+      AND (
+        document.search_document @@ query_terms.any_terms
+        OR similarity(lower(document.content), query_terms.exact_query) >= 0.2
+      )
+    )
+  )
+ORDER BY
+  (position(query_terms.exact_query IN lower(document.content)) > 0) DESC,
+  ts_rank(document.search_document, query_terms.all_terms) DESC,
+  ts_rank(document.search_document, query_terms.any_terms) DESC,
+  similarity(lower(document.content), query_terms.exact_query) DESC,
+  memory.updated_at DESC
+LIMIT $4`, tenantID, continuityID, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search active conversation memory: %w", err)
+	}
+	defer rows.Close()
+	memories := make([]Memory, 0)
+	for rows.Next() {
+		var memory Memory
+		if err := rows.Scan(&memory.ID, &memory.Content); err != nil {
+			return nil, fmt.Errorf("scan active conversation memory: %w", err)
+		}
+		memories = append(memories, memory)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate active conversation memory: %w", err)
+	}
+	return memories, nil
+}
 
 const conversationUserSourceRef = "conversation:user"
 

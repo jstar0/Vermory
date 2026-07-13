@@ -74,6 +74,38 @@ func (s *BridgeService) ExportWorkspace(ctx context.Context, request ExportWorks
 	)
 }
 
+func (s *BridgeService) LinkConversations(ctx context.Context, request LinkConversationsRequest) (BridgeReceipt, error) {
+	if err := s.configured(); err != nil {
+		return BridgeReceipt{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return BridgeReceipt{}, err
+	}
+	primary, err := s.store.ResolveConversation(ctx, s.tenantID, request.Primary)
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
+	if primary.Status != ResolutionResolved {
+		return BridgeReceipt{}, fmt.Errorf("primary conversation does not exist")
+	}
+	linked, err := s.store.ResolveConversation(ctx, s.tenantID, request.Linked)
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
+	if linked.Status != ResolutionResolved {
+		return BridgeReceipt{}, fmt.Errorf("linked conversation does not exist")
+	}
+	return s.store.LinkConversationContinuities(
+		ctx,
+		s.tenantID,
+		request.OperationID,
+		primary.ContinuityID,
+		linked.ContinuityID,
+		request.Primary.Channel+"/"+request.Primary.ThreadID,
+		request.Linked.Channel+"/"+request.Linked.ThreadID,
+	)
+}
+
 func (s *BridgeService) Reverse(ctx context.Context, request ReverseBridgeRequest) (BridgeReceipt, error) {
 	if err := s.configured(); err != nil {
 		return BridgeReceipt{}, err

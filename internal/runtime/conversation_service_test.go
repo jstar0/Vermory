@@ -117,6 +117,122 @@ func TestConversationConsumerAppliesGlobalDefaultWithoutPersistingLocalOverride(
 	requireNotContains(t, llm.calls[2].ContextPacket, "Default user-facing replies to Chinese")
 }
 
+func TestConversationLinkedGovernedMemorySharesWithoutPoolingRawHistoryAndReverses(t *testing.T) {
+	ctx := context.Background()
+	store := openTestStore(t)
+	primaryAnchor := ConversationAnchor{Channel: "openclaw_dm", ThreadID: "thesis-submission"}
+	linkedAnchor := ConversationAnchor{Channel: "web_chat", ThreadID: "thesis-submission"}
+	siblingAnchor := ConversationAnchor{Channel: "email_forward", ThreadID: "thesis-submission"}
+	unrelatedAnchor := ConversationAnchor{Channel: "web_chat", ThreadID: "literature-plan"}
+	primary, _ := confirmConversationMemoryForBridge(t, store, "local", primaryAnchor, "link-primary-deadline", "The thesis submission package is due on 18 July at 17:00.")
+	linked, _ := confirmConversationMemoryForBridge(t, store, "local", linkedAnchor, "link-child-style", "References use GB/T 7714-2015 numeric style.")
+	_, _ = confirmConversationMemoryForBridge(t, store, "local", siblingAnchor, "link-sibling-room", "The thesis defense room is C204.")
+	_, _ = confirmConversationMemoryForBridge(t, store, "local", unrelatedAnchor, "link-unrelated-plan", "Create a literature-reading plan for next semester.")
+	_, err := store.CommitObservation(ctx, "local", primary.ContinuityID, CommitObservationRequest{
+		OperationID: "link-primary-raw-history",
+		Kind:        ObservationKindUserMessage,
+		Content:     "PRIMARY_RAW_HISTORY must stay in the OpenClaw thread.",
+		SourceRef:   conversationUserSourceRef,
+	})
+	requireNoError(t, err)
+	_, err = store.CommitObservation(ctx, "local", linked.ContinuityID, CommitObservationRequest{
+		OperationID: "link-child-raw-history",
+		Kind:        ObservationKindUserMessage,
+		Content:     "LINKED_LOCAL_HISTORY belongs to the Web Chat thread.",
+		SourceRef:   conversationUserSourceRef,
+	})
+	requireNoError(t, err)
+
+	llm := &recordingProvider{output: "ok"}
+	chat := NewConversationService(store, "local", llm, "test-model", ConversationServiceConfig{})
+	_, err = chat.Chat(ctx, ChatTurnRequest{
+		OperationID: "link-before",
+		Anchor:      linkedAnchor,
+		Message:     "When is the thesis submission package due?",
+	})
+	requireNoError(t, err)
+	requireNotContains(t, llm.calls[0].ContextPacket, "18 July at 17:00")
+
+	bridges := NewBridgeService(store, "local")
+	linkedBridge, err := bridges.LinkConversations(ctx, LinkConversationsRequest{
+		OperationID: "bridge-link-thesis-channels",
+		Primary:     primaryAnchor,
+		Linked:      linkedAnchor,
+	})
+	requireNoError(t, err)
+	if linkedBridge.Action != BridgeActionLink || linkedBridge.Status != BridgeStatusActive || linkedBridge.SourceContinuityID != primary.ContinuityID || linkedBridge.TargetContinuityID != linked.ContinuityID {
+		t.Fatalf("unexpected link receipt: %#v", linkedBridge)
+	}
+	_, err = bridges.LinkConversations(ctx, LinkConversationsRequest{
+		OperationID: "bridge-link-thesis-email",
+		Primary:     primaryAnchor,
+		Linked:      siblingAnchor,
+	})
+	requireNoError(t, err)
+
+	_, err = chat.Chat(ctx, ChatTurnRequest{
+		OperationID: "link-after-child",
+		Anchor:      linkedAnchor,
+		Message:     "When is the thesis submission package due now?",
+	})
+	requireNoError(t, err)
+	childPacket := llm.calls[1].ContextPacket
+	requireContains(t, childPacket, "Governed memory:\nThe thesis submission package is due on 18 July at 17:00.")
+	requireContains(t, childPacket, "LINKED_LOCAL_HISTORY")
+	requireNotContains(t, childPacket, "PRIMARY_RAW_HISTORY")
+	_, err = chat.Chat(ctx, ChatTurnRequest{
+		OperationID: "link-after-sibling",
+		Anchor:      linkedAnchor,
+		Message:     "Which room is the thesis defense in?",
+	})
+	requireNoError(t, err)
+	requireContains(t, llm.calls[2].ContextPacket, "C204")
+
+	_, err = chat.Chat(ctx, ChatTurnRequest{
+		OperationID: "link-after-primary",
+		Anchor:      primaryAnchor,
+		Message:     "Which reference style should the thesis use?",
+	})
+	requireNoError(t, err)
+	primaryPacket := llm.calls[3].ContextPacket
+	requireContains(t, primaryPacket, "GB/T 7714-2015")
+	requireContains(t, primaryPacket, "PRIMARY_RAW_HISTORY")
+	requireNotContains(t, primaryPacket, "LINKED_LOCAL_HISTORY")
+
+	_, err = chat.Chat(ctx, ChatTurnRequest{
+		OperationID: "link-unrelated",
+		Anchor:      unrelatedAnchor,
+		Message:     "When is the thesis submission package due?",
+	})
+	requireNoError(t, err)
+	unrelatedPacket := llm.calls[4].ContextPacket
+	requireNotContains(t, unrelatedPacket, "18 July at 17:00")
+	requireNotContains(t, unrelatedPacket, "GB/T 7714-2015")
+
+	_, err = bridges.LinkConversations(ctx, LinkConversationsRequest{
+		OperationID: "bridge-link-reject-nested",
+		Primary:     linkedAnchor,
+		Linked:      unrelatedAnchor,
+	})
+	if err == nil || !strings.Contains(err.Error(), "primary") {
+		t.Fatalf("linked child became a nested primary: %v", err)
+	}
+
+	reversed, err := bridges.Reverse(ctx, ReverseBridgeRequest{OperationID: "bridge-link-thesis-reverse", BridgeID: linkedBridge.ID})
+	requireNoError(t, err)
+	if reversed.Status != BridgeStatusReversed {
+		t.Fatalf("link was not reversed: %#v", reversed)
+	}
+	_, err = chat.Chat(ctx, ChatTurnRequest{
+		OperationID: "link-after-reverse",
+		Anchor:      linkedAnchor,
+		Message:     "When is the thesis submission package due after separation?",
+	})
+	requireNoError(t, err)
+	requireNotContains(t, llm.calls[5].ContextPacket, "18 July at 17:00")
+	requireNotContains(t, llm.calls[5].ContextPacket, "C204")
+}
+
 func TestConversationServiceDoesNotCrossThreadBoundary(t *testing.T) {
 	store := openTestStore(t)
 	llm := &recordingProvider{output: "answer"}

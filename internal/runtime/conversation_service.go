@@ -51,7 +51,7 @@ func (s *ConversationService) Chat(ctx context.Context, request ChatTurnRequest)
 	if err != nil {
 		return s.failTurn(ctx, turn, "global_defaults_retrieval_error", err)
 	}
-	memories, err := s.store.SearchActiveMemory(ctx, s.tenantID, resolution.ContinuityID, request.Message, s.config.MemoryLimit)
+	memories, err := s.store.SearchActiveConversationMemory(ctx, s.tenantID, resolution.ContinuityID, request.Message, s.config.MemoryLimit)
 	if err != nil {
 		return s.failTurn(ctx, turn, "memory_retrieval_error", err)
 	}

@@ -107,25 +107,25 @@ git commit -m "feat: add promote and export bridge effects"
 - Modify: `internal/runtime/conversation_service.go`
 - Modify: `internal/runtime/conversation_service_test.go`
 
-- [ ] **Step 1: Write failing link tests**
+- [x] **Step 1: Write failing link tests**
 
 Prove pre-link isolation, post-link governed-memory sharing in both directions, sibling sharing through one primary, unrelated-thread isolation, raw recent-history locality, graph ambiguity rejection, and reversal isolation.
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime -run 'TestBridge.*Link|TestConversation.*Linked'
 ```
 
-- [ ] **Step 3: Implement link transactions and scoped search**
+- [x] **Step 3: Implement link transactions and scoped search**
 
 Add one active primary-child edge per bridge. Add conversation-memory search that resolves the active root group while leaving `ListRecentConversationObservations` unchanged.
 
-- [ ] **Step 4: Implement reversal and replay**
+- [x] **Step 4: Implement reversal and replay**
 
 Reversal marks the edge reversed. Fresh deliveries stop cross-continuity retrieval; historical deliveries remain audit evidence.
 
-- [ ] **Step 5: Run runtime tests and commit**
+- [x] **Step 5: Run runtime tests and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime

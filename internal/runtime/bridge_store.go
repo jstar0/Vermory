@@ -129,6 +129,71 @@ VALUES ($1::uuid, $2, 'export', $3::uuid, $4)`, operation.ID, tenantID, memory.I
 	return receipt, err
 }
 
+func (s *Store) LinkConversationContinuities(ctx context.Context, tenantID, operationID, primaryContinuityID, linkedContinuityID, primaryAnchor, linkedAnchor string) (BridgeReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return BridgeReceipt{}, fmt.Errorf("begin conversation link: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	operation, replayed, err := createBridgeOperationTx(ctx, tx, bridgeLedgerInput{
+		TenantID:           tenantID,
+		OperationID:        operationID,
+		Action:             BridgeActionLink,
+		RequestFingerprint: bridgeRequestFingerprint(primaryAnchor, linkedAnchor),
+		SourceContinuityID: primaryContinuityID,
+		TargetContinuityID: linkedContinuityID,
+		SourceAnchor:       primaryAnchor,
+		TargetAnchor:       linkedAnchor,
+	})
+	if err != nil {
+		return BridgeReceipt{}, err
+	}
+	if !replayed {
+		var validContinuities int
+		if err := tx.QueryRow(ctx, `
+SELECT count(*)
+FROM continuity_spaces
+WHERE tenant_id = $1 AND id IN ($2::uuid, $3::uuid)
+  AND continuity_line = 'conversation' AND state = 'active'`, tenantID, primaryContinuityID, linkedContinuityID).Scan(&validContinuities); err != nil {
+			return BridgeReceipt{}, fmt.Errorf("validate linked conversations: %w", err)
+		}
+		if validContinuities != 2 {
+			return BridgeReceipt{}, fmt.Errorf("both bridge endpoints must be active conversations in this tenant")
+		}
+		var primaryIsChild, linkedIsPrimary, linkedIsChild bool
+		if err := tx.QueryRow(ctx, `
+SELECT
+  EXISTS (SELECT 1 FROM conversation_links WHERE tenant_id = $1 AND linked_continuity_id = $2::uuid AND link_state = 'active'),
+  EXISTS (SELECT 1 FROM conversation_links WHERE tenant_id = $1 AND primary_continuity_id = $3::uuid AND link_state = 'active'),
+  EXISTS (SELECT 1 FROM conversation_links WHERE tenant_id = $1 AND linked_continuity_id = $3::uuid AND link_state = 'active')`,
+			tenantID, primaryContinuityID, linkedContinuityID).Scan(&primaryIsChild, &linkedIsPrimary, &linkedIsChild); err != nil {
+			return BridgeReceipt{}, fmt.Errorf("validate conversation link graph: %w", err)
+		}
+		if primaryIsChild {
+			return BridgeReceipt{}, fmt.Errorf("primary conversation is already linked under another primary")
+		}
+		if linkedIsPrimary {
+			return BridgeReceipt{}, fmt.Errorf("linked conversation is already a primary conversation")
+		}
+		if linkedIsChild {
+			return BridgeReceipt{}, fmt.Errorf("linked conversation already belongs to an active link group")
+		}
+		if _, err := tx.Exec(ctx, `
+INSERT INTO conversation_links (
+  bridge_id, tenant_id, primary_continuity_id, linked_continuity_id, link_state
+)
+VALUES ($1::uuid, $2, $3::uuid, $4::uuid, 'active')`, operation.ID, tenantID, primaryContinuityID, linkedContinuityID); err != nil {
+			return BridgeReceipt{}, fmt.Errorf("create conversation link: %w", err)
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return BridgeReceipt{}, fmt.Errorf("commit conversation link: %w", err)
+	}
+	receipt, err := s.InspectBridge(ctx, tenantID, operation.ID)
+	receipt.Replayed = replayed
+	return receipt, err
+}
+
 func (s *Store) ReverseBridge(ctx context.Context, tenantID, operationID, bridgeID string) (BridgeReceipt, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -186,6 +251,17 @@ ORDER BY order_index ASC`, bridgeID, tenantID)
 		case BridgeActionExport:
 			if _, err := tx.Exec(ctx, `UPDATE bridge_operations SET export_body = '[revoked]' WHERE id = $1::uuid`, bridgeID); err != nil {
 				return BridgeReceipt{}, fmt.Errorf("redact revoked export: %w", err)
+			}
+		case BridgeActionLink:
+			command, err := tx.Exec(ctx, `
+UPDATE conversation_links
+SET link_state = 'reversed', updated_at = now()
+WHERE bridge_id = $1::uuid AND tenant_id = $2 AND link_state = 'active'`, bridgeID, tenantID)
+			if err != nil {
+				return BridgeReceipt{}, fmt.Errorf("reverse conversation link: %w", err)
+			}
+			if command.RowsAffected() != 1 {
+				return BridgeReceipt{}, fmt.Errorf("active conversation link effect is missing")
 			}
 		default:
 			return BridgeReceipt{}, fmt.Errorf("bridge action %q reversal is not implemented", action)
