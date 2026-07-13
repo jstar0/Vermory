@@ -154,7 +154,28 @@ func NewDatabaseCommand() *cobra.Command {
 	grantRuntime.Flags().StringVar(&runtimeRole, "role", "", "restricted PostgreSQL login role")
 	markRequired(grantRuntime, "role")
 
-	database.AddCommand(migrate, grantRuntime)
+	rebuildProjections := &cobra.Command{
+		Use:   "rebuild-projections",
+		Short: "Rebuild disposable search projections from active governed memory",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if strings.TrimSpace(options.databaseURL) == "" {
+				return errors.New("--database-url is required")
+			}
+			store, err := runtime.OpenStore(cmd.Context(), options.databaseURL)
+			if err != nil {
+				return err
+			}
+			defer store.Close()
+			documents, err := store.RebuildAllProjections(cmd.Context())
+			if err != nil {
+				return err
+			}
+			return writeJSON(cmd, map[string]any{"status": "rebuilt", "documents": documents})
+		},
+	}
+
+	database.AddCommand(migrate, grantRuntime, rebuildProjections)
 	return database
 }
 

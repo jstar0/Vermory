@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -68,7 +69,7 @@ func TestIdentityTokenIssuePrintsSecretOnceAndInspectDoesNot(t *testing.T) {
 
 func TestDatabaseCommandsAreRegisteredAndMigrateIsExplicit(t *testing.T) {
 	root := newTestRoot()
-	for _, path := range [][]string{{"identity", "token", "issue"}, {"identity", "token", "inspect"}, {"identity", "token", "revoke"}, {"database", "migrate"}, {"database", "grant-runtime"}} {
+	for _, path := range [][]string{{"identity", "token", "issue"}, {"identity", "token", "inspect"}, {"identity", "token", "revoke"}, {"database", "migrate"}, {"database", "grant-runtime"}, {"database", "rebuild-projections"}} {
 		if findCommand(root, path...) == nil {
 			t.Fatalf("missing command %s", strings.Join(path, " "))
 		}
@@ -80,6 +81,56 @@ func TestDatabaseCommandsAreRegisteredAndMigrateIsExplicit(t *testing.T) {
 	output := executeCommand(t, "database", "migrate", "--database-url", databaseURL)
 	if !strings.Contains(output.String(), "migrated") {
 		t.Fatalf("unexpected migrate output: %s", output.String())
+	}
+}
+
+func TestDatabaseRebuildProjectionsUsesOnlyActiveMemories(t *testing.T) {
+	databaseURL := resetIdentityCLIStore(t)
+	pool, err := pgxpool.New(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	var continuityID string
+	if err := pool.QueryRow(context.Background(), `
+INSERT INTO continuity_spaces (tenant_id, continuity_line, state)
+VALUES ('cli-rebuild', 'workspace', 'active')
+RETURNING id::text`).Scan(&continuityID); err != nil {
+		t.Fatal(err)
+	}
+	for index, memory := range []struct {
+		status  string
+		content string
+	}{{status: "active", content: "CLI-ACTIVE-7319"}, {status: "deleted", content: "CLI-DELETED-9981"}} {
+		var observationID string
+		if err := pool.QueryRow(context.Background(), `
+INSERT INTO observations (tenant_id, continuity_id, operation_id, observation_kind, content)
+VALUES ('cli-rebuild', $1::uuid, $2, 'source_update', $3)
+RETURNING id::text`, continuityID, fmt.Sprintf("cli-rebuild-observation-%d", index), memory.content).Scan(&observationID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(context.Background(), `
+INSERT INTO governed_memories (
+  tenant_id, continuity_id, origin_observation_id, memory_kind, lifecycle_status, content
+)
+VALUES ('cli-rebuild', $1::uuid, $2::uuid, 'fact', $3, $4)`, continuityID, observationID, memory.status, memory.content); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	output := executeCommand(t, "database", "rebuild-projections", "--database-url", databaseURL)
+	if !strings.Contains(output.String(), `"status":"rebuilt"`) || !strings.Contains(output.String(), `"documents":1`) {
+		t.Fatalf("unexpected rebuild output: %s", output.String())
+	}
+	var active, deleted int
+	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM memory_search_documents WHERE content = 'CLI-ACTIVE-7319'`).Scan(&active); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM memory_search_documents WHERE content = 'CLI-DELETED-9981'`).Scan(&deleted); err != nil {
+		t.Fatal(err)
+	}
+	if active != 1 || deleted != 0 {
+		t.Fatalf("unexpected rebuilt projection: active=%d deleted=%d", active, deleted)
 	}
 }
 
