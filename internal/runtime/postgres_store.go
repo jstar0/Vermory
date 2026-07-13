@@ -20,6 +20,7 @@ type ResolutionStatus string
 const (
 	ResolutionResolved          ResolutionStatus = "resolved"
 	ResolutionNeedsConfirmation ResolutionStatus = "needs_confirmation"
+	ResolutionUnresolved        ResolutionStatus = "unresolved"
 )
 
 type WorkspaceResolution struct {
@@ -434,10 +435,11 @@ func (s *Store) DeleteMemory(ctx context.Context, tenantID, continuityID, memory
 func deleteMemoryTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, memoryID string) error {
 	var lifecycleStatus string
 	var originObservationID *string
+	var memoryContent string
 	err := tx.QueryRow(ctx, `
-SELECT lifecycle_status, origin_observation_id::text
+SELECT lifecycle_status, origin_observation_id::text, content
 FROM governed_memories
-WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid`, memoryID, tenantID, continuityID).Scan(&lifecycleStatus, &originObservationID)
+WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid`, memoryID, tenantID, continuityID).Scan(&lifecycleStatus, &originObservationID, &memoryContent)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return fmt.Errorf("memory does not belong to this continuity")
 	}
@@ -459,6 +461,22 @@ WHERE id = $1::uuid`, memoryID); err != nil {
 	if originObservationID != nil {
 		if _, err := tx.Exec(ctx, `UPDATE observations SET content = '[redacted]' WHERE id = $1::uuid`, *originObservationID); err != nil {
 			return fmt.Errorf("redact origin observation: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `
+UPDATE conversation_turns
+SET answer = '[redacted]', updated_at = now()
+WHERE tenant_id = $1 AND continuity_id = $2::uuid AND assistant_observation_id = $3::uuid`,
+			tenantID, continuityID, *originObservationID); err != nil {
+			return fmt.Errorf("redact conversation turn answer: %w", err)
+		}
+	}
+	if memoryContent != "" && memoryContent != "[redacted]" {
+		if _, err := tx.Exec(ctx, `
+UPDATE memory_deliveries
+SET context_body = replace(context_body, $3, '[redacted]')
+WHERE tenant_id = $1 AND continuity_id = $2::uuid
+  AND position($3 IN context_body) > 0`, tenantID, continuityID, memoryContent); err != nil {
+			return fmt.Errorf("redact memory from delivery history: %w", err)
 		}
 	}
 	return nil

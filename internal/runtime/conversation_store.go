@@ -10,6 +10,38 @@ import (
 
 const conversationUserSourceRef = "conversation:user"
 
+func (s *Store) ResolveConversation(ctx context.Context, tenantID string, anchor ConversationAnchor) (ConversationResolution, error) {
+	anchor, err := anchor.Normalized()
+	if err != nil {
+		return ConversationResolution{}, err
+	}
+	var continuityID string
+	err = s.pool.QueryRow(ctx, `
+SELECT b.continuity_id::text
+FROM conversation_bindings b
+JOIN continuity_spaces c ON c.id = b.continuity_id
+WHERE b.tenant_id = $1 AND b.channel = $2 AND b.thread_id = $3
+  AND b.binding_state = 'confirmed'
+  AND c.continuity_line = 'conversation' AND c.state = 'active'`,
+		tenantID, anchor.Channel, anchor.ThreadID).Scan(&continuityID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ConversationResolution{
+			Status:   ResolutionUnresolved,
+			Channel:  anchor.Channel,
+			ThreadID: anchor.ThreadID,
+		}, nil
+	}
+	if err != nil {
+		return ConversationResolution{}, fmt.Errorf("resolve conversation binding: %w", err)
+	}
+	return ConversationResolution{
+		Status:       ResolutionResolved,
+		ContinuityID: continuityID,
+		Channel:      anchor.Channel,
+		ThreadID:     anchor.ThreadID,
+	}, nil
+}
+
 func (s *Store) ResolveOrCreateConversation(ctx context.Context, tenantID string, anchor ConversationAnchor) (ConversationResolution, error) {
 	anchor, err := anchor.Normalized()
 	if err != nil {
@@ -129,6 +161,108 @@ LIMIT $4`, tenantID, continuityID, beforeSequence, limit)
 		observations[len(reversed)-1-i] = reversed[i]
 	}
 	return observations, nil
+}
+
+func (s *Store) ListConversationObservations(ctx context.Context, tenantID, continuityID string, limit int) ([]ConversationObservation, error) {
+	if limit <= 0 || limit > maxRecentConversationObservations {
+		limit = maxRecentConversationObservations
+	}
+	rows, err := s.pool.Query(ctx, `
+SELECT id::text, observation_seq, observation_kind, content
+FROM observations
+WHERE tenant_id = $1 AND continuity_id = $2::uuid
+ORDER BY observation_seq DESC
+LIMIT $3`, tenantID, continuityID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list conversation observations: %w", err)
+	}
+	defer rows.Close()
+
+	reversed := make([]ConversationObservation, 0, limit)
+	for rows.Next() {
+		var observation ConversationObservation
+		if err := rows.Scan(&observation.ID, &observation.Sequence, &observation.Kind, &observation.Content); err != nil {
+			return nil, fmt.Errorf("scan conversation observation: %w", err)
+		}
+		reversed = append(reversed, observation)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate conversation observations: %w", err)
+	}
+	observations := make([]ConversationObservation, len(reversed))
+	for i := range reversed {
+		observations[len(reversed)-1-i] = reversed[i]
+	}
+	return observations, nil
+}
+
+func (s *Store) ConfirmConversationObservation(ctx context.Context, tenantID, continuityID, observationID, operationID string) (MemoryReceipt, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return MemoryReceipt{}, fmt.Errorf("begin conversation confirmation: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var kind, content string
+	if err := tx.QueryRow(ctx, `
+SELECT observation_kind, content
+FROM observations
+WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid
+  AND observation_kind IN ('user_message', 'assistant_message')
+FOR UPDATE`, observationID, tenantID, continuityID).Scan(&kind, &content); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return MemoryReceipt{}, fmt.Errorf("observation does not belong to this conversation")
+		}
+		return MemoryReceipt{}, fmt.Errorf("lock conversation observation: %w", err)
+	}
+	if content == "[redacted]" {
+		return MemoryReceipt{}, fmt.Errorf("redacted observation cannot become memory")
+	}
+
+	confirmation, err := commitObservationTx(ctx, tx, tenantID, continuityID, CommitObservationRequest{
+		OperationID: operationID,
+		Kind:        ObservationKindUserConfirmation,
+		Content:     "User confirmed an observation.",
+		SourceRef:   "observation:" + observationID,
+	})
+	if err != nil {
+		return MemoryReceipt{}, err
+	}
+
+	var existing MemoryReceipt
+	err = tx.QueryRow(ctx, `
+SELECT id::text, lifecycle_status
+FROM governed_memories
+WHERE origin_observation_id = $1::uuid`, observationID).Scan(&existing.MemoryID, &existing.Status)
+	if err == nil {
+		existing.Replayed = true
+		if err := tx.Commit(ctx); err != nil {
+			return MemoryReceipt{}, fmt.Errorf("commit replayed conversation confirmation: %w", err)
+		}
+		return existing, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return MemoryReceipt{}, fmt.Errorf("lookup confirmed conversation memory: %w", err)
+	}
+
+	var memoryID string
+	if err := tx.QueryRow(ctx, `
+INSERT INTO governed_memories (
+  tenant_id, continuity_id, origin_observation_id, memory_kind, lifecycle_status, content
+)
+VALUES ($1, $2::uuid, $3::uuid, 'fact', 'active', $4)
+RETURNING id::text`, tenantID, continuityID, observationID, content).Scan(&memoryID); err != nil {
+		return MemoryReceipt{}, fmt.Errorf("create confirmed conversation memory: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO memory_search_documents (memory_id, tenant_id, continuity_id, content, search_document)
+VALUES ($1::uuid, $2, $3::uuid, $4, to_tsvector('simple', $4))`, memoryID, tenantID, continuityID, content); err != nil {
+		return MemoryReceipt{}, fmt.Errorf("project confirmed conversation memory: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return MemoryReceipt{}, fmt.Errorf("commit conversation confirmation: %w", err)
+	}
+	return MemoryReceipt{MemoryID: memoryID, Status: "active", Replayed: confirmation.Replayed}, nil
 }
 
 func (s *Store) BeginConversationTurn(ctx context.Context, tenantID, continuityID string, request ChatTurnRequest) (ChatTurnReceipt, error) {

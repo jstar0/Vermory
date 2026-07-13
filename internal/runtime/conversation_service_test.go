@@ -136,3 +136,183 @@ func TestConversationServicePersistsFailedTurnWithoutAssistantObservation(t *tes
 		t.Fatalf("provider failure wrote an assistant observation: %#v", recent)
 	}
 }
+
+func TestConversationGovernanceRequiresExplicitConfirmationForAssistantOutput(t *testing.T) {
+	store := openTestStore(t)
+	llm := &recordingProvider{output: "The durable fact is ALPHA-17."}
+	service := NewConversationService(store, "local", llm, "test-model", ConversationServiceConfig{})
+	ctx := context.Background()
+	anchor := ConversationAnchor{Channel: "web_chat", ThreadID: "matter-confirm"}
+
+	turn, err := service.Chat(ctx, ChatTurnRequest{
+		OperationID: "confirm-turn",
+		Anchor:      anchor,
+		Message:     "Report the durable fact.",
+	})
+	requireNoError(t, err)
+	resolution, err := store.ResolveOrCreateConversation(ctx, "local", anchor)
+	requireNoError(t, err)
+	before, err := store.SearchActiveMemory(ctx, "local", resolution.ContinuityID, "ALPHA-17", 5)
+	requireNoError(t, err)
+	if len(before) != 0 {
+		t.Fatalf("assistant output became active before confirmation: %#v", before)
+	}
+
+	confirmed, err := service.Confirm(ctx, ConfirmConversationMemoryRequest{
+		OperationID:   "confirm-observation",
+		Anchor:        anchor,
+		ObservationID: turn.AssistantObservationID,
+	})
+	requireNoError(t, err)
+	if confirmed.Status != "active" {
+		t.Fatalf("confirmation did not create active memory: %#v", confirmed)
+	}
+	after, err := store.SearchActiveMemory(ctx, "local", resolution.ContinuityID, "ALPHA-17", 5)
+	requireNoError(t, err)
+	if len(after) != 1 || after[0].Content != "The durable fact is ALPHA-17." {
+		t.Fatalf("confirmed memory is not retrievable: %#v", after)
+	}
+}
+
+func TestConversationGovernanceRejectsObservationFromAnotherThread(t *testing.T) {
+	store := openTestStore(t)
+	llm := &recordingProvider{output: "thread-a fact"}
+	service := NewConversationService(store, "local", llm, "test-model", ConversationServiceConfig{})
+	ctx := context.Background()
+
+	turn, err := service.Chat(ctx, ChatTurnRequest{
+		OperationID: "cross-thread-turn",
+		Anchor:      ConversationAnchor{Channel: "web_chat", ThreadID: "thread-a"},
+		Message:     "produce a fact",
+	})
+	requireNoError(t, err)
+	_, err = service.Confirm(ctx, ConfirmConversationMemoryRequest{
+		OperationID:   "cross-thread-confirm",
+		Anchor:        ConversationAnchor{Channel: "web_chat", ThreadID: "thread-b"},
+		ObservationID: turn.AssistantObservationID,
+	})
+	if err == nil {
+		t.Fatal("confirmation must reject an observation from another conversation")
+	}
+}
+
+func TestConversationGovernanceCorrectsAndForgetsTargetedMemory(t *testing.T) {
+	store := openTestStore(t)
+	llm := &recordingProvider{output: "Use release flag old_mode."}
+	service := NewConversationService(store, "local", llm, "test-model", ConversationServiceConfig{})
+	ctx := context.Background()
+	anchor := ConversationAnchor{Channel: "web_chat", ThreadID: "matter-lifecycle"}
+
+	turn, err := service.Chat(ctx, ChatTurnRequest{
+		OperationID: "lifecycle-turn",
+		Anchor:      anchor,
+		Message:     "Which release flag should be used?",
+	})
+	requireNoError(t, err)
+	confirmed, err := service.Confirm(ctx, ConfirmConversationMemoryRequest{
+		OperationID:   "lifecycle-confirm",
+		Anchor:        anchor,
+		ObservationID: turn.AssistantObservationID,
+	})
+	requireNoError(t, err)
+	corrected, err := service.Correct(ctx, CorrectConversationMemoryRequest{
+		OperationID: "lifecycle-correct",
+		Anchor:      anchor,
+		MemoryID:    confirmed.MemoryID,
+		Content:     "Use release flag new_mode.",
+	})
+	requireNoError(t, err)
+	if corrected.Memory.Status != "active" {
+		t.Fatalf("correction did not create active memory: %#v", corrected)
+	}
+
+	resolution, err := store.ResolveOrCreateConversation(ctx, "local", anchor)
+	requireNoError(t, err)
+	matches, err := store.SearchActiveMemory(ctx, "local", resolution.ContinuityID, "release flag", 5)
+	requireNoError(t, err)
+	if len(matches) != 1 || strings.Contains(matches[0].Content, "old_mode") || !strings.Contains(matches[0].Content, "new_mode") {
+		t.Fatalf("correction lifecycle is wrong: %#v", matches)
+	}
+
+	forgotten, err := service.Forget(ctx, ForgetConversationMemoryRequest{
+		OperationID: "lifecycle-forget",
+		Anchor:      anchor,
+		MemoryID:    corrected.Memory.MemoryID,
+	})
+	requireNoError(t, err)
+	if forgotten.Memory.Status != "deleted" {
+		t.Fatalf("forget did not delete targeted memory: %#v", forgotten)
+	}
+	requireNoError(t, store.RebuildProjection(ctx, "local", resolution.ContinuityID))
+	matches, err = store.SearchActiveMemory(ctx, "local", resolution.ContinuityID, "new_mode", 5)
+	requireNoError(t, err)
+	if len(matches) != 0 {
+		t.Fatalf("forgotten memory returned after rebuild: %#v", matches)
+	}
+}
+
+func TestConversationForgetRedactsOriginHistoryTurnReplayAndDelivery(t *testing.T) {
+	store := openTestStore(t)
+	const secret = "ORCHID-7419"
+	llm := &recordingProvider{output: "The temporary recovery code is " + secret + "."}
+	service := NewConversationService(store, "local", llm, "test-model", ConversationServiceConfig{})
+	ctx := context.Background()
+	anchor := ConversationAnchor{Channel: "web_chat", ThreadID: "matter-delete"}
+	request := ChatTurnRequest{OperationID: "delete-turn", Anchor: anchor, Message: "Show the temporary code."}
+
+	turn, err := service.Chat(ctx, request)
+	requireNoError(t, err)
+	confirmed, err := service.Confirm(ctx, ConfirmConversationMemoryRequest{
+		OperationID:   "delete-confirm",
+		Anchor:        anchor,
+		ObservationID: turn.AssistantObservationID,
+	})
+	requireNoError(t, err)
+	llm.output = "Use the governed recovery guidance."
+	followup, err := service.Chat(ctx, ChatTurnRequest{
+		OperationID: "delete-followup",
+		Anchor:      anchor,
+		Message:     "What recovery information is retained?",
+	})
+	requireNoError(t, err)
+	_, err = service.Forget(ctx, ForgetConversationMemoryRequest{
+		OperationID: "delete-forget",
+		Anchor:      anchor,
+		MemoryID:    confirmed.MemoryID,
+	})
+	requireNoError(t, err)
+
+	replayed, err := service.Chat(ctx, request)
+	requireNoError(t, err)
+	if strings.Contains(replayed.Answer, secret) {
+		t.Fatalf("replayed answer retained deleted content: %#v", replayed)
+	}
+	inspection, err := service.Inspect(ctx, anchor)
+	requireNoError(t, err)
+	encoded := inspectionText(inspection)
+	if strings.Contains(encoded, secret) {
+		t.Fatalf("inspection retained deleted content: %s", encoded)
+	}
+	if !strings.Contains(encoded, "[redacted]") {
+		t.Fatalf("inspection did not retain a redacted marker: %s", encoded)
+	}
+
+	var deliveryBody string
+	err = store.pool.QueryRow(ctx, `
+SELECT context_body FROM memory_deliveries WHERE id = $1::uuid`, followup.DeliveryID).Scan(&deliveryBody)
+	requireNoError(t, err)
+	if strings.Contains(deliveryBody, secret) {
+		t.Fatalf("delivery retained deleted content: %s", deliveryBody)
+	}
+}
+
+func inspectionText(inspection ConversationInspection) string {
+	var parts []string
+	for _, observation := range inspection.Observations {
+		parts = append(parts, observation.Content)
+	}
+	for _, memory := range inspection.Memories {
+		parts = append(parts, memory.Content)
+	}
+	return strings.Join(parts, "\n")
+}

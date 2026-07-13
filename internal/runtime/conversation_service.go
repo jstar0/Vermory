@@ -91,6 +91,89 @@ func (s *ConversationService) Chat(ctx context.Context, request ChatTurnRequest)
 	)
 }
 
+func (s *ConversationService) Confirm(ctx context.Context, request ConfirmConversationMemoryRequest) (MemoryReceipt, error) {
+	if err := s.configured(); err != nil {
+		return MemoryReceipt{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return MemoryReceipt{}, err
+	}
+	resolution, err := s.confirmedConversation(ctx, request.Anchor)
+	if err != nil {
+		return MemoryReceipt{}, err
+	}
+	return s.store.ConfirmConversationObservation(
+		ctx,
+		s.tenantID,
+		resolution.ContinuityID,
+		request.ObservationID,
+		request.OperationID,
+	)
+}
+
+func (s *ConversationService) Correct(ctx context.Context, request CorrectConversationMemoryRequest) (GovernedObservationReceipt, error) {
+	if err := s.configured(); err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	resolution, err := s.confirmedConversation(ctx, request.Anchor)
+	if err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	return s.store.CommitGovernedObservation(ctx, s.tenantID, resolution.ContinuityID, CommitObservationRequest{
+		OperationID:        request.OperationID,
+		Kind:               ObservationKindUserCorrection,
+		Content:            request.Content,
+		SourceRef:          "memory:" + request.MemoryID,
+		SupersedesMemoryID: request.MemoryID,
+	})
+}
+
+func (s *ConversationService) Forget(ctx context.Context, request ForgetConversationMemoryRequest) (GovernedObservationReceipt, error) {
+	if err := s.configured(); err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	resolution, err := s.confirmedConversation(ctx, request.Anchor)
+	if err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	return s.store.CommitGovernedObservation(ctx, s.tenantID, resolution.ContinuityID, CommitObservationRequest{
+		OperationID:    request.OperationID,
+		Kind:           ObservationKindForgetRequest,
+		Content:        "Operator requested deletion.",
+		SourceRef:      "memory:" + request.MemoryID,
+		TargetMemoryID: request.MemoryID,
+	})
+}
+
+func (s *ConversationService) Inspect(ctx context.Context, anchor ConversationAnchor) (ConversationInspection, error) {
+	if err := s.configured(); err != nil {
+		return ConversationInspection{}, err
+	}
+	resolution, err := s.confirmedConversation(ctx, anchor)
+	if err != nil {
+		return ConversationInspection{}, err
+	}
+	observations, err := s.store.ListConversationObservations(ctx, s.tenantID, resolution.ContinuityID, maxRecentConversationObservations)
+	if err != nil {
+		return ConversationInspection{}, err
+	}
+	memories, err := s.store.ListGovernedMemories(ctx, s.tenantID, resolution.ContinuityID)
+	if err != nil {
+		return ConversationInspection{}, err
+	}
+	return ConversationInspection{
+		Resolution:   resolution,
+		Observations: observations,
+		Memories:     memories,
+	}, nil
+}
+
 func BuildConversationContext(memories []Memory, recent []ConversationObservation) string {
 	sections := make([]string, 0, 2)
 	if len(memories) > 0 {
@@ -137,4 +220,15 @@ func (s *ConversationService) configured() error {
 		return fmt.Errorf("conversation service is not configured")
 	}
 	return nil
+}
+
+func (s *ConversationService) confirmedConversation(ctx context.Context, anchor ConversationAnchor) (ConversationResolution, error) {
+	resolution, err := s.store.ResolveConversation(ctx, s.tenantID, anchor)
+	if err != nil {
+		return ConversationResolution{}, err
+	}
+	if resolution.Status != ResolutionResolved {
+		return ConversationResolution{}, fmt.Errorf("conversation does not exist")
+	}
+	return resolution, nil
 }

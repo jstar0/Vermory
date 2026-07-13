@@ -262,7 +262,7 @@ git commit -m "feat: add persistent conversation turns"
 **Interfaces:**
 - Produces: `ConversationService.Confirm`, `ConversationService.Correct`, `ConversationService.Forget`, and `ConversationService.Inspect`.
 
-- [ ] **Step 1: Write failing confirmation, correction, deletion, and rebuild tests**
+- [x] **Step 1: Write failing confirmation, correction, deletion, and rebuild tests**
 
 Tests must assert:
 
@@ -282,7 +282,7 @@ confirmed, err := service.Confirm(ctx, ConfirmConversationMemoryRequest{
 - the forgotten content is absent from recent history and search after projection rebuild;
 - replayed governance operations do not duplicate effects.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./internal/runtime -run 'TestConversationGovernance|TestConversationForget' -count=1
@@ -290,7 +290,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./inter
 
 Expected: compile failure because the governance methods do not exist.
 
-- [ ] **Step 3: Implement content-free confirmation with targeted origin**
+- [x] **Step 3: Implement content-free confirmation with targeted origin**
 
 In one transaction:
 
@@ -300,15 +300,15 @@ In one transaction:
 - create active governed memory using the target observation as `origin_observation_id` and its exact content;
 - create the search projection.
 
-- [ ] **Step 4: Reuse lifecycle operations for correction and forget**
+- [x] **Step 4: Reuse lifecycle operations for correction and forget**
 
 Correction uses `user_correction` and the exact target memory ID. Forget uses the fixed `Operator requested deletion.` observation and encodes only the target memory ID in the operation source reference. All ownership and lifecycle checks remain in PostgreSQL transactions.
 
-- [ ] **Step 5: Implement inspection without deleted-content disclosure**
+- [x] **Step 5: Implement inspection without deleted-content disclosure**
 
 Return recent observations and governed memory receipts for the exact continuity. Deleted content may appear only as `[redacted]`; raw provider artifacts and delivery audit metadata are excluded.
 
-- [ ] **Step 6: Run tests and verify GREEN**
+- [x] **Step 6: Run tests and verify GREEN**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./internal/runtime -count=1
@@ -316,7 +316,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test ./inter
 
 Expected: PASS, including workspace governance regressions.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/runtime/conversation_types.go internal/runtime/conversation_store.go internal/runtime/conversation_service.go internal/runtime/conversation_store_test.go internal/runtime/conversation_service_test.go

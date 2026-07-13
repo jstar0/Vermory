@@ -104,6 +104,86 @@ type ConversationServiceConfig struct {
 	RecentLimit int
 }
 
+type ConfirmConversationMemoryRequest struct {
+	OperationID   string             `json:"operation_id"`
+	Anchor        ConversationAnchor `json:"-"`
+	ObservationID string             `json:"observation_id"`
+}
+
+func (r *ConfirmConversationMemoryRequest) Validate() error {
+	r.OperationID = strings.TrimSpace(r.OperationID)
+	r.ObservationID = strings.TrimSpace(r.ObservationID)
+	if r.OperationID == "" {
+		return fmt.Errorf("operation_id is required")
+	}
+	if r.ObservationID == "" {
+		return fmt.Errorf("observation_id is required")
+	}
+	anchor, err := r.Anchor.Normalized()
+	if err != nil {
+		return err
+	}
+	r.Anchor = anchor
+	return nil
+}
+
+type CorrectConversationMemoryRequest struct {
+	OperationID string             `json:"operation_id"`
+	Anchor      ConversationAnchor `json:"-"`
+	MemoryID    string             `json:"memory_id"`
+	Content     string             `json:"content"`
+}
+
+func (r *CorrectConversationMemoryRequest) Validate() error {
+	r.OperationID = strings.TrimSpace(r.OperationID)
+	r.MemoryID = strings.TrimSpace(r.MemoryID)
+	r.Content = strings.TrimSpace(r.Content)
+	if r.OperationID == "" {
+		return fmt.Errorf("operation_id is required")
+	}
+	if r.MemoryID == "" {
+		return fmt.Errorf("memory_id is required")
+	}
+	if r.Content == "" {
+		return fmt.Errorf("content is required")
+	}
+	anchor, err := r.Anchor.Normalized()
+	if err != nil {
+		return err
+	}
+	r.Anchor = anchor
+	return nil
+}
+
+type ForgetConversationMemoryRequest struct {
+	OperationID string             `json:"operation_id"`
+	Anchor      ConversationAnchor `json:"-"`
+	MemoryID    string             `json:"memory_id"`
+}
+
+func (r *ForgetConversationMemoryRequest) Validate() error {
+	r.OperationID = strings.TrimSpace(r.OperationID)
+	r.MemoryID = strings.TrimSpace(r.MemoryID)
+	if r.OperationID == "" {
+		return fmt.Errorf("operation_id is required")
+	}
+	if r.MemoryID == "" {
+		return fmt.Errorf("memory_id is required")
+	}
+	anchor, err := r.Anchor.Normalized()
+	if err != nil {
+		return err
+	}
+	r.Anchor = anchor
+	return nil
+}
+
+type ConversationInspection struct {
+	Resolution   ConversationResolution    `json:"conversation"`
+	Observations []ConversationObservation `json:"observations"`
+	Memories     []GovernedMemory          `json:"memories"`
+}
+
 func (c ConversationServiceConfig) normalized() ConversationServiceConfig {
 	if c.MemoryLimit <= 0 {
 		c.MemoryLimit = defaultContextItems
