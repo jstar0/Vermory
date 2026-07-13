@@ -397,7 +397,7 @@ git commit -m "feat: expose local web chat api"
 - Consumes: `runtime.NewConversationService`, `webchat.NewHandler`, existing `provider.Provider` implementations.
 - Produces: `vermory web-chat`.
 
-- [ ] **Step 1: Write failing command tests**
+- [x] **Step 1: Write failing command tests**
 
 Tests must prove:
 
@@ -407,7 +407,7 @@ Tests must prove:
 - `mock`, `grok-cli`, `openai-compatible`, `siliconflow`, and `duojie` provider names build through the existing provider interface;
 - request clients cannot override the configured model.
 
-- [ ] **Step 2: Run tests and verify RED**
+- [x] **Step 2: Run tests and verify RED**
 
 ```bash
 go test ./cmd/vermory -run 'TestWebChat' -count=1
@@ -415,7 +415,7 @@ go test ./cmd/vermory -run 'TestWebChat' -count=1
 
 Expected: command constructor missing.
 
-- [ ] **Step 3: Implement `newWebChatCommand`**
+- [x] **Step 3: Implement `newWebChatCommand`**
 
 Required flags:
 
@@ -431,7 +431,7 @@ Required flags:
 
 Construct the provider at server startup, migrate PostgreSQL, build `ConversationService`, create an `http.Server` with bounded header/read/write/idle timeouts, and shut it down when the command context is cancelled.
 
-- [ ] **Step 4: Run command and full unit tests**
+- [x] **Step 4: Run command and full unit tests**
 
 ```bash
 go test ./cmd/vermory ./internal/webchat ./internal/runtime -count=1
@@ -439,7 +439,7 @@ go test ./cmd/vermory ./internal/webchat ./internal/runtime -count=1
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add cmd/vermory/web_chat.go cmd/vermory/web_chat_test.go cmd/vermory/main.go
