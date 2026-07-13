@@ -80,6 +80,15 @@ func TestIdentityAndDatabaseCommandsAreRegistered(t *testing.T) {
 	}
 }
 
+func TestAuthenticatedServeCommandIsRegistered(t *testing.T) {
+	for _, command := range newRootCommand().Commands() {
+		if command.Name() == "serve" {
+			return
+		}
+	}
+	t.Fatal("expected authenticated serve command")
+}
+
 func TestOperatorMemoryForgetHasNoFreeTextFlag(t *testing.T) {
 	root := newRootCommand()
 	for _, parent := range root.Commands() {

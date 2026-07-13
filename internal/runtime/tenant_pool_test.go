@@ -190,6 +190,19 @@ func TestRuntimeRoleValidationRejectsUnsafeIdentities(t *testing.T) {
 		t.Fatal("BYPASSRLS identity passed runtime validation")
 	}
 
+	unprovisionedRole, unprovisionedURL := createTenantPoolRole(t, admin.pool, databaseURL, "unprovisioned", "")
+	if _, err := admin.pool.Exec(ctx, "GRANT USAGE ON SCHEMA public, vermory_auth TO "+pgx.Identifier{unprovisionedRole}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	unprovisionedStore, err := OpenStore(ctx, unprovisionedURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(unprovisionedStore.Close)
+	if err := unprovisionedStore.ValidateRuntimeRole(ctx); err == nil {
+		t.Fatal("unprovisioned runtime identity passed startup validation")
+	}
+
 	leakyRole, leakyURL := createTenantPoolRole(t, admin.pool, databaseURL, "legacy_access", "")
 	if _, err := admin.pool.Exec(ctx, "GRANT SELECT ON public.projects TO "+pgx.Identifier{leakyRole}.Sanitize()); err != nil {
 		t.Fatal(err)

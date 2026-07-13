@@ -224,6 +224,23 @@ WHERE n.nspname = 'public'
 	if ownedTables != 0 {
 		return ErrUnsafeRuntimeRole
 	}
+	var hasRequiredPrivileges bool
+	if err := s.pool.QueryRow(validationCtx, `
+SELECT
+  COALESCE(bool_and(
+    has_table_privilege(current_user, 'public.' || required.table_name, 'SELECT')
+    AND has_table_privilege(current_user, 'public.' || required.table_name, 'INSERT')
+    AND has_table_privilege(current_user, 'public.' || required.table_name, 'UPDATE')
+    AND has_table_privilege(current_user, 'public.' || required.table_name, 'DELETE')
+  ), false)
+  AND has_sequence_privilege(current_user, 'public.observations_observation_seq_seq', 'USAGE')
+  AND has_function_privilege(current_user, 'vermory_auth.authenticate_token(text,bytea)', 'EXECUTE')
+FROM unnest($1::text[]) AS required(table_name)`, tables).Scan(&hasRequiredPrivileges); err != nil {
+		return fmt.Errorf("validate runtime required privileges: %w", err)
+	}
+	if !hasRequiredPrivileges {
+		return ErrUnsafeRuntimeRole
+	}
 	forbiddenTables := []string{
 		"vermory_auth.api_tokens",
 		"public.projects", "public.sources", "public.source_versions", "public.claims",

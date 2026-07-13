@@ -308,30 +308,30 @@ func NewAuthenticatedHandler(
 
 and `vermory serve`.
 
-- [ ] **Step 1: Write failing authentication/authorization tests**
+- [x] **Step 1: Write failing authentication/authorization tests**
 
 Cover missing/malformed/unknown/expired/revoked token `401`, client-role governance `403`, operator success, safe cross-tenant not-found behavior, no accepted tenant field, and no token/tenant/resource leakage in errors.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/webchat -run 'TestAuthenticated' -v
 ```
 
-- [ ] **Step 3: Implement principal middleware and route policy**
+- [x] **Step 3: Implement principal middleware and route policy**
 
 Parse one Bearer credential, authenticate it, authorize the route, then construct existing conversation/default/bridge services with `principal.TenantID`. Do not cache tenant-bound services across principals.
 
-- [ ] **Step 4: Write failing `serve` tests**
+- [x] **Step 4: Write failing `serve` tests**
 
 Require runtime DB URL and listen address, reject implicit migrations, reject unsafe runtime role, reject non-loopback without both TLS files, and accept loopback without TLS.
 
-- [ ] **Step 5: Implement `serve`**
+- [x] **Step 5: Implement `serve`**
 
 Open one plain auth pool and one RLS-enforced store pool from the runtime DSN. Validate the runtime role. Start `http.Server` with the existing timeouts; use `ListenAndServeTLS` only when certificate/key are present. Keep `web-chat` unchanged.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
