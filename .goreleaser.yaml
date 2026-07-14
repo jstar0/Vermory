@@ -1,0 +1,71 @@
+version: 2
+
+project_name: vermory
+
+builds:
+  - id: vermory
+    main: ./cmd/vermory
+    binary: vermory
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w
+      - -X vermory/internal/brand.Version={{ .Version }}
+      - -X vermory/internal/brand.Revision={{ .FullCommit }}
+      - -X vermory/internal/brand.BuildDate={{ .CommitDate }}
+
+archives:
+  - id: vermory
+    ids:
+      - vermory
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    builds_info:
+      group: root
+      owner: root
+      mode: 0755
+      mtime: "{{ .CommitDate }}"
+    files:
+      - src: LICENSE
+        info:
+          group: root
+          owner: root
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: README.md
+        info:
+          group: root
+          owner: root
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: README.zh-CN.md
+        info:
+          group: root
+          owner: root
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  disable: true
+
+source:
+  enabled: false
+
+release:
+  draft: true
+  prerelease: auto

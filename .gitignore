@@ -11,6 +11,8 @@ tmp/
 *.log
 integrations/openclaw/node_modules/
 integrations/openclaw/dist/
+integrations/openclaw/*.tgz
+dist/
 
 # Local-only presentation and pre-Vermory planning material.
 bluebridge-report/

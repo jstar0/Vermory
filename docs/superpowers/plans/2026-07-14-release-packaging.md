@@ -75,21 +75,22 @@ git commit -m "feat: expose release version metadata"
 - Consumes: Task 1 linker variables.
 - Produces: four `tar.gz` archives, `checksums.txt`, and GoReleaser metadata under `dist/`.
 
-- [ ] **Step 1: Verify missing release configuration**
+- [x] **Step 1: Verify missing release configuration**
 
 Run:
 
 ```bash
-goreleaser check
+goreleaser check --config .goreleaser.yaml
 ```
 
-Expected: FAIL because `.goreleaser.yaml` does not exist.
+Expected: FAIL because `.goreleaser.yaml` does not exist. Do not accept
+GoReleaser's implicit default configuration as a release contract.
 
-- [ ] **Step 2: Add minimal GoReleaser configuration**
+- [x] **Step 2: Add minimal GoReleaser configuration**
 
 Configure one `vermory` build from `./cmd/vermory`, `CGO_ENABLED=0`, the four target tuples, `-trimpath`, release linker metadata, `tar.gz` archives with the required files, SHA-256 checksums, and no source archive.
 
-- [ ] **Step 3: Run a real snapshot build**
+- [x] **Step 3: Run a real snapshot build**
 
 Run:
 
@@ -100,7 +101,7 @@ goreleaser release --snapshot --clean --skip=publish
 
 Require four archives, one checksum file, successful host execution of the Darwin arm64 binary, and `go version -m` evidence for every binary.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .goreleaser.yaml .gitignore
