@@ -7,10 +7,17 @@ import (
 	"reflect"
 	"testing"
 
+	"vermory/internal/brand"
 	"vermory/internal/runtime"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+func TestServerVersionUsesBrandVersion(t *testing.T) {
+	if got := serverImplementation().Version; got != brand.Version {
+		t.Fatalf("MCP version %q does not match brand version %q", got, brand.Version)
+	}
+}
 
 func TestPrepareContextToolReturnsNeedsConfirmationWithoutContext(t *testing.T) {
 	handler, _ := testHandler(t)

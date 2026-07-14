@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -61,9 +62,18 @@ func newRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:           brand.Slug,
 		Short:         brand.Name + " - " + brand.Tagline,
+		Version:       brand.Version,
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "Print release build metadata",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return json.NewEncoder(cmd.OutOrStdout()).Encode(brand.Info())
+		},
+	})
 
 	runSelfCaseCmd := &cobra.Command{
 		Use:   "run-self-case",

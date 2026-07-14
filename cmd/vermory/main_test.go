@@ -1,9 +1,65 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
+
+	"vermory/internal/brand"
 )
+
+func TestVersionCommandUsesStableBuildMetadata(t *testing.T) {
+	originalVersion, originalRevision, originalBuildDate := brand.Version, brand.Revision, brand.BuildDate
+	brand.Version = "0.1.0-alpha.1"
+	brand.Revision = "abc123"
+	brand.BuildDate = "2026-07-14T00:00:00Z"
+	t.Cleanup(func() {
+		brand.Version, brand.Revision, brand.BuildDate = originalVersion, originalRevision, originalBuildDate
+	})
+
+	command := newRootCommand()
+	var output bytes.Buffer
+	command.SetOut(&output)
+	command.SetArgs([]string{"version"})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(output.Bytes(), &got); err != nil {
+		t.Fatalf("version output is not JSON: %v\n%s", err, output.String())
+	}
+	for key, want := range map[string]string{
+		"version":    "0.1.0-alpha.1",
+		"revision":   "abc123",
+		"build_date": "2026-07-14T00:00:00Z",
+	} {
+		if got[key] != want {
+			t.Fatalf("version field %s = %#v, want %q", key, got[key], want)
+		}
+	}
+	if value, ok := got["go_version"].(string); !ok || value == "" {
+		t.Fatalf("missing go_version: %#v", got)
+	}
+}
+
+func TestRootVersionFlagUsesBrandVersion(t *testing.T) {
+	originalVersion := brand.Version
+	brand.Version = "0.1.0-alpha.1"
+	t.Cleanup(func() { brand.Version = originalVersion })
+
+	command := newRootCommand()
+	var output bytes.Buffer
+	command.SetOut(&output)
+	command.SetArgs([]string{"--version"})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "0.1.0-alpha.1") {
+		t.Fatalf("root version output did not use brand version: %q", output.String())
+	}
+}
 
 func TestRealityAttestationCLIExposesVerifyButNoSignCommand(t *testing.T) {
 	verifyFound := false

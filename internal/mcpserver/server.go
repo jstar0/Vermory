@@ -53,7 +53,7 @@ func New(service *runtime.Service, config Config) *Handler {
 }
 
 func NewServer(handler *Handler) *mcp.Server {
-	server := mcp.NewServer(&mcp.Implementation{Name: brand.Slug, Version: "0.1.0"}, nil)
+	server := mcp.NewServer(serverImplementation(), nil)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "prepare_context",
 		Description: "Resolve a workspace and return governed context for the current task.",
@@ -63,6 +63,10 @@ func NewServer(handler *Handler) *mcp.Server {
 		Description: "Record a coding-agent result as a proposed observation for the prepared workspace.",
 	}, handler.CommitObservation)
 	return server
+}
+
+func serverImplementation() *mcp.Implementation {
+	return &mcp.Implementation{Name: brand.Slug, Version: brand.Version}
 }
 
 func (h *Handler) PrepareContext(ctx context.Context, _ *mcp.CallToolRequest, input PrepareContextInput) (*mcp.CallToolResult, PrepareContextOutput, error) {
