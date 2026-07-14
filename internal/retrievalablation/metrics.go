@@ -23,10 +23,12 @@ func ScoreQuery(query Query, results []RankedResult) QueryMetrics {
 	for index, result := range results {
 		rank := index + 1
 		if _, exists := relevant[result.RecordID]; exists {
-			foundRelevant[result.RecordID] = struct{}{}
-			dcg += 1 / math.Log2(float64(rank+1))
-			if metrics.MRR == 0 {
-				metrics.MRR = 1 / float64(rank)
+			if _, counted := foundRelevant[result.RecordID]; !counted {
+				foundRelevant[result.RecordID] = struct{}{}
+				dcg += 1 / math.Log2(float64(rank+1))
+				if metrics.MRR == 0 {
+					metrics.MRR = 1 / float64(rank)
+				}
 			}
 		}
 		if _, exists := forbidden[result.RecordID]; exists {

@@ -48,6 +48,17 @@ func TestScoreQueryNDCGPenalizesMissingRelevantResults(t *testing.T) {
 	}
 }
 
+func TestScoreQueryDoesNotDoubleCountDuplicateRelevantResults(t *testing.T) {
+	query := Query{Limit: 3, RelevantRecordIDs: []string{"a"}}
+	metrics := ScoreQuery(query, []RankedResult{
+		{RecordID: "a", Eligible: true},
+		{RecordID: "a", Eligible: true},
+	})
+	if metrics.RecallAtK != 1 || metrics.MRR != 1 || metrics.NDCGAtK != 1 {
+		t.Fatalf("duplicate relevant result inflated metrics: %#v", metrics)
+	}
+}
+
 func TestAggregateMetricsBuildsConditionAndCohortViews(t *testing.T) {
 	reports := []QueryReport{
 		{
