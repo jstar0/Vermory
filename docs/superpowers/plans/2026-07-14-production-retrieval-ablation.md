@@ -33,7 +33,7 @@
 - Consumes: existing `casebook/cases/101-*` through `109-*`, `201-*` through `205-*`, and `301-*` through `305-*` provenance paths.
 - Produces: `LoadCorpus(path string) (Corpus, error)`, `ValidateCorpus(root string, corpus Corpus) error`, and `CorpusSHA256(corpus Corpus) (string, error)`.
 
-- [ ] **Step 1: Define the frozen corpus types and canonical lifecycle vocabulary.**
+- [x] **Step 1: Define the frozen corpus types and canonical lifecycle vocabulary.**
 
 ```go
 type Corpus struct {
@@ -72,7 +72,7 @@ type Query struct {
 }
 ```
 
-- [ ] **Step 2: Write loader tests that reject duplicate IDs, unknown scopes, unsupported lines/lifecycles, missing provenance files, empty query sets, limits outside 1-12, overlapping relevant/forbidden IDs, non-active relevant records, and forbidden IDs that do not exist.**
+- [x] **Step 2: Write loader tests that reject duplicate IDs, unknown scopes, unsupported lines/lifecycles, missing provenance files, empty query sets, limits outside 1-12, overlapping relevant/forbidden IDs, non-active relevant records, and forbidden IDs that do not exist.**
 
 Run:
 
@@ -82,15 +82,15 @@ go test -count=1 ./internal/retrievalablation -run 'Corpus'
 
 Expected: FAIL because the package and corpus do not exist.
 
-- [ ] **Step 3: Implement strict JSON loading, unknown-field rejection, canonical sorting for hashing, provenance containment under `casebook/cases`, and corpus validation.**
+- [x] **Step 3: Implement strict JSON loading, unknown-field rejection, canonical sorting for hashing, provenance containment under `casebook/cases`, and corpus validation.**
 
 The loader must reject trailing JSON and produce a lowercase 64-character SHA-256 over canonical JSON with sorted scopes, records, queries, and every ID list.
 
-- [ ] **Step 4: Write `corpus.json` with at least four tenants, eight scopes, 48 active records, four proposed records, four superseded records, four deleted records, and 24 queries across every cohort frozen in the design.**
+- [x] **Step 4: Write `corpus.json` with at least four tenants, eight scopes, 48 active records, four proposed records, four superseded records, four deleted records, and 24 queries across every cohort frozen in the design.**
 
 Every record must cite an existing case directory and every query must include at least one relevant and one forbidden record. The corpus must include exact paths, flags, error codes, model names, dates, durations, numbers, Chinese paraphrases, English paraphrases, mixed-language requests, multi-fact queries, same-scope distractors, cross-continuity distractors, and cross-tenant distractors.
 
-- [ ] **Step 5: Run corpus tests and a JSON syntax check, then commit.**
+- [x] **Step 5: Run corpus tests and a JSON syntax check, then commit.**
 
 ```bash
 jq empty runtime/cases/W08-production-retrieval-ablation/corpus.json
@@ -112,7 +112,7 @@ git commit -m "test: freeze production retrieval ablation corpus"
 - Consumes: Task 1 `Query` values and ranked results from later search adapters.
 - Produces: `FuseRRF`, `ScoreQuery`, `AggregateMetrics`, `ConditionReport`, `QueryReport`, and stable condition names.
 
-- [ ] **Step 1: Define ranked result and report types.**
+- [x] **Step 1: Define ranked result and report types.**
 
 ```go
 const (
@@ -143,17 +143,17 @@ type QueryMetrics struct {
 }
 ```
 
-- [ ] **Step 2: Write failing fusion tests for deduplication, exact-guard precedence, the exact `1/(60+rank)` formula, missing ranks, deterministic ties, limit truncation, and lexical-only degradation preserving IDs and order.**
+- [x] **Step 2: Write failing fusion tests for deduplication, exact-guard precedence, the exact `1/(60+rank)` formula, missing ranks, deterministic ties, limit truncation, and lexical-only degradation preserving IDs and order.**
 
-- [ ] **Step 3: Implement `FuseRRF(query string, limit int, lexical, vector []RankedResult) []RankedResult` without provider calls, mutable global weights, or content-based special cases beyond the frozen exact substring guard.**
+- [x] **Step 3: Implement `FuseRRF(query string, limit int, lexical, vector []RankedResult) []RankedResult` without provider calls, mutable global weights, or content-based special cases beyond the frozen exact substring guard.**
 
-- [ ] **Step 4: Write failing metric tests for hit@1, recall@k, MRR, binary nDCG, multi-relevant queries, forbidden results, ineligible results, zero results, per-cohort aggregation, and deterministic percentile latency.**
+- [x] **Step 4: Write failing metric tests for hit@1, recall@k, MRR, binary nDCG, multi-relevant queries, forbidden results, ineligible results, zero results, per-cohort aggregation, and deterministic percentile latency.**
 
-- [ ] **Step 5: Implement scoring and aggregation with no LLM judge.**
+- [x] **Step 5: Implement scoring and aggregation with no LLM judge.**
 
 `ScoreQuery` compares stable record IDs. `AggregateMetrics` computes macro averages over queries and exact integer violation totals. Empty relevant sets are invalid corpus input rather than a special score.
 
-- [ ] **Step 6: Run pure package tests and commit.**
+- [x] **Step 6: Run pure package tests and commit.**
 
 ```bash
 go test -count=1 ./internal/retrievalablation -run 'Fusion|Metric'
@@ -175,7 +175,7 @@ git commit -m "feat: score deterministic retrieval ablations"
 - Consumes: `runtime.Store`, `memorybackend.Backend`, Task 1 corpus, and Task 2 fusion/metrics.
 - Produces: `Run(ctx context.Context, options Options) (Report, error)`, `SeedCorpus`, `RunCondition`, and rebuild/degradation evidence.
 
-- [ ] **Step 1: Define the runner dependency boundary.**
+- [x] **Step 1: Define the runner dependency boundary.**
 
 ```go
 type LexicalSearcher interface {
@@ -195,7 +195,7 @@ type Options struct {
 }
 ```
 
-- [ ] **Step 2: Write failing database tests that materialize active, proposed, superseded, deleted, cross-continuity, and cross-tenant records exclusively through runtime APIs and require a stable corpus-record-to-memory-ID map.**
+- [x] **Step 2: Write failing database tests that materialize active, proposed, superseded, deleted, cross-continuity, and cross-tenant records exclusively through runtime APIs and require a stable corpus-record-to-memory-ID map.**
 
 Run:
 
@@ -205,7 +205,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -c
 
 Expected: FAIL because seeding and the runner are absent.
 
-- [ ] **Step 3: Implement corpus seeding with `ConfirmWorkspaceBinding`, `ResolveOrCreateConversation`, `CommitGovernedObservation`, supersession, and `DeleteMemory`.**
+- [x] **Step 3: Implement corpus seeding with `ConfirmWorkspaceBinding`, `ResolveOrCreateConversation`, `CommitGovernedObservation`, supersession, and `DeleteMemory`.**
 
 Use deterministic operation IDs derived from run ID plus record ID. Active
 vector records use the returned governed memory IDs. Proposed records are never
@@ -213,13 +213,13 @@ inserted into the ANN projection; superseded and deleted records exercise a
 put/delete transition and must be absent from the final index. Never insert
 directly into authoritative runtime tables or `memory_search_documents`.
 
-- [ ] **Step 4: Make native backend scope rebuild deterministic and expose no authority mutation.**
+- [x] **Step 4: Make native backend scope rebuild deterministic and expose no authority mutation.**
 
 If existing `RebuildScope` ordering is unstable, sort records by ID before embedding and insertion. Do not add lifecycle or authority semantics beyond the existing `Record.Status` filter.
 
-- [ ] **Step 5: Write failing runner tests for all three conditions, vector eligibility recheck, exact lexical fallback on vector error, completed-query preservation after another query fails, and projection reset/rebuild result equivalence.**
+- [x] **Step 5: Write failing runner tests for all three conditions, vector eligibility recheck, exact lexical fallback on vector error, completed-query preservation after another query fails, and projection reset/rebuild result equivalence.**
 
-- [ ] **Step 6: Implement the runner.**
+- [x] **Step 6: Implement the runner.**
 
 For each query:
 
@@ -232,9 +232,9 @@ For each query:
 6. score lexical, eligible vector, and hybrid outputs;
 7. persist query evidence in the in-memory report even if a later query fails.
 
-- [ ] **Step 7: Add a forced vector-outage backend and require hybrid results to equal lexical results byte-for-byte in ID order with `degraded_to_lexical=true`.**
+- [x] **Step 7: Add a forced vector-outage backend and require hybrid results to equal lexical results byte-for-byte in ID order with `degraded_to_lexical=true`.**
 
-- [ ] **Step 8: Run focused serial database tests and native backend tests, then commit.**
+- [x] **Step 8: Run focused serial database tests and native backend tests, then commit.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/retrievalablation ./internal/memorybackend
@@ -255,19 +255,19 @@ git commit -m "feat: run governed retrieval ablations"
 - Consumes: Task 3 `Run` and `Report`.
 - Produces: `vermory retrieval-ablation`, `report.json`, and `report.md`.
 
-- [ ] **Step 1: Write failing report tests that require deterministic JSON and Markdown, canonical condition/cohort ordering, corpus hash, implementation revision, schema version, authority fingerprint, embedding profile, engine version, every query trace, hard-gate status, failures, non-claims, exact artifact replay, and conflicting replay rejection without reseeding deleted content.**
+- [x] **Step 1: Write failing report tests that require deterministic JSON and Markdown, canonical condition/cohort ordering, corpus hash, implementation revision, schema version, authority fingerprint, embedding profile, engine version, every query trace, hard-gate status, failures, non-claims, exact artifact replay, and conflicting replay rejection without reseeding deleted content.**
 
-- [ ] **Step 2: Implement `WriteReport(outputDir string, report Report) (map[string]string, error)` using atomic temporary files followed by rename.**
+- [x] **Step 2: Implement `WriteReport(outputDir string, report Report) (ArtifactPaths, bool, error)` using atomic temporary files followed by rename.**
 
 The report must omit API keys, request headers, database credentials, private environment values, and raw private corpus text. The Markdown renderer must derive only from the JSON report value.
 
-- [ ] **Step 3: Write failing Cobra tests for every required flag, missing API-key environment variable, invalid corpus, stable success output, provider failure, and absence of secrets in stdout/stderr.**
+- [x] **Step 3: Write failing Cobra tests for every required flag, missing API-key environment variable, invalid corpus, stable success output, provider failure, and absence of secrets in stdout/stderr.**
 
-- [ ] **Step 4: Add `newRetrievalAblationCommand` and register it in `newRootCommand`.**
+- [x] **Step 4: Add `newRetrievalAblationCommand` and register it in `newRootCommand`.**
 
 The command reads the API key with `os.Getenv(options.EmbeddingAPIKeyEnv)`, passes the value only in memory, and prints one line containing run ID, query count, hard-gate status, qualification status, and report path.
 
-- [ ] **Step 5: Run command/package tests and commit.**
+- [x] **Step 5: Run command/package tests and commit.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/retrievalablation ./cmd/vermory
@@ -288,21 +288,21 @@ git commit -m "feat: expose production retrieval ablation"
 - Consumes: isolated release binary, dedicated PostgreSQL database, direct SiliconFlow embeddings, and W08 corpus.
 - Produces: one public measured retrieval result, preserved failures, and an H-009 decision state that does not change the runtime default.
 
-- [ ] **Step 1: Build an isolated release binary, create a dedicated database, migrate it, and record PostgreSQL, schema, pgvector, binary revision, corpus hash, and corpus counts.**
+- [x] **Step 1: Build an isolated release binary, create a dedicated database, migrate it, and record PostgreSQL, schema, pgvector, binary revision, corpus hash, and corpus counts.**
 
-- [ ] **Step 2: Verify direct `BAAI/bge-m3` embedding compatibility with one bounded probe, recording only HTTP status, model, vector dimensions, duration, and response artifact SHA-256.**
+- [x] **Step 2: Verify direct `BAAI/bge-m3` embedding compatibility with one bounded probe, recording only HTTP status, model, vector dimensions, duration, and response artifact SHA-256.**
 
 Do not log the authorization header or key. Preserve provider timeout/rate-limit failures if they occur.
 
-- [ ] **Step 3: Execute the full W08 run once with a stable run ID and require all lifecycle/scope hard gates to pass.**
+- [x] **Step 3: Execute the full W08 run once with a stable run ID and require all lifecycle/scope hard gates to pass.**
 
-- [ ] **Step 4: Force vector failure and require every hybrid query to degrade to the exact lexical IDs/order without authority changes.**
+- [x] **Step 4: Force vector failure and require every hybrid query to degrade to the exact lexical IDs/order without authority changes.**
 
-- [ ] **Step 5: Delete the vector projection, rebuild it from the governed corpus, rerun the vector and hybrid conditions, and require result-ID equivalence plus an unchanged authority fingerprint.**
+- [x] **Step 5: Delete the vector projection, rebuild it from the governed corpus, rerun the vector and hybrid conditions, and require result-ID equivalence plus an unchanged authority fingerprint.**
 
-- [ ] **Step 6: Review the measured cohort deltas without tuning the corpus or formula, then set H-009 to `testing` with `measured`, `hard_gate_failed`, or `ready_for_threshold_review` exactly as supported by the report.**
+- [x] **Step 6: Review the measured cohort deltas without tuning the corpus or formula, then set H-009 to `testing` with `measured`, `hard_gate_failed`, or `ready_for_threshold_review` exactly as supported by the report.**
 
-- [ ] **Step 7: Commit a normalized report snapshot and evidence document containing exact commands, versions, hashes, counts, metrics, per-cohort deltas, failures, degradation, rebuild equivalence, and explicit non-claims.**
+- [x] **Step 7: Commit a normalized report snapshot and evidence document containing exact commands, versions, hashes, counts, metrics, per-cohort deltas, failures, degradation, rebuild equivalence, and explicit non-claims.**
 
 ```bash
 git add docs/evidence/2026-07-14-production-retrieval-ablation.md docs/evidence/snapshots/2026-07-14-production-retrieval-ablation-report.json docs/evaluation-matrix.md docs/superpowers/specs/2026-07-11-vermory-hypothesis-register.md README.md
@@ -319,7 +319,7 @@ git commit -m "docs: record production retrieval ablation evidence"
 - Consumes: all W08 implementation and evidence.
 - Produces: green local and protected-CI gates, independently verified release artifact, clean commits, and an updated Draft PR while the overall Vermory goal remains active.
 
-- [ ] **Step 1: Run the complete serial PostgreSQL suite, selected runtime/new-package race suite, reality race, vet, tidy, module diff, and diff check.**
+- [x] **Step 1: Run the complete serial PostgreSQL suite, selected runtime/new-package race suite, reality race, vet, tidy, module diff, and diff check.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
@@ -331,9 +331,9 @@ git diff --exit-code -- go.mod go.sum
 git diff --check
 ```
 
-- [ ] **Step 2: Run Actionlint, GoReleaser check and four-platform snapshot/checksums, downloaded host archive execution, OpenClaw tests/typecheck/build/package, schema replay, RLS/runtime-role checks, and native backup/restore including the unchanged runtime authority fingerprint.**
+- [x] **Step 2: Run Actionlint, GoReleaser check and four-platform snapshot/checksums, downloaded host archive execution, OpenClaw tests/typecheck/build/package, schema replay, RLS/runtime-role checks, and native backup/restore including the unchanged runtime authority fingerprint.**
 
-- [ ] **Step 3: Scan all tracked and public evidence files for credential-shaped values and require zero matches. Remove every dedicated database, temporary runtime role, API transcript containing headers, isolated HOME, and downloaded local artifact after normalized evidence is committed.**
+- [x] **Step 3: Scan all tracked and public evidence files for credential-shaped values and require zero matches. Remove every dedicated database, temporary runtime role, API transcript containing headers, isolated HOME, and downloaded local artifact after normalized evidence is committed.**
 
 - [ ] **Step 4: Mark the plan checklist from fresh evidence, push `agent/grok-cli-runtime`, wait for protected CI, download the final artifact, verify GitHub digest, all four archive checksums/layouts, OpenClaw package, and darwin/arm64 execution.**
 
