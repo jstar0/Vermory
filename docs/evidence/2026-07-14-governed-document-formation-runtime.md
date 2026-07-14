@@ -324,6 +324,36 @@ The snapshot archives cover `darwin/amd64`, `darwin/arm64`,
 The host archive reported version `0.0.0-SNAPSHOT-988ef60` and revision
 `988ef6069cc41a51d97d5bbb56303e6d77aab877`.
 
+## Remote CI Delivery
+
+Implementation and evidence head `5b962a95ecb65f79b0a34c1396b037d4dec23d4a`
+passed protected pull-request CI run
+[`29325444582`](https://github.com/jstar0/Vermory/actions/runs/29325444582).
+Job `87060532691` completed all 19 main steps in `3m51s`, including the
+PostgreSQL-backed suite, runtime and reality race gates, vet, module verification,
+release build, OpenClaw check/package, snapshot build/upload, and clean-diff
+verification.
+
+```text
+artifact ID: 8307774917
+artifact name: vermory-pr-snapshot-6fe81bac9f42313c9e07cf47ed8deea5ec93b133
+artifact size: 20,540,870 bytes
+GitHub digest: sha256:d1c8380fdf888b6372877ba96ada10110712bd227d0f9b4d67977fd4473ed8d4
+downloaded ZIP SHA-256: d1c8380fdf888b6372877ba96ada10110712bd227d0f9b4d67977fd4473ed8d4
+```
+
+The independently downloaded artifact contained the OpenClaw `0.1.0` package
+and four Go archives. Its `checksums.txt` returned `OK` for darwin/amd64,
+darwin/arm64, linux/amd64, and linux/arm64. Every archive again contained the
+same exact four-file layout. The downloaded darwin/arm64 binary executed on the
+host and reported version `0.0.0-SNAPSHOT-6fe81ba`, merge revision
+`6fe81bac9f42313c9e07cf47ed8deea5ec93b133`, build date
+`2026-07-14T10:28:00Z`, and Go `1.25.7`.
+
+After that run, Draft PR 1 reported `CLEAN`, `MERGEABLE`, and required
+`test=SUCCESS`. The workflow emitted a Node 20 deprecation annotation for pinned
+GitHub actions being forced onto Node 24; it did not fail or skip a gate.
+
 ## Cleanup
 
 After evidence capture, both dedicated databases, both temporary runtime roles,
