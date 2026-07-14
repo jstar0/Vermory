@@ -46,6 +46,7 @@ type QueryReport struct {
 	Cohorts           []string       `json:"cohorts"`
 	Duration          time.Duration  `json:"duration"`
 	Results           []RankedResult `json:"results"`
+	RejectedResults   []RankedResult `json:"rejected_results,omitempty"`
 	Metrics           QueryMetrics   `json:"metrics"`
 	DegradedToLexical bool           `json:"degraded_to_lexical"`
 	Error             string         `json:"error,omitempty"`
@@ -56,4 +57,25 @@ type ConditionReport struct {
 	Queries []QueryReport        `json:"queries"`
 	Metrics Aggregate            `json:"metrics"`
 	Cohorts map[string]Aggregate `json:"cohorts"`
+}
+
+type HardGateReport struct {
+	Pass            bool `json:"pass"`
+	ForbiddenCount  int  `json:"forbidden_count"`
+	IneligibleCount int  `json:"ineligible_count"`
+}
+
+type RunFailure struct {
+	Condition string `json:"condition"`
+	QueryID   string `json:"query_id"`
+	Error     string `json:"error"`
+}
+
+type Report struct {
+	RunID                       string            `json:"run_id"`
+	CorpusSHA256                string            `json:"corpus_sha256"`
+	Conditions                  []ConditionReport `json:"conditions"`
+	HardGates                   HardGateReport    `json:"hard_gates"`
+	ProjectionRebuildEquivalent bool              `json:"projection_rebuild_equivalent"`
+	Failures                    []RunFailure      `json:"failures,omitempty"`
 }
