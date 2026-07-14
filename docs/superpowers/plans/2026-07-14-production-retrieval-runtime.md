@@ -507,8 +507,8 @@ git diff --check
 
 - [x] **Step 3: Remove every dedicated database, temporary role, provider transcript containing headers, isolated HOME, downloaded artifact, local `dist/`, and temporary release host after normalized evidence is committed.**
 
-- [ ] **Step 4: Mark the checklist from fresh evidence, push `agent/grok-cli-runtime`, wait for protected CI, and independently verify the final artifact digest, four archive checksums/layouts, OpenClaw package, and darwin/arm64 execution.**
+- [x] **Step 4: Mark the checklist from fresh evidence, push `agent/grok-cli-runtime`, wait for protected CI, and independently verify the final artifact digest, four archive checksums/layouts, OpenClaw package, and darwin/arm64 execution.**
 
-- [ ] **Step 5: Append `Final Production Retrieval Runtime Delivery` to Draft PR 1 with the real result, preserved failures, exact non-claims, final run/job/artifact/digest, and confirmation that the PR remains Draft, `CLEAN`, `MERGEABLE`, and required `test=SUCCESS`.**
+- [x] **Step 5: Append `Final Production Retrieval Runtime Delivery` to Draft PR 1 with the real result, preserved failures, exact non-claims, final run/job/artifact/digest, and confirmation that the PR remains Draft, `CLEAN`, `MERGEABLE`, and required `test=SUCCESS`.**
 
-- [ ] **Step 6: Keep the overall Vermory goal active. W09 does not complete the second independent retrieval batch, source authority ranking, embedding migration, scale/fault qualification, sealed evaluation, signing, or final release acceptance.**
+- [x] **Step 6: Keep the overall Vermory goal active. W09 does not complete the second independent retrieval batch, source authority ranking, embedding migration, scale/fault qualification, sealed evaluation, signing, or final release acceptance.**
