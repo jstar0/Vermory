@@ -85,12 +85,13 @@ git commit -m "test: freeze workspace source revision case"
 **Files:**
 - Modify: `internal/runtime/governance.go`
 - Modify: `internal/runtime/governance_test.go`
+- Modify: `internal/runtime/postgres_store.go`
 
 **Interfaces:**
 - Produces: `GovernanceService.ReviseSource(ctx context.Context, repoRoot, memoryID string, write GovernanceWriteRequest) (GovernedObservationReceipt, error)`.
 - Consumes: existing `Store.CommitGovernedObservation` with `ObservationKindSourceUpdate` and `SupersedesMemoryID`.
 
-- [ ] **Step 1: Write failing lifecycle tests**
+- [x] **Step 1: Write failing lifecycle tests**
 
 Add tests proving:
 
@@ -113,7 +114,7 @@ Assertions:
 - exact replay returns the original receipt;
 - conflicting replay is rejected.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -124,7 +125,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 
 Expected: FAIL because `ReviseSource` does not exist.
 
-- [ ] **Step 3: Implement the minimal service operation**
+- [x] **Step 3: Implement the minimal service operation**
 
 Validate `memoryID` and `SourceRef`, then call the existing scoped commit path:
 
@@ -138,14 +139,16 @@ return s.commit(ctx, repoRoot, CommitObservationRequest{
 })
 ```
 
-Do not change the PostgreSQL schema or generic lifecycle transaction.
+Do not change the PostgreSQL schema. The existing governed-memory replay path
+must compare the persisted `supersedes_memory_id` with the replay request so a
+different target cannot be accepted under the same operation ID.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run focused runtime tests and:
 
 ```bash
-git add internal/runtime/governance.go internal/runtime/governance_test.go
+git add internal/runtime/governance.go internal/runtime/governance_test.go internal/runtime/postgres_store.go
 git commit -m "feat: add explicit source revision governance"
 ```
 

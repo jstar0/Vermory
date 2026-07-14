@@ -516,12 +516,15 @@ SELECT EXISTS (
 		return MemoryReceipt{}, fmt.Errorf("observation does not belong to this continuity")
 	}
 
-	var existingID, existingStatus string
+	var existingID, existingStatus, existingSupersedesMemoryID string
 	err := tx.QueryRow(ctx, `
-SELECT id::text, lifecycle_status
+SELECT id::text, lifecycle_status, COALESCE(supersedes_memory_id::text, '')
 FROM governed_memories
-WHERE origin_observation_id = $1::uuid`, observationID).Scan(&existingID, &existingStatus)
+WHERE origin_observation_id = $1::uuid`, observationID).Scan(&existingID, &existingStatus, &existingSupersedesMemoryID)
 	if err == nil {
+		if existingSupersedesMemoryID != request.SupersedesMemoryID {
+			return MemoryReceipt{}, fmt.Errorf("operation_id is already bound to another supersession target")
+		}
 		return MemoryReceipt{MemoryID: existingID, Status: existingStatus, Replayed: true}, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {

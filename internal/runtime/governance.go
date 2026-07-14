@@ -73,6 +73,22 @@ func (s *GovernanceService) AddSource(ctx context.Context, repoRoot string, writ
 	})
 }
 
+func (s *GovernanceService) ReviseSource(ctx context.Context, repoRoot, memoryID string, write GovernanceWriteRequest) (GovernedObservationReceipt, error) {
+	if strings.TrimSpace(memoryID) == "" {
+		return GovernedObservationReceipt{}, fmt.Errorf("memory_id is required for source revision")
+	}
+	if strings.TrimSpace(write.SourceRef) == "" {
+		return GovernedObservationReceipt{}, fmt.Errorf("source_ref is required for source revision")
+	}
+	return s.commit(ctx, repoRoot, CommitObservationRequest{
+		OperationID:        write.OperationID,
+		Kind:               ObservationKindSourceUpdate,
+		Content:            write.Content,
+		SourceRef:          write.SourceRef,
+		SupersedesMemoryID: memoryID,
+	})
+}
+
 func (s *GovernanceService) Correct(ctx context.Context, repoRoot, memoryID string, write GovernanceWriteRequest) (GovernedObservationReceipt, error) {
 	if strings.TrimSpace(memoryID) == "" {
 		return GovernedObservationReceipt{}, fmt.Errorf("memory_id is required for correction")
