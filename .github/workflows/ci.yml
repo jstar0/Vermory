@@ -11,15 +11,65 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: vermory_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vermory_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      VERMORY_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/vermory_test?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
-      - name: Test
-        run: go test -count=1 ./...
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: integrations/openclaw/pnpm-lock.yaml
+      - name: Test with PostgreSQL
+        run: go test -p 1 -count=1 ./...
+      - name: Runtime race tests
+        run: >-
+          go test -race -p 1 -count=1
+          ./internal/authn
+          ./internal/runtime
+          ./internal/webchat
+          ./internal/identitycli
+          ./internal/operatorcli
+          ./internal/mcpserver
+          ./cmd/vermory
+          ./internal/provider
       - name: Reality race tests
         run: go test -count=1 -race ./internal/reality
       - name: Vet
         run: go vet ./...
+      - name: Verify Go module files
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Build release binary
+        run: go build -trimpath -o /tmp/vermory ./cmd/vermory
+      - name: Install OpenClaw integration dependencies
+        run: pnpm -C integrations/openclaw install --frozen-lockfile
+      - name: Check OpenClaw integration
+        run: pnpm -C integrations/openclaw check
+      - name: Verify OpenClaw package
+        run: pnpm -C integrations/openclaw pack --dry-run
+      - name: Verify clean diff
+        run: git diff --check
