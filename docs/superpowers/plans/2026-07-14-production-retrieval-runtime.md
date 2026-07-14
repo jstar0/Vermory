@@ -115,7 +115,7 @@ git commit -m "feat: add production retrieval projection schema"
 - Consumes: Task 1 event/cursor/vector tables and existing OpenAI-compatible embedding HTTP implementation.
 - Produces: `RetrievalProfile`, `ProjectionStatus`, `ProjectionEvent`, `ProjectionWorker`, `NewProjectionWorker`, `RunOnce`, `Run`, `Store.RetrievalProjectionStatus`, `Store.ResetVectorProjection`, and exported `memorybackend.NewOpenAIEmbedder` through a small `Embedder` interface.
 
-- [ ] **Step 1: Define and validate the frozen profile and worker options.**
+- [x] **Step 1: Define and validate the frozen profile and worker options.**
 
 ```go
 const ProductionRetrievalProfileID = "siliconflow-bge-m3-1024-v1"
@@ -146,24 +146,24 @@ func (w *ProjectionWorker) Run(context.Context) error
 Validation rejects any profile/model/dimension mismatch before opening a
 provider request.
 
-- [ ] **Step 2: Write failing PostgreSQL tests for ordered event reads, cursor creation, monotonic advance, duplicate replay, reset, status, and active-only vector rows.**
+- [x] **Step 2: Write failing PostgreSQL tests for ordered event reads, cursor creation, monotonic advance, duplicate replay, reset, status, and active-only vector rows.**
 
 Tests must prove that current authority wins over event history: processing an
 old `active` event after deletion deletes/skips the vector row.
 
-- [ ] **Step 3: Write failing worker tests for success, provider HTTP 503, wrong dimensions, concurrent worker lock, cancellation, and deletion/supersession committed while embedding is in flight.**
+- [x] **Step 3: Write failing worker tests for success, provider HTTP 503, wrong dimensions, concurrent worker lock, cancellation, and deletion/supersession committed while embedding is in flight.**
 
 Use a deterministic local HTTP embedding endpoint. A blocked endpoint allows a
 test to commit deletion before releasing the response; the late completion must
 not restore the row.
 
-- [ ] **Step 4: Export the existing embedding constructor without changing request semantics.**
+- [x] **Step 4: Export the existing embedding constructor without changing request semantics.**
 
 The exported constructor must continue omitting the unsupported optional
 `dimensions` request field and must reject a response whose vector length is not
 exactly 1024.
 
-- [ ] **Step 5: Implement the store and worker with a tenant/profile PostgreSQL advisory lock.**
+- [x] **Step 5: Implement the store and worker with a tenant/profile PostgreSQL advisory lock.**
 
 `RunOnce` processes at most `BatchSize` events. It may hold one acquired
 connection and advisory lock across the provider call, but it must not hold an
@@ -181,7 +181,7 @@ projection_write_error
 authority_changed
 ```
 
-- [ ] **Step 6: Run worker/store tests, native embedding tests, race tests, and commit.**
+- [x] **Step 6: Run worker/store tests, native embedding tests, race tests, and commit.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
