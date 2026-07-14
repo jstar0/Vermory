@@ -190,6 +190,6 @@ go build -trimpath -o /tmp/vermory-benchmark-release ./cmd/vermory
 git diff --check
 ```
 
-- [ ] **Step 5: Document, commit, push, and update Draft PR**
+- [x] **Step 5: Document, commit, push, and update Draft PR**
 
 Record the exact source revisions, hashes, record IDs, conditions, deterministic metrics, failures, database evidence, and non-claims. Keep PR 1 in Draft state and retain the overall platform goal as active.
