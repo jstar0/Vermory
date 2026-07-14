@@ -39,7 +39,7 @@ func (p *GrokCLI) Generate(ctx context.Context, req GenerateRequest) (GenerateRe
 		"--disable-web-search",
 		"--no-plan",
 		"--no-subagents",
-		"--max-turns", "2",
+		"--max-turns", "3",
 		"--permission-mode", "dontAsk",
 		"--output-format", "json",
 	}

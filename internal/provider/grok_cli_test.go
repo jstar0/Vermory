@@ -47,8 +47,8 @@ func TestGrokCLIProviderRunsIsolatedSingleTurnAndCapturesJSON(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(string(arguments)), "\n")
 	for index, line := range lines {
 		if line == "--max-turns" {
-			if index+1 >= len(lines) || lines[index+1] != "2" {
-				t.Fatalf("expected Grok max turns 2, got %q", strings.Join(lines, " "))
+			if index+1 >= len(lines) || lines[index+1] != "3" {
+				t.Fatalf("expected Grok max turns 3, got %q", strings.Join(lines, " "))
 			}
 			break
 		}
