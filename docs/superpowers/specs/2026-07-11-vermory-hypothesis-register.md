@@ -36,7 +36,8 @@ rejected       evidence showed the hypothesis should not continue
 - Status: `supported`
 - Candidate: PostgreSQL plus pgvector is sufficient for the native deployment; Redis, Neo4j, Qdrant, and Elasticsearch are not default dependencies.
 - Existing evidence: backend lifecycle, B01-B10, 200-record, 1,000-record, deletion, ARM64, and AMD64 tests support the retrieval substrate.
-- Evidence needed: formation, hybrid retrieval, concurrent update/delete, sealed quality cases, and long-running operation.
+- Existing operational evidence: the opt-in schema-15 scale profile seeded 10,000 governed memories, ran 8 concurrent readers with concurrent deletion, measured search p50/p95 at 17/210 ms on this machine, and recovered after terminating one PostgreSQL backend connection.
+- Evidence needed: formation, sealed quality cases, long-running operation, and larger calibrated deployment profiles.
 - Falsifier: a required constitutional behavior cannot be implemented reliably or within calibrated profiles without another default service.
 - Decision gate: after the second evidence batch and first operational profile.
 
