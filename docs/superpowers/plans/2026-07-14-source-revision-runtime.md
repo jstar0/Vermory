@@ -43,11 +43,11 @@
 - Produces: case `106-workspace-source-revision` with one stale command, one current replacement command, and one unaffected timeout fact.
 - Produces: deterministic `must_include` and `must_not_include` assertions for the downstream task.
 
-- [ ] **Step 1: Add a failing casebook loader assertion**
+- [x] **Step 1: Add a failing casebook loader assertion**
 
 Extend the casebook loader/suite test to require the new case and its task. The task must require `pnpm exec release:verify --mode locked` and `800 ms`, and forbid `npm run release:verify -- --legacy`.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -57,7 +57,7 @@ go test ./internal/casebook -run 'Test.*Case' -count=1
 
 Expected: FAIL because case `106-workspace-source-revision` does not exist.
 
-- [ ] **Step 3: Add the frozen case**
+- [x] **Step 3: Add the frozen case**
 
 The source trajectory must state:
 
@@ -71,7 +71,7 @@ The independent API timeout remains 800 ms.
 
 Current claims contain only the replacement command and the unchanged timeout. The task asks Codex to create a release check artifact from current governed context.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run the focused casebook test, then:
 
