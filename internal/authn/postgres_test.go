@@ -1,8 +1,9 @@
 package authn
 
 import (
+	"bytes"
 	"context"
-	"encoding/hex"
+	"encoding/base64"
 	"errors"
 	"os"
 	"strings"
@@ -27,21 +28,24 @@ func TestPostgresTokenLifecycleStoresOnlyDigestAndReplaysSafely(t *testing.T) {
 	if first.Replayed || first.Token.Reveal() == "" || first.Inspection.TenantID != request.TenantID {
 		t.Fatalf("unexpected issue receipt: %#v", first)
 	}
-	secret := strings.Split(first.Token.Reveal(), "_")[2]
+	secret, err := base64.RawURLEncoding.DecodeString(first.Token.secret)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	var storedDigest string
+	var storedDigest []byte
 	var storedPublicID string
 	if err := pool.QueryRow(ctx, `
-SELECT encode(token_digest, 'hex'), public_id
+SELECT token_digest, public_id
 FROM vermory_auth.api_tokens
 WHERE public_id = $1`, first.Token.PublicID()).Scan(&storedDigest, &storedPublicID); err != nil {
 		t.Fatal(err)
 	}
 	digest := first.Token.Digest()
-	if storedPublicID != first.Token.PublicID() || storedDigest != hex.EncodeToString(digest[:]) {
-		t.Fatalf("stored token material mismatch: public_id=%q digest=%q", storedPublicID, storedDigest)
+	if storedPublicID != first.Token.PublicID() || !bytes.Equal(storedDigest, digest[:]) {
+		t.Fatalf("stored token material mismatch: public_id=%q digest=%x", storedPublicID, storedDigest)
 	}
-	if strings.Contains(storedDigest, secret) {
+	if bytes.Equal(storedDigest, secret) {
 		t.Fatal("stored digest unexpectedly contains raw token secret")
 	}
 
