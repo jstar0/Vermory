@@ -166,7 +166,7 @@ git commit -m "feat: add explicit source revision governance"
 - Required flags: `--database-url`, `--tenant-id`, `--repo-root`, `--operation-id`, `--memory-id`, `--source-ref`, and `--content`.
 - Produces: the existing JSON mutation receipt shape.
 
-- [ ] **Step 1: Write failing command tests**
+- [x] **Step 1: Write failing command tests**
 
 Require the command to exist and execute:
 
@@ -181,7 +181,7 @@ vermory memory revise-source \
 
 The integration test must inspect lifecycle history and active search after command execution.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -192,14 +192,14 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 
 Expected: FAIL because `revise-source` is absent.
 
-- [ ] **Step 3: Implement the command and documentation**
+- [x] **Step 3: Implement the command and documentation**
 
 Wire the required flags to `GovernanceService.ReviseSource`. Keep `memory correct` as the user-authoritative path and document the distinction:
 
 - `revise-source`: a trusted source revision replaces a named source-backed active fact;
 - `correct`: an explicit user correction replaces a named active fact.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 Run focused CLI tests, `go run ./cmd/vermory memory revise-source --help`, and:
 

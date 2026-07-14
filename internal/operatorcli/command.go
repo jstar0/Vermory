@@ -147,6 +147,32 @@ func NewMemoryCommand() *cobra.Command {
 	addSource.Flags().StringVar(&sourceRef, "source-ref", "", "opaque source reference")
 	markRequired(addSource, "repo-root", "operation-id", "content", "source-ref")
 
+	var reviseSourceRoot, reviseSourceOperationID, reviseSourceMemoryID, reviseSourceContent, reviseSourceRef string
+	reviseSource := &cobra.Command{
+		Use:   "revise-source",
+		Short: "Replace one named active fact with a trusted source revision",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withGovernance(cmd.Context(), options, func(service *runtime.GovernanceService) error {
+				receipt, err := service.ReviseSource(cmd.Context(), reviseSourceRoot, reviseSourceMemoryID, runtime.GovernanceWriteRequest{
+					OperationID: reviseSourceOperationID,
+					Content:     reviseSourceContent,
+					SourceRef:   reviseSourceRef,
+				})
+				if err != nil {
+					return err
+				}
+				return writeMutationJSON(cmd, service, reviseSourceRoot, receipt)
+			})
+		},
+	}
+	reviseSource.Flags().StringVar(&reviseSourceRoot, "repo-root", "", "absolute workspace root")
+	reviseSource.Flags().StringVar(&reviseSourceOperationID, "operation-id", "", "idempotency key")
+	reviseSource.Flags().StringVar(&reviseSourceMemoryID, "memory-id", "", "active memory superseded by the source revision")
+	reviseSource.Flags().StringVar(&reviseSourceContent, "content", "", "replacement trusted source fact")
+	reviseSource.Flags().StringVar(&reviseSourceRef, "source-ref", "", "opaque replacement source reference")
+	markRequired(reviseSource, "repo-root", "operation-id", "memory-id", "content", "source-ref")
+
 	var correctRoot, correctOperationID, correctMemoryID, correctContent string
 	correct := &cobra.Command{
 		Use:   "correct",
@@ -191,7 +217,7 @@ func NewMemoryCommand() *cobra.Command {
 	forget.Flags().StringVar(&forgetMemoryID, "memory-id", "", "memory to redact")
 	markRequired(forget, "repo-root", "operation-id", "memory-id")
 
-	command.AddCommand(inspect, addSource, correct, forget)
+	command.AddCommand(inspect, addSource, reviseSource, correct, forget)
 	return command
 }
 

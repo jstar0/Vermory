@@ -45,11 +45,11 @@ Confirmation only binds this exact root. A rename, worktree, mirror, or new
 path is not inferred to be the same workspace; explicit rebind is a separate
 bridge capability and is not part of this slice.
 
-## Record, Correct, And Forget
+## Record, Revise, Correct, And Forget
 
 Every mutation requires an operator-selected `operation_id`. Reusing the same
 ID for a retry is idempotent. Keep the `memory_id` from each JSON receipt: it
-is the only accepted target for correction or deletion.
+is the only accepted target for source revision, user correction, or deletion.
 
 ```bash
 ./bin/vermory memory add-source \
@@ -66,21 +66,27 @@ is the only accepted target for correction or deletion.
   --repo-root /fixtures/vermory-w03
 ```
 
-Copy the active v1 `memory_id` from the inspect response into the correction:
+Copy the active v1 `memory_id` from the inspect response into the trusted
+source revision:
 
 ```bash
-./bin/vermory memory correct \
+./bin/vermory memory revise-source \
   --database-url 'postgresql:///vermory_w03?host=/tmp' \
   --tenant-id local-w03 \
   --repo-root /fixtures/vermory-w03 \
-  --operation-id w03-correct-v2 \
+  --operation-id w03-source-v2 \
   --memory-id '<v1-memory-id>' \
+  --source-ref fixture:W03:release-notes-v2 \
   --content 'Use checkout_eta_v2 for the staged checkout release.'
 ```
 
-The correction atomically supersedes only the named active fact. It does not
-use content similarity to choose a target. Copy the returned v2 `memory_id`
-into the forget operation:
+The source revision atomically supersedes only the named active fact and keeps
+the replacement as a `source_update`. It does not use content similarity to
+choose a target or replace other facts from the source. Use `memory correct`
+instead when the authority is an explicit user correction rather than a new
+trusted source version. Both operations require a named active target.
+
+Copy the returned v2 `memory_id` into the forget operation:
 
 ```bash
 ./bin/vermory memory forget \

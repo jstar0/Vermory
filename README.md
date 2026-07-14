@@ -121,6 +121,24 @@ go run ./cmd/vermory experiment-0 \
 
 Generated artifacts are written below `artifacts/` and are intentionally not committed.
 
+Trusted local ingestion can replace one named active fact with a newer source
+revision without overwriting unrelated workspace memory:
+
+```bash
+go run ./cmd/vermory memory revise-source \
+  --database-url "$VERMORY_DATABASE_URL" \
+  --tenant-id local \
+  --repo-root /absolute/workspace \
+  --operation-id release-manifest-v2 \
+  --memory-id '<superseded-memory-id>' \
+  --source-ref repo:release-manifest@v2 \
+  --content 'Use pnpm exec release:verify --mode locked.'
+```
+
+`revise-source` records source authority. `memory correct` remains the separate
+user-authoritative correction path. Neither command guesses a target from
+semantic similarity.
+
 Run the qualified LongMemEval oracle sample after obtaining the official source
 artifact and preparing a dedicated PostgreSQL database:
 

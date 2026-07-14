@@ -101,6 +101,65 @@ func TestWorkspaceAndMemoryCommandsCompleteGovernedFlow(t *testing.T) {
 	assertNoActiveCheckoutFact(t, databaseURL, confirmed.ContinuityID)
 }
 
+func TestMemorySourceRevisionCommandKeepsIndependentFact(t *testing.T) {
+	databaseURL := resetCommandStore(t)
+	confirmed := runJSONCommand(t, databaseURL, "workspace", "confirm", "--repo-root", "/repo/release-console")
+	original := runJSONCommand(t, databaseURL,
+		"memory", "add-source",
+		"--repo-root", "/repo/release-console",
+		"--operation-id", "cli-release-command-v1",
+		"--source-ref", "repo:release-manifest@v1",
+		"--content", "Use npm run release:verify -- --legacy.")
+	timeout := runJSONCommand(t, databaseURL,
+		"memory", "add-source",
+		"--repo-root", "/repo/release-console",
+		"--operation-id", "cli-release-timeout-v1",
+		"--source-ref", "repo:api-contract@v1",
+		"--content", "The independent API timeout remains 800 ms.")
+
+	revised := runJSONCommand(t, databaseURL,
+		"memory", "revise-source",
+		"--repo-root", "/repo/release-console",
+		"--operation-id", "cli-release-command-v2",
+		"--memory-id", original.MemoryID,
+		"--source-ref", "repo:release-manifest@v2",
+		"--content", "Use pnpm exec release:verify --mode locked.")
+	if revised.MemoryStatus != "active" || revised.MemoryID == original.MemoryID {
+		t.Fatalf("unexpected source revision receipt: %#v", revised)
+	}
+
+	listed := runMemoryListCommand(t, databaseURL, "/repo/release-console")
+	if !containsMemory(listed.Memories, original.MemoryID, "superseded") ||
+		!containsMemoryRevision(listed.Memories, revised.MemoryID, "active", original.MemoryID) ||
+		!containsMemory(listed.Memories, timeout.MemoryID, "active") {
+		t.Fatalf("unexpected source revision lifecycle: %#v", listed)
+	}
+
+	store, err := runtime.OpenStore(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(store.Close)
+	if err := store.RebuildProjection(context.Background(), "local", confirmed.ContinuityID); err != nil {
+		t.Fatal(err)
+	}
+	assertActiveSearchContains(t, store, confirmed.ContinuityID, "release verify locked", "pnpm exec release:verify --mode locked")
+	assertActiveSearchContains(t, store, confirmed.ContinuityID, "API timeout", "800 ms")
+	assertActiveSearchExcludes(t, store, confirmed.ContinuityID, "npm run release:verify -- --legacy", "npm run release:verify -- --legacy")
+
+	err = runCommand(t, databaseURL,
+		"memory", "revise-source",
+		"--repo-root", "/repo/release-console",
+		"--operation-id", "cli-release-command-v2",
+		"--memory-id", timeout.MemoryID,
+		"--source-ref", "repo:release-manifest@v2",
+		"--content", "Use pnpm exec release:verify --mode locked.")
+	if err == nil || !strings.Contains(err.Error(), "another supersession target") {
+		t.Fatalf("unexpected conflicting revision replay result: %v", err)
+	}
+	assertActiveSearchContains(t, store, confirmed.ContinuityID, "API timeout", "800 ms")
+}
+
 func TestMemoryCommandsRejectUnconfirmedWorkspace(t *testing.T) {
 	databaseURL := resetCommandStore(t)
 	err := runCommand(t, databaseURL,
@@ -379,6 +438,42 @@ func containsMemory(memories []runtime.GovernedMemory, id, status string) bool {
 		}
 	}
 	return false
+}
+
+func containsMemoryRevision(memories []runtime.GovernedMemory, id, status, supersedes string) bool {
+	for _, memory := range memories {
+		if memory.ID == id && memory.LifecycleStatus == status && memory.SupersedesMemoryID == supersedes {
+			return true
+		}
+	}
+	return false
+}
+
+func assertActiveSearchContains(t *testing.T, store *runtime.Store, continuityID, query, expected string) {
+	t.Helper()
+	matches, err := store.SearchActiveMemory(context.Background(), "local", continuityID, query, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, match := range matches {
+		if strings.Contains(match.Content, expected) {
+			return
+		}
+	}
+	t.Fatalf("search %q did not contain %q: %#v", query, expected, matches)
+}
+
+func assertActiveSearchExcludes(t *testing.T, store *runtime.Store, continuityID, query, forbidden string) {
+	t.Helper()
+	matches, err := store.SearchActiveMemory(context.Background(), "local", continuityID, query, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, match := range matches {
+		if strings.Contains(match.Content, forbidden) {
+			t.Fatalf("search %q returned forbidden content %q: %#v", query, forbidden, matches)
+		}
+	}
 }
 
 func assertNoActiveCheckoutFact(t *testing.T, databaseURL, continuityID string) {

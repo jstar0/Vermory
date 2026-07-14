@@ -134,3 +134,24 @@ func TestOperatorMemoryForgetHasNoFreeTextFlag(t *testing.T) {
 	}
 	t.Fatal("expected memory forget command")
 }
+
+func TestOperatorSourceRevisionCommandIsRegistered(t *testing.T) {
+	root := newRootCommand()
+	for _, parent := range root.Commands() {
+		if parent.Name() != "memory" {
+			continue
+		}
+		for _, child := range parent.Commands() {
+			if child.Name() != "revise-source" {
+				continue
+			}
+			for _, flag := range []string{"repo-root", "operation-id", "memory-id", "source-ref", "content"} {
+				if child.Flags().Lookup(flag) == nil {
+					t.Fatalf("revise-source is missing --%s", flag)
+				}
+			}
+			return
+		}
+	}
+	t.Fatal("expected memory revise-source command")
+}
