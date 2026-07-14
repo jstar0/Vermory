@@ -293,6 +293,68 @@ func TestProjectionWorkerLateEmbeddingCannotRestoreDeletedMemory(t *testing.T) {
 	assertVectorPresence(t, store, active.Memory.MemoryID, false)
 }
 
+func TestCandidateProfileLateEmbeddingCannotRestoreDeletedMemory(t *testing.T) {
+	store, tenantID, repoRoot, active := seedProjectionWorkerActive(t, "retrieval-worker-candidate-late-delete")
+	blocking := &projectionTestEmbedder{
+		vector:  testVector1024(0.8),
+		started: make(chan struct{}, 1),
+		release: make(chan struct{}),
+	}
+	worker, err := NewProjectionWorker(store, blocking, ProjectionWorkerOptions{
+		TenantID: tenantID,
+		Profile: RetrievalProfile{
+			ID:         MigrationRetrievalProfileID,
+			BaseURL:    "https://api.siliconflow.cn/v1",
+			Model:      "BAAI/bge-large-zh-v1.5",
+			Dimensions: 1024,
+		},
+		BatchSize: 8,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resultCh := make(chan ProjectionRunResult, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		result, runErr := worker.RunOnce(context.Background())
+		resultCh <- result
+		errCh <- runErr
+	}()
+	select {
+	case <-blocking.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("candidate worker did not reach embedding")
+	}
+	if _, err := NewGovernanceService(store, tenantID).Forget(context.Background(), repoRoot, active.Memory.MemoryID, "candidate-late-delete"); err != nil {
+		t.Fatal(err)
+	}
+	close(blocking.release)
+	result := <-resultCh
+	workerErr := <-errCh
+	if workerErr == nil || result.FailureCode != "authority_changed" {
+		t.Fatalf("candidate late authority change was not detected: result=%#v err=%v", result, workerErr)
+	}
+	assertProfileVectorPresence(t, store, MigrationRetrievalProfileID, active.Memory.MemoryID, false)
+
+	retry, err := NewProjectionWorker(store, &projectionTestEmbedder{vector: testVector1024(0.1)}, ProjectionWorkerOptions{
+		TenantID: tenantID,
+		Profile: RetrievalProfile{
+			ID:         MigrationRetrievalProfileID,
+			BaseURL:    "https://api.siliconflow.cn/v1",
+			Model:      "BAAI/bge-large-zh-v1.5",
+			Dimensions: 1024,
+		},
+		BatchSize: 8,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := retry.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	assertProfileVectorPresence(t, store, MigrationRetrievalProfileID, active.Memory.MemoryID, false)
+}
+
 func seedProjectionWorkerActive(t *testing.T, tenantID string) (*Store, string, string, GovernedObservationReceipt) {
 	t.Helper()
 	store := openTestStore(t)
@@ -365,13 +427,18 @@ func mustProjectionWorker(t *testing.T, store *Store, embedder Embedder, tenantI
 }
 
 func assertVectorPresence(t *testing.T, store *Store, memoryID string, want bool) {
+	assertProfileVectorPresence(t, store, ProductionRetrievalProfileID, memoryID, want)
+}
+
+func assertProfileVectorPresence(t *testing.T, store *Store, profileID, memoryID string, want bool) {
 	t.Helper()
 	var exists bool
 	if err := store.pool.QueryRow(context.Background(), `
 SELECT EXISTS (
   SELECT 1 FROM memory_vector_documents
   WHERE profile_id = $1 AND memory_id = $2::uuid
-)`, ProductionRetrievalProfileID, memoryID).Scan(&exists); err != nil {
+
+)`, profileID, memoryID).Scan(&exists); err != nil {
 		t.Fatal(err)
 	}
 	if exists != want {

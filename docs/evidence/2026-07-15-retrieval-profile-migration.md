@@ -62,6 +62,7 @@ two different embedding models.
 - Both profile cursors reach lag zero.
 - A real vector query through each profile returns the governed release command.
 - Profile-specific retrieval fingerprints prevent a v1/v2 audit replay from being treated as the same profile.
+- The candidate worker's in-flight embedding completion is rejected after authority deletion and a retry does not restore the candidate vector row.
 - The default CLI/runtime profile remains `siliconflow-bge-m3-1024-v1`.
 
 ## Non-Claims
@@ -69,4 +70,4 @@ two different embedding models.
 - The candidate profile is not the production default.
 - This is not a model quality ranking or a claim that v2 is better.
 - This does not prove arbitrary embedding dimensions or automatic cutover.
-- This does not replace the required scale, fault, sealed-evaluation, or final release gates.
+- This does not replace the required scale, sealed-evaluation, or final release gates.

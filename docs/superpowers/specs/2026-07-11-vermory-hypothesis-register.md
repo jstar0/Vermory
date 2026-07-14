@@ -140,7 +140,7 @@ No ranking algorithm or weight is accepted before ablation.
 - Reason: avoids coupling authoritative memory to one embedding model and supports measured cutover.
 - Existing evidence: migration 15 registers active v1 and candidate v2 profiles with independent cursors and vector rows. A real SiliconFlow run rebuilt `BAAI/bge-m3` and `BAAI/bge-large-zh-v1.5` side by side with 31 requests each, 30 rows each, zero cursor lag, unchanged v1 row count, and required-fact retrieval through both profiles.
 - Evidence artifact: `docs/evidence/2026-07-15-retrieval-profile-migration.md`.
-- Evidence needed: migration quality/latency comparison on the independent W10 batch, rollback under an in-flight worker, and a decision on candidate promotion criteria.
+- Evidence needed: migration quality/latency comparison on the independent W10 batch and a decision on candidate promotion criteria.
 - Falsifier: a simpler rebuild-and-swap mechanism is operationally sufficient for calibrated deployment profiles.
 - Decision gate: after the first embedding migration rehearsal.
 
