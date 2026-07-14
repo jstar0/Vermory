@@ -237,20 +237,28 @@ provider output governance-only and deletion authoritative.
 
 The W06 source database, including all three real source-match decisions, was
 dumped with PostgreSQL 18.4 `pg_dump --format=custom --no-owner --no-acl` and
-restored into a fresh database with `pg_restore --exit-on-error`.
+restored into a fresh database with `pg_restore --exit-on-error`. The delivery
+snapshot binary was built from commit `5f052d4d15a28d858ca67d8e793c94d72d828845`.
+Migrate was replayed twice against both source and target; all four commands
+returned schema 12 with no migrations to run.
 
 ```text
+source database: vermory_w06_final_20260714080714
+target database: vermory_w06_delivery_restore_20260714083232
 source authority fingerprint: 3353564dcddeb2f526f6362ee5710671
 target authority fingerprint: 3353564dcddeb2f526f6362ee5710671
-dump SHA-256: 86c74b2d1c35587947730c9d7a9f62e50fb8f91d803c96af0bfe12d092e7677e
+dump SHA-256: ef00dca5c8c156fb228debd306f71cc293c8a8d4f5ac52225e888a6c6061c95d
+delivery binary SHA-256: c2cfd1da34d95549b56a321a1c6199a87544ab0cfdd5ee5e6aeed05aa29c4d61
 restored schema version: 12
 restored source-match rows: 3
 restored matched rows: 1
 restored abstained rows: 2
 restored RLS: enabled, one policy
+restored projection documents: 4
+restricted runtime role: `vermory_w06_delivery_runtime_20260714083232`
 ```
 
-The restored projection was deleted and rebuilt through the current release
+The restored projection was deleted and rebuilt through the current snapshot
 binary. It returned four active documents and the same projection fingerprint
 `bdfe130b1df34408a324841e5e7c7555`; the authority fingerprint remained
 unchanged. A newly created restricted runtime role was provisioned with
@@ -260,10 +268,26 @@ audit table returned `0` rows with no tenant setting, `3` for `w06-local`, and
 
 ## Local Release Gates
 
-The previous schema-11 gate record is not reused for this schema-12 evidence.
-Fresh full-repository, race, migration, recovery, packaging, OpenClaw, and
-checksum gates are recorded only after this final runtime evidence is committed
-and the resulting head is tested.
+All local gates below were run after the evidence refresh on commit
+`5f052d4d15a28d858ca67d8e793c94d72d828845`:
+
+```text
+go test -p 1 -count=1 ./...                                      PASS
+go test -race -p 1 (8 runtime/client/provider packages)           PASS
+go test -race -count=1 ./internal/reality                        PASS
+go vet ./...                                                     PASS
+go mod tidy with zero go.mod/go.sum diff                         PASS
+actionlint v1.7.7, CI and Release workflows                      PASS
+GoReleaser v2.17.0 configuration check                           PASS
+GoReleaser snapshot, four target archives                        PASS
+snapshot SHA-256 verification, four archives                     PASS
+OpenClaw: 5 files, 43 tests, typecheck, build                     PASS
+OpenClaw package dry-run                                          PASS
+schema 12 migration replay on source and target                  PASS
+native dump/restore authority, projection, role, and RLS checks    PASS
+git diff --check                                                 PASS
+W06 evidence credential-shaped scan                              0 matches
+```
 
 ## Claim Boundary
 
