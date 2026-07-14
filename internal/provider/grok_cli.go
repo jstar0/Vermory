@@ -35,6 +35,7 @@ func (p *GrokCLI) Generate(ctx context.Context, req GenerateRequest) (GenerateRe
 	}
 
 	args := []string{
+		"--verbatim",
 		"--no-memory",
 		"--disable-web-search",
 		"--no-plan",

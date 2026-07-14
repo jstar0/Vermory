@@ -24,7 +24,7 @@ const (
 	longMemEvalFullHistory      = "full_oracle_history"
 	longMemEvalPlainRetrieval   = "plain_lexical_retrieval"
 	longMemEvalVermoryPacket    = "vermory_packet"
-	longMemEvalSystemPrompt     = "Answer the question only from the supplied conversation memory. If the information is absent or insufficient, say that it cannot be determined. Do not use tools or external sources."
+	longMemEvalSystemPrompt     = "Answer the question only from the supplied conversation memory. If the information is absent or insufficient, say that it cannot be determined. Respond in English with the shortest sufficient answer and reuse exact factual wording or numbers from the source when possible. Do not use tools or external sources."
 	longMemEvalArtifactPrefix   = "benchmarks"
 	longMemEvalConversationChan = "benchmark_longmemeval"
 )

@@ -57,6 +57,7 @@ func TestGrokCLIProviderRunsIsolatedSingleTurnAndCapturesJSON(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
+		"--verbatim",
 		"--no-memory",
 		"--disable-web-search",
 		"--no-plan",

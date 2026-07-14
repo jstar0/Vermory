@@ -59,6 +59,9 @@ func TestLongMemEvalRunnerUsesFourComparableConditionsAndProductionVermoryPath(t
 	}
 
 	for _, call := range llm.calls {
+		if !strings.Contains(call.System, "Respond in English") {
+			t.Fatalf("benchmark reader did not receive the frozen English output contract: %q", call.System)
+		}
 		for _, forbidden := range []string{"continuity_id", "tenant_id", "memory_id", "has_answer"} {
 			if strings.Contains(call.ContextPacket, forbidden) {
 				t.Fatalf("model-facing packet leaked %q: %s", forbidden, call.ContextPacket)
