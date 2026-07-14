@@ -105,6 +105,12 @@ restricted runtime role boundary. It is authoritative audit data and therefore
 included in backup/restore fingerprints. It is never a search projection and
 never contributes text to model-facing context.
 
+If a referenced memory is forgotten, deletion wins over diagnostic retention.
+Vermory preserves decision IDs, status, selected-key metadata, and artifact
+hashes, but redacts matching candidate content and source references, redacts
+provider output and reason text, redacts source content when it represents the
+deleted memory, and recomputes the candidate-set fingerprint.
+
 ## Transaction And Replay Rules
 
 The initial request and candidate snapshot are inserted as `pending` before the
@@ -144,6 +150,8 @@ decision.
 - Proposed match results remain absent from normal retrieval and MCP context.
 - Match audit rows are RLS protected, included in native backup/restore, and
   excluded from projection rebuild.
+- Forget removes deleted fact text from source content, candidate snapshots,
+  provider output, and reason fields without erasing structural audit IDs.
 - The restricted runtime role can use the table but cannot bypass tenant RLS.
 - The primary real runtime uses the locally authenticated Grok CLI, not a mock
   or Mac mini NewAPI route.

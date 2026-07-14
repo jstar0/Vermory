@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"vermory/internal/provider"
 )
@@ -95,6 +96,8 @@ func (s *SourceMatchingService) MatchSource(ctx context.Context, repoRoot string
 	if len(generated.RawArtifact) != 0 {
 		artifactSHA = sourceMatchSHA256(generated.RawArtifact)
 	}
+	completionCtx, cancelCompletion := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancelCompletion()
 	if generateErr != nil {
 		failureCode := "provider_error"
 		if errors.Is(generateErr, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -102,7 +105,7 @@ func (s *SourceMatchingService) MatchSource(ctx context.Context, repoRoot string
 		} else if errors.Is(generateErr, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
 			failureCode = "provider_canceled"
 		}
-		return s.store.CompleteSourceMatch(ctx, s.tenantID, begin.ID, SourceMatchCompletion{
+		return s.store.CompleteSourceMatch(completionCtx, s.tenantID, begin.ID, SourceMatchCompletion{
 			Decision:               SourceMatchFailed,
 			ResolvedModel:          resolvedModel,
 			ProviderOutput:         generated.Output,
@@ -114,7 +117,7 @@ func (s *SourceMatchingService) MatchSource(ctx context.Context, repoRoot string
 
 	decision, parseErr := parseSourceMatchProviderOutput(generated.Output)
 	if parseErr != nil {
-		return s.store.CompleteSourceMatch(ctx, s.tenantID, begin.ID, SourceMatchCompletion{
+		return s.store.CompleteSourceMatch(completionCtx, s.tenantID, begin.ID, SourceMatchCompletion{
 			Decision:               SourceMatchFailed,
 			ResolvedModel:          resolvedModel,
 			ProviderOutput:         generated.Output,
@@ -123,7 +126,7 @@ func (s *SourceMatchingService) MatchSource(ctx context.Context, repoRoot string
 			FailureCode:            "invalid_provider_output",
 		})
 	}
-	return s.store.CompleteSourceMatch(ctx, s.tenantID, begin.ID, SourceMatchCompletion{
+	return s.store.CompleteSourceMatch(completionCtx, s.tenantID, begin.ID, SourceMatchCompletion{
 		Decision:               decision.Decision,
 		SelectedMemoryKey:      decision.MemoryKey,
 		ResolvedModel:          resolvedModel,

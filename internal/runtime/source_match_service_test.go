@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"vermory/internal/provider"
 )
@@ -185,6 +186,38 @@ func TestSourceMatchingServicePersistsInvalidOutputAndProviderFailure(t *testing
 	}
 }
 
+func TestSourceMatchingServicePersistsFailureAfterRequestDeadline(t *testing.T) {
+	store := openTestStore(t)
+	governance := NewGovernanceService(store, "service-deadline")
+	repoRoot := "/fixtures/source-match-deadline"
+	resolution, err := governance.ConfirmWorkspace(context.Background(), repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSourceMatchFact(t, governance, repoRoot, "deadline-signing", "release.signing.mode", "Use signer A.", "fixture:signer:a")
+	service := NewSourceMatchingService(store, "service-deadline", sourceMatchDeadlineProvider{}, "test-provider", "test-model")
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	receipt, err := service.MatchSource(ctx, repoRoot, SourceMatchRequest{
+		OperationID:   "service-deadline-match",
+		SourceRef:     "fixture:signer:b",
+		SourceContent: "Use signer B.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt.Status != SourceMatchFailed || receipt.FailureCode != "provider_timeout" {
+		t.Fatalf("request cancellation did not persist a terminal failure: %#v", receipt)
+	}
+	inspected, err := store.InspectSourceMatch(context.Background(), "service-deadline", resolution.ContinuityID, "service-deadline-match")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inspected.Status != SourceMatchFailed || inspected.FailureCode != "provider_timeout" {
+		t.Fatalf("persisted cancellation mismatch: %#v", inspected)
+	}
+}
+
 func TestSourceMatchingServiceFailsWhenCandidateSetChangesDuringProviderCall(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
@@ -232,6 +265,13 @@ type sourceMatchTestProvider struct {
 	err          error
 	calls        []provider.GenerateRequest
 	beforeReturn func()
+}
+
+type sourceMatchDeadlineProvider struct{}
+
+func (sourceMatchDeadlineProvider) Generate(ctx context.Context, _ provider.GenerateRequest) (provider.GenerateResponse, error) {
+	<-ctx.Done()
+	return provider.GenerateResponse{}, ctx.Err()
 }
 
 func (p *sourceMatchTestProvider) Generate(_ context.Context, request provider.GenerateRequest) (provider.GenerateResponse, error) {

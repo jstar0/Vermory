@@ -211,6 +211,69 @@ func TestSourceMatchStoreRejectsInvalidAmbiguousAndDriftedTargets(t *testing.T) 
 	}
 }
 
+func TestSourceMatchAuditRedactsForgottenMemoryContent(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	service := NewGovernanceService(store, "source-match-redaction")
+	repoRoot := "/fixtures/source-match-redaction"
+	resolution, err := service.ConfirmWorkspace(ctx, repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldContent := "Use REDACTION-OLD-KEYCHAIN for production signing."
+	newContent := "Use REDACTION-NEW-OIDC for production signing."
+	old := addSourceMatchFact(t, service, repoRoot, "redaction-old", "release.signing.mode", oldContent, "fixture:redaction:old")
+	begin := beginSourceMatchForTest(t, store, "source-match-redaction", resolution.ContinuityID, "redaction-match", newContent)
+	matched, err := store.CompleteSourceMatch(ctx, "source-match-redaction", begin.ID, SourceMatchCompletion{
+		Decision:          SourceMatchMatched,
+		SelectedMemoryKey: "release.signing.mode",
+		ResolvedModel:     "test-model",
+		ProviderOutput:    `{"decision":"matched","memory_key":"release.signing.mode","reason":"REDACTION-OLD-KEYCHAIN becomes REDACTION-NEW-OIDC"}`,
+		Reason:            "REDACTION-OLD-KEYCHAIN becomes REDACTION-NEW-OIDC",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.AcceptCandidate(ctx, repoRoot, matched.CandidateMemoryID, "redaction-accept"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Forget(ctx, repoRoot, matched.CandidateMemoryID, "redaction-forget-new"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Forget(ctx, repoRoot, old.Memory.MemoryID, "redaction-forget-old"); err != nil {
+		t.Fatal(err)
+	}
+
+	var sourceRef, sourceContent, candidateSet, candidateFingerprint, providerOutput, reason string
+	if err := store.pool.QueryRow(ctx, `
+SELECT source_ref, source_content, candidate_set::text, candidate_set_fingerprint,
+       provider_output, reason
+FROM source_match_decisions
+WHERE tenant_id = 'source-match-redaction' AND operation_id = 'redaction-match'`).Scan(
+		&sourceRef,
+		&sourceContent,
+		&candidateSet,
+		&candidateFingerprint,
+		&providerOutput,
+		&reason,
+	); err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{sourceRef, sourceContent, candidateSet, providerOutput, reason} {
+		for _, forbidden := range []string{"REDACTION-OLD-KEYCHAIN", "REDACTION-NEW-OIDC", "fixture:redaction:old", "fixture:redaction-match"} {
+			if strings.Contains(value, forbidden) {
+				t.Fatalf("forgotten source match content survived in %q", value)
+			}
+		}
+	}
+	if sourceRef != "[redacted]" || sourceContent != "[redacted]" || providerOutput != "[redacted]" || reason != "[redacted]" {
+		t.Fatalf("source match audit was not redacted consistently: ref=%q content=%q output=%q reason=%q", sourceRef, sourceContent, providerOutput, reason)
+	}
+	if len(candidateFingerprint) != 64 || !strings.Contains(candidateSet, "[redacted]") {
+		t.Fatalf("candidate set redaction/fingerprint mismatch: set=%s fingerprint=%s", candidateSet, candidateFingerprint)
+	}
+}
+
 func addSourceMatchFact(t *testing.T, service *GovernanceService, repoRoot, operationID, key, content, sourceRef string) GovernedObservationReceipt {
 	t.Helper()
 	receipt, err := service.AddSource(context.Background(), repoRoot, GovernanceWriteRequest{

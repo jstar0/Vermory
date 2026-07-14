@@ -179,6 +179,15 @@ func TestRuntimeRoleValidationRejectsUnsafeIdentities(t *testing.T) {
 	if err := runtimeStore.ValidateRuntimeRole(ctx); err != nil {
 		t.Fatalf("restricted runtime role was rejected: %v", err)
 	}
+	if _, err := admin.pool.Exec(ctx, "REVOKE ALL ON public.source_match_decisions FROM "+pgx.Identifier{runtimeRole}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	if err := runtimeStore.ValidateRuntimeRole(ctx); err == nil {
+		t.Fatal("runtime identity without source_match_decisions access passed validation")
+	}
+	if err := authn.GrantRuntimeRole(ctx, admin.pool, runtimeRole); err != nil {
+		t.Fatal(err)
+	}
 
 	_, bypassURL := createTenantPoolRole(t, admin.pool, databaseURL, "bypass", "BYPASSRLS")
 	bypassStore, err := OpenStore(ctx, bypassURL)

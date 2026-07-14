@@ -213,6 +213,7 @@ WHERE rolname = current_user`).Scan(&canLogin, &superuser, &bypassRLS); err != n
 		"continuity_spaces", "continuity_bindings", "conversation_bindings", "observations",
 		"governed_memories", "memory_deliveries", "memory_search_documents", "conversation_turns",
 		"bridge_operations", "bridge_events", "bridge_memory_effects", "conversation_links",
+		"source_match_decisions",
 	}
 	var ownedTables int
 	if err := s.pool.QueryRow(validationCtx, `
@@ -640,6 +641,9 @@ WHERE id = $1::uuid`, memoryID); err != nil {
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM memory_search_documents WHERE memory_id = $1::uuid`, memoryID); err != nil {
 		return fmt.Errorf("remove deleted search document: %w", err)
+	}
+	if err := redactSourceMatchMemoryTx(ctx, tx, tenantID, continuityID, memoryID, memoryContent); err != nil {
+		return err
 	}
 	if originObservationID != nil {
 		if _, err := tx.Exec(ctx, `

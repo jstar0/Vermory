@@ -496,3 +496,53 @@ func truncateSourceMatchText(value string, limit int) string {
 	}
 	return value[:limit]
 }
+
+func redactSourceMatchMemoryTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, memoryID, memoryContent string) error {
+	_, err := tx.Exec(ctx, `
+WITH affected AS (
+  SELECT decision.id,
+         jsonb_agg(
+           CASE
+             WHEN candidate.value->>'memory_id' = $3
+             THEN candidate.value || jsonb_build_object(
+               'content', '[redacted]',
+               'source_ref', '[redacted]'
+             )
+             ELSE candidate.value
+           END
+           ORDER BY candidate.ordinality
+         ) AS redacted_candidate_set,
+         (decision.candidate_memory_id = $3::uuid OR decision.source_content = $4) AS redact_source
+  FROM source_match_decisions decision
+  CROSS JOIN LATERAL jsonb_array_elements(decision.candidate_set)
+    WITH ORDINALITY AS candidate(value, ordinality)
+  WHERE decision.tenant_id = $1
+    AND decision.continuity_id = $2::uuid
+    AND (
+      decision.target_memory_id = $3::uuid
+      OR decision.candidate_memory_id = $3::uuid
+      OR EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(decision.candidate_set) item
+        WHERE item->>'memory_id' = $3
+      )
+    )
+  GROUP BY decision.id, decision.candidate_memory_id, decision.source_content
+)
+UPDATE source_match_decisions decision
+SET candidate_set = affected.redacted_candidate_set,
+    candidate_set_fingerprint = encode(
+      digest(convert_to(affected.redacted_candidate_set::text, 'UTF8'), 'sha256'),
+      'hex'
+    ),
+    source_ref = CASE WHEN affected.redact_source THEN '[redacted]' ELSE decision.source_ref END,
+    source_content = CASE WHEN affected.redact_source THEN '[redacted]' ELSE decision.source_content END,
+    provider_output = '[redacted]',
+    reason = '[redacted]'
+FROM affected
+WHERE decision.id = affected.id`, tenantID, continuityID, memoryID, memoryContent)
+	if err != nil {
+		return fmt.Errorf("redact forgotten memory from source match audit: %w", err)
+	}
+	return nil
+}
