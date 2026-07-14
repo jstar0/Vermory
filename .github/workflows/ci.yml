@@ -87,7 +87,6 @@ jobs:
             dist/*.tar.gz
             dist/checksums.txt
             dist/*.tgz
-            dist/metadata.json
           if-no-files-found: error
           retention-days: 7
       - name: Verify clean diff

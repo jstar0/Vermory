@@ -48,7 +48,6 @@ jobs:
             dist/*.tar.gz
             dist/checksums.txt
             dist/*.tgz
-            dist/metadata.json
           if-no-files-found: error
           retention-days: 7
 
@@ -98,6 +97,5 @@ jobs:
             dist/*.tar.gz
             dist/checksums.txt
             dist/*.tgz
-            dist/metadata.json
           if-no-files-found: error
           retention-days: 7
