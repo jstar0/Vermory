@@ -344,6 +344,26 @@ This is `production_path_integrated`, not `accepted_default`. H-009 remains
 source-authority ranking, embedding migration, and scale/fault qualification.
 See [the scoped evidence](evidence/2026-07-14-production-retrieval-runtime.md).
 
+## Independent Retrieval Batch W10
+
+W10 is the second independent retrieval-quality batch. It uses a fresh
+PostgreSQL 18 database, 39 governed records across six scopes and four tenants,
+18 queries, and 102 direct SiliconFlow `BAAI/bge-m3` embedding requests. All
+retrieval records were seeded through the authoritative runtime and all vector
+projection state was rebuilt from active authority.
+
+| Condition | Hit@1 | Recall@K | MRR | nDCG@K | P95 | Forbidden | Ineligible |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `lexical_runtime` | 0.7222 | 0.7593 | 0.7500 | 0.7353 | 1.133 ms | 0 | 0 |
+| `vector_pg` | 1.0000 | 1.0000 | 1.0000 | 0.9919 | 125.291 ms | 0 | 0 |
+| `hybrid_rrf` | 1.0000 | 1.0000 | 1.0000 | 0.9908 | 125.620 ms | 0 | 0 |
+
+All hard gates passed, including active-only projection equality, zero
+forbidden/ineligible results, and rebuild equivalence. A same-identity replay
+returned `replayed=true`. The batch strengthens the case for an opt-in semantic
+projection but again provides no independent RRF gain; H-009 remains
+`testing/measured` and lexical remains the default. See [the W10 evidence](evidence/2026-07-15-independent-retrieval-batch.md).
+
 ## LongMemEval Original Sample
 
 The committed original-data evidence uses six frozen records from the official
