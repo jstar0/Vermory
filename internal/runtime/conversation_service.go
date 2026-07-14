@@ -277,7 +277,24 @@ func (s *ConversationService) prepareConversationTurn(ctx context.Context, reque
 	if err != nil {
 		return s.failPreparedTurn(ctx, turn, "global_defaults_retrieval_error", err)
 	}
-	memories, err := s.store.SearchActiveConversationMemory(ctx, s.tenantID, resolution.ContinuityID, request.Message, s.config.MemoryLimit)
+	var memories []Memory
+	if s.config.Retriever == nil {
+		memories, err = s.store.SearchActiveConversationMemory(ctx, s.tenantID, resolution.ContinuityID, request.Message, s.config.MemoryLimit)
+	} else {
+		continuityIDs, scopeErr := s.store.ResolveLinkedConversationContinuityIDs(ctx, s.tenantID, resolution.ContinuityID)
+		if scopeErr != nil {
+			return s.failPreparedTurn(ctx, turn, "memory_retrieval_error", scopeErr)
+		}
+		var result RetrievalResult
+		result, err = s.config.Retriever.Retrieve(ctx, RetrievalRequest{
+			OperationID:   "conversation-retrieval:" + request.OperationID,
+			TenantID:      s.tenantID,
+			ContinuityIDs: continuityIDs,
+			Query:         request.Message,
+			Limit:         s.config.MemoryLimit,
+		})
+		memories = result.Memories
+	}
 	if err != nil {
 		return s.failPreparedTurn(ctx, turn, "memory_retrieval_error", err)
 	}

@@ -70,7 +70,23 @@ func (s *Store) ResetVectorProjection(ctx context.Context, tenantID, profileID s
 	if profileID != ProductionRetrievalProfileID {
 		return fmt.Errorf("unsupported retrieval profile")
 	}
-	tx, err := s.pool.Begin(ctx)
+	connection, err := s.pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire vector projection reset connection: %w", err)
+	}
+	defer connection.Release()
+	lockKey1, lockKey2 := projectionAdvisoryLockKeys(profileID, tenantID)
+	var locked bool
+	if err := connection.QueryRow(ctx, `SELECT pg_try_advisory_lock($1, $2)`, lockKey1, lockKey2).Scan(&locked); err != nil {
+		return fmt.Errorf("acquire vector projection reset lock: %w", err)
+	}
+	if !locked {
+		return fmt.Errorf("retrieval projection worker is already running")
+	}
+	defer func() {
+		_, _ = connection.Exec(context.Background(), `SELECT pg_advisory_unlock($1, $2)`, lockKey1, lockKey2)
+	}()
+	tx, err := connection.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin vector projection reset: %w", err)
 	}

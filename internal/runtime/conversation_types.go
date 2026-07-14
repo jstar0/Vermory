@@ -198,6 +198,7 @@ func (r *FailExternalConversationTurnRequest) Validate() error {
 type ConversationServiceConfig struct {
 	MemoryLimit int
 	RecentLimit int
+	Retriever   MemoryRetriever
 }
 
 type ConfirmConversationMemoryRequest struct {

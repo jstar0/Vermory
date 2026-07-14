@@ -20,12 +20,17 @@ type CommitObservationResponse struct {
 }
 
 type Service struct {
-	store    *Store
-	tenantID string
+	store     *Store
+	tenantID  string
+	retriever MemoryRetriever
 }
 
 func NewService(store *Store, tenantID string) *Service {
 	return &Service{store: store, tenantID: strings.TrimSpace(tenantID)}
+}
+
+func NewServiceWithRetriever(store *Store, tenantID string, retriever MemoryRetriever) *Service {
+	return &Service{store: store, tenantID: strings.TrimSpace(tenantID), retriever: retriever}
 }
 
 func (s *Service) PrepareContext(ctx context.Context, request PrepareContextRequest) (PrepareContextResponse, error) {
@@ -46,7 +51,20 @@ func (s *Service) PrepareContext(ctx context.Context, request PrepareContextRequ
 	if err != nil {
 		return PrepareContextResponse{}, err
 	}
-	memories, err := s.store.SearchActiveMemory(ctx, s.tenantID, resolution.ContinuityID, request.Task, request.MaxItems)
+	var memories []Memory
+	if s.retriever == nil {
+		memories, err = s.store.SearchActiveMemory(ctx, s.tenantID, resolution.ContinuityID, request.Task, request.MaxItems)
+	} else {
+		var result RetrievalResult
+		result, err = s.retriever.Retrieve(ctx, RetrievalRequest{
+			OperationID:   "workspace-retrieval:" + request.OperationID,
+			TenantID:      s.tenantID,
+			ContinuityIDs: []string{resolution.ContinuityID},
+			Query:         request.Task,
+			Limit:         request.MaxItems,
+		})
+		memories = result.Memories
+	}
 	if err != nil {
 		return PrepareContextResponse{}, err
 	}

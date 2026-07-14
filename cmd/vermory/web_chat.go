@@ -22,6 +22,7 @@ type webChatOptions struct {
 	TenantID    string
 	Listen      string
 	Provider    webChatProviderOptions
+	Retrieval   retrievalRuntimeOptions
 }
 
 func (o webChatOptions) Validate() error {
@@ -53,7 +54,7 @@ type webChatProviderOptions struct {
 }
 
 func newWebChatCommand() *cobra.Command {
-	options := webChatOptions{}
+	options := webChatOptions{Retrieval: defaultRetrievalRuntimeOptions()}
 	command := &cobra.Command{
 		Use:   "web-chat",
 		Short: "Run the local conversation continuity Web Chat API",
@@ -68,10 +69,14 @@ func newWebChatCommand() *cobra.Command {
 			}
 			store, err := runtime.OpenStore(command.Context(), options.DatabaseURL)
 			if err != nil {
-				return err
+				return fmt.Errorf("open Web Chat runtime store")
 			}
 			defer store.Close()
 			if err := store.Migrate(command.Context()); err != nil {
+				return fmt.Errorf("migrate Web Chat runtime store")
+			}
+			retriever, err := buildRuntimeRetriever(store, options.Retrieval)
+			if err != nil {
 				return err
 			}
 			service := runtime.NewConversationService(
@@ -79,7 +84,7 @@ func newWebChatCommand() *cobra.Command {
 				options.TenantID,
 				llm,
 				model,
-				runtime.ConversationServiceConfig{},
+				runtime.ConversationServiceConfig{Retriever: retriever},
 			)
 			defaults := runtime.NewGlobalDefaultsService(store, options.TenantID)
 			bridges := runtime.NewBridgeService(store, options.TenantID)
@@ -107,6 +112,7 @@ func newWebChatCommand() *cobra.Command {
 	command.Flags().StringVar(&options.Provider.BaseURL, "base-url", "", "direct provider base URL")
 	command.Flags().StringVar(&options.Provider.APIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	command.Flags().StringVar(&options.Provider.GrokCommand, "grok-command", "", "authenticated Grok CLI command")
+	addSharedRetrievalFlags(command, &options.Retrieval)
 	return command
 }
 

@@ -17,6 +17,7 @@ type authenticatedHandler struct {
 	provider      provider.Provider
 	model         string
 	authenticator authn.Authenticator
+	retriever     runtime.MemoryRetriever
 }
 
 type routeAccess int
@@ -29,6 +30,10 @@ const (
 
 func NewAuthenticatedHandler(store *runtime.Store, llm provider.Provider, model string, authenticator authn.Authenticator) http.Handler {
 	return &authenticatedHandler{store: store, provider: llm, model: model, authenticator: authenticator}
+}
+
+func NewAuthenticatedHandlerWithRetriever(store *runtime.Store, llm provider.Provider, model string, authenticator authn.Authenticator, retriever runtime.MemoryRetriever) http.Handler {
+	return &authenticatedHandler{store: store, provider: llm, model: model, authenticator: authenticator, retriever: retriever}
 }
 
 func (handler *authenticatedHandler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
@@ -60,7 +65,7 @@ func (handler *authenticatedHandler) ServeHTTP(response http.ResponseWriter, req
 		return
 	}
 
-	service := runtime.NewConversationService(handler.store, principal.TenantID, handler.provider, handler.model, runtime.ConversationServiceConfig{})
+	service := runtime.NewConversationService(handler.store, principal.TenantID, handler.provider, handler.model, runtime.ConversationServiceConfig{Retriever: handler.retriever})
 	defaults := runtime.NewGlobalDefaultsService(handler.store, principal.TenantID)
 	bridges := runtime.NewBridgeService(handler.store, principal.TenantID)
 	buffered := newBufferedResponse()

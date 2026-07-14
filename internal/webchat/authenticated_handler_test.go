@@ -103,6 +103,49 @@ func TestAuthenticatedHandlerUsesPrincipalTenantAndRolePolicy(t *testing.T) {
 	}
 }
 
+func TestAuthenticatedHandlerPassesPrincipalTenantToRetrieverWithoutExposingMetadata(t *testing.T) {
+	_, store := testHandler(t, provider.Mock{Output: "unused"})
+	authenticator := staticAuthenticator{principals: map[string]authn.Principal{
+		"client-semantic": principal("identity-semantic", authn.RoleClient),
+	}}
+	retriever := &authenticatedRecordingRetriever{}
+	handler := NewAuthenticatedHandlerWithRetriever(store, provider.Mock{Output: "semantic answer"}, "test-model", authenticator, retriever)
+	response := performAuthenticatedJSON(t, handler, "client-semantic", http.MethodPost, "/v1/chat/turn", `{
+  "operation_id":"authenticated-semantic-turn",
+  "channel":"web_chat",
+  "thread_id":"semantic-thread",
+  "message":"What is the rollback approval rule?"
+}`)
+	if response.Code != http.StatusOK {
+		t.Fatalf("semantic chat failed: %d %s", response.Code, response.Body.String())
+	}
+	if len(retriever.requests) != 1 {
+		t.Fatalf("retriever calls=%d", len(retriever.requests))
+	}
+	request := retriever.requests[0]
+	if request.TenantID != "identity-semantic" || request.OperationID != "conversation-retrieval:authenticated-semantic-turn" || len(request.ContinuityIDs) != 1 {
+		t.Fatalf("authenticated retrieval request used the wrong authority: %#v", request)
+	}
+	for _, internal := range []string{"vector", runtime.ProductionRetrievalProfileID, "55555555-5555-5555-5555-555555555555", "retrieval_mode", "audit_id"} {
+		if strings.Contains(response.Body.String(), internal) {
+			t.Fatalf("authenticated response exposed retrieval metadata %q: %s", internal, response.Body.String())
+		}
+	}
+}
+
+type authenticatedRecordingRetriever struct {
+	requests []runtime.RetrievalRequest
+}
+
+func (retriever *authenticatedRecordingRetriever) Retrieve(_ context.Context, request runtime.RetrievalRequest) (runtime.RetrievalResult, error) {
+	retriever.requests = append(retriever.requests, request)
+	return runtime.RetrievalResult{
+		Memories:  []runtime.Memory{{ID: "66666666-6666-6666-6666-666666666666", Content: "Rollback requires two maintainers."}},
+		Effective: runtime.RetrievalVector,
+		AuditID:   "55555555-5555-5555-5555-555555555555",
+	}, nil
+}
+
 func TestAuthenticatedHandlerHidesCrossTenantResourcesAndRejectsRequestAuthority(t *testing.T) {
 	_, store := testHandler(t, provider.Mock{Output: "unused"})
 	authenticator := staticAuthenticator{principals: map[string]authn.Principal{

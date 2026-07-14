@@ -50,6 +50,48 @@ func TestPrepareContextFindsCurrentFactWhenTaskHasPartialTermOverlap(t *testing.
 	requireContains(t, got.Context, "checkout_eta_v2")
 }
 
+func TestPrepareContextUsesInjectedRetrieverWithoutExposingRetrievalMetadata(t *testing.T) {
+	_, store, continuityID, _ := seededService(t)
+	retriever := &recordingMemoryRetriever{result: RetrievalResult{
+		Memories:  []Memory{{ID: "11111111-1111-1111-1111-111111111111", Content: "Semantic rollback approval requires two maintainers."}},
+		Effective: RetrievalVector,
+		AuditID:   "22222222-2222-2222-2222-222222222222",
+	}}
+	service := NewServiceWithRetriever(store, "local", retriever)
+	prepared, err := service.PrepareContext(context.Background(), PrepareContextRequest{
+		OperationID: "workspace-semantic-prepare",
+		Workspace:   WorkspaceAnchor{RepoRoot: "/repo/web-checkout"},
+		Task:        "Who approves rollback?",
+		MaxItems:    4,
+	})
+	requireNoError(t, err)
+	if len(retriever.requests) != 1 {
+		t.Fatalf("retriever calls=%d", len(retriever.requests))
+	}
+	request := retriever.requests[0]
+	if request.OperationID != "workspace-retrieval:workspace-semantic-prepare" || request.TenantID != "local" || request.Query != "Who approves rollback?" || request.Limit != 4 {
+		t.Fatalf("unexpected workspace retrieval request: %#v", request)
+	}
+	if len(request.ContinuityIDs) != 1 || request.ContinuityIDs[0] != continuityID {
+		t.Fatalf("unexpected workspace retrieval scope: %#v", request.ContinuityIDs)
+	}
+	requireContains(t, prepared.Context, "Semantic rollback approval requires two maintainers.")
+	for _, internal := range []string{"vector", "22222222-2222-2222-2222-222222222222", "audit"} {
+		requireNotContains(t, prepared.Context, internal)
+	}
+}
+
+type recordingMemoryRetriever struct {
+	requests []RetrievalRequest
+	result   RetrievalResult
+	err      error
+}
+
+func (retriever *recordingMemoryRetriever) Retrieve(_ context.Context, request RetrievalRequest) (RetrievalResult, error) {
+	retriever.requests = append(retriever.requests, request)
+	return retriever.result, retriever.err
+}
+
 func TestWorkspaceConsumerReceivesGlobalDefaultsWithoutChangingDeliveryScope(t *testing.T) {
 	ctx := context.Background()
 	service, store, workspaceContinuityID, _ := seededService(t)

@@ -2,7 +2,9 @@ package runtime
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestProductionRetrievalProfileIsFrozen(t *testing.T) {
@@ -29,6 +31,35 @@ func TestProductionRetrievalProfileIsFrozen(t *testing.T) {
 				t.Fatalf("invalid profile was accepted: %#v", profile)
 			}
 		})
+	}
+}
+
+func TestResetVectorProjectionRejectsRunningWorker(t *testing.T) {
+	store, tenantID, _, _ := seedProjectionWorkerActive(t, "retrieval-reset-lock")
+	blocking := &projectionTestEmbedder{
+		vector:  testVector1024(0.5),
+		started: make(chan struct{}, 1),
+		release: make(chan struct{}),
+	}
+	worker := mustProjectionWorker(t, store, blocking, tenantID, 8)
+	done := make(chan error, 1)
+	go func() {
+		_, err := worker.RunOnce(context.Background())
+		done <- err
+	}()
+	select {
+	case <-blocking.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("worker did not acquire the projection lock")
+	}
+	err := store.ResetVectorProjection(context.Background(), tenantID, ProductionRetrievalProfileID)
+	close(blocking.release)
+	workerErr := <-done
+	if err == nil || !strings.Contains(err.Error(), "already running") {
+		t.Fatalf("projection reset raced a running worker: %v", err)
+	}
+	if workerErr != nil {
+		t.Fatal(workerErr)
 	}
 }
 

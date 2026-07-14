@@ -3,6 +3,8 @@ package runtime
 import (
 	"context"
 	"errors"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -231,6 +233,53 @@ func TestConversationLinkedGovernedMemorySharesWithoutPoolingRawHistoryAndRevers
 	requireNoError(t, err)
 	requireNotContains(t, llm.calls[5].ContextPacket, "18 July at 17:00")
 	requireNotContains(t, llm.calls[5].ContextPacket, "C204")
+}
+
+func TestConversationPreparationUsesInjectedRetrieverWithAuthorizedLinkedScope(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	tenantID := "conversation-retriever"
+	primaryAnchor := ConversationAnchor{Channel: "openclaw_dm", ThreadID: "release-primary"}
+	childAnchor := ConversationAnchor{Channel: "web_chat", ThreadID: "release-child"}
+	primary, _ := confirmConversationMemoryForBridge(t, store, tenantID, primaryAnchor, "conversation-retriever-primary", "Primary governed fact.")
+	child, _ := confirmConversationMemoryForBridge(t, store, tenantID, childAnchor, "conversation-retriever-child", "Child governed fact.")
+	if _, err := NewBridgeService(store, tenantID).LinkConversations(ctx, LinkConversationsRequest{
+		OperationID: "conversation-retriever-link",
+		Primary:     primaryAnchor,
+		Linked:      childAnchor,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	retriever := &recordingMemoryRetriever{result: RetrievalResult{
+		Memories:  []Memory{{ID: "33333333-3333-3333-3333-333333333333", Content: "Semantic deployment decision is current."}},
+		Effective: RetrievalVector,
+		AuditID:   "44444444-4444-4444-4444-444444444444",
+	}}
+	service := NewConversationService(store, tenantID, nil, "", ConversationServiceConfig{Retriever: retriever, MemoryLimit: 3})
+	prepared, err := service.PrepareExternalTurn(ctx, ExternalConversationTurnRequest{
+		OperationID: "conversation-semantic-prepare",
+		Anchor:      childAnchor,
+		Message:     "What is the deployment decision?",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(retriever.requests) != 1 {
+		t.Fatalf("retriever calls=%d", len(retriever.requests))
+	}
+	request := retriever.requests[0]
+	if request.OperationID != "conversation-retrieval:conversation-semantic-prepare" || request.TenantID != tenantID || request.Query != "What is the deployment decision?" || request.Limit != 3 {
+		t.Fatalf("unexpected conversation retrieval request: %#v", request)
+	}
+	wantScope := []string{primary.ContinuityID, child.ContinuityID}
+	sort.Strings(wantScope)
+	if !reflect.DeepEqual(request.ContinuityIDs, wantScope) {
+		t.Fatalf("conversation retrieval scope=%#v want %#v", request.ContinuityIDs, wantScope)
+	}
+	requireContains(t, prepared.Context, "Semantic deployment decision is current.")
+	for _, internal := range []string{"vector", "44444444-4444-4444-4444-444444444444", "audit"} {
+		requireNotContains(t, prepared.Context, internal)
+	}
 }
 
 func TestConversationExternalTurnPreparesGovernedContextWithoutRawHistory(t *testing.T) {

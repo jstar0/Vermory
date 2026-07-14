@@ -22,6 +22,7 @@ type serveOptions struct {
 	TLSCert     string
 	TLSKey      string
 	Provider    webChatProviderOptions
+	Retrieval   retrievalRuntimeOptions
 }
 
 func (options serveOptions) Validate() error {
@@ -44,7 +45,7 @@ func (options serveOptions) Validate() error {
 }
 
 func newServeCommand() *cobra.Command {
-	options := serveOptions{}
+	options := serveOptions{Retrieval: defaultRetrievalRuntimeOptions()}
 	command := &cobra.Command{
 		Use:   "serve",
 		Short: "Run the authenticated multi-tenant Vermory API",
@@ -59,23 +60,27 @@ func newServeCommand() *cobra.Command {
 			}
 			store, err := runtime.OpenStoreWithOptions(command.Context(), options.DatabaseURL, runtime.StoreOptions{EnforceTenantContext: true})
 			if err != nil {
-				return err
+				return fmt.Errorf("open authenticated runtime store")
 			}
 			defer store.Close()
 			if err := store.ValidateRuntimeRole(command.Context()); err != nil {
 				return err
 			}
+			retriever, err := buildRuntimeRetriever(store, options.Retrieval)
+			if err != nil {
+				return err
+			}
 			authPool, err := pgxpool.New(command.Context(), options.DatabaseURL)
 			if err != nil {
-				return fmt.Errorf("open authentication database pool: %w", err)
+				return fmt.Errorf("open authentication database pool")
 			}
 			defer authPool.Close()
 			if err := authPool.Ping(command.Context()); err != nil {
-				return fmt.Errorf("connect authentication database pool: %w", err)
+				return fmt.Errorf("connect authentication database pool")
 			}
 			server := &http.Server{
 				Addr:              options.Listen,
-				Handler:           webchat.NewAuthenticatedHandler(store, llm, model, authn.NewPostgresAuthenticator(authPool)),
+				Handler:           webchat.NewAuthenticatedHandlerWithRetriever(store, llm, model, authn.NewPostgresAuthenticator(authPool), retriever),
 				ReadHeaderTimeout: 5 * time.Second,
 				ReadTimeout:       30 * time.Second,
 				WriteTimeout:      5 * time.Minute,
@@ -102,6 +107,7 @@ func newServeCommand() *cobra.Command {
 	command.Flags().StringVar(&options.Provider.BaseURL, "base-url", "", "direct provider base URL")
 	command.Flags().StringVar(&options.Provider.APIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	command.Flags().StringVar(&options.Provider.GrokCommand, "grok-command", "", "authenticated Grok CLI command")
+	addSharedRetrievalFlags(command, &options.Retrieval)
 	return command
 }
 

@@ -58,6 +58,7 @@ func newRootCommand() *cobra.Command {
 	var loadScopeSuffix string
 	var mcpDatabaseURL string
 	var mcpTenantID string
+	mcpRetrieval := defaultRetrievalRuntimeOptions()
 
 	rootCmd := &cobra.Command{
 		Use:           brand.Slug,
@@ -99,6 +100,9 @@ func newRootCommand() *cobra.Command {
 	rootCmd.AddCommand(newServeCommand())
 	rootCmd.AddCommand(newBenchmarkLongMemEvalCommand())
 	rootCmd.AddCommand(newRetrievalAblationCommand())
+	rootCmd.AddCommand(newRetrievalWorkerCommand())
+	rootCmd.AddCommand(newRetrievalStatusCommand())
+	rootCmd.AddCommand(newRetrievalRebuildCommand())
 
 	mcpStdioCmd := &cobra.Command{
 		Use:   "mcp-stdio",
@@ -113,18 +117,27 @@ func newRootCommand() *cobra.Command {
 			}
 			store, err := runtime.OpenStore(cmd.Context(), mcpDatabaseURL)
 			if err != nil {
-				return err
+				return fmt.Errorf("open MCP runtime store")
 			}
 			defer store.Close()
 			if err := store.Migrate(cmd.Context()); err != nil {
+				return fmt.Errorf("migrate MCP runtime store")
+			}
+			retriever, err := buildRuntimeRetriever(store, mcpRetrieval)
+			if err != nil {
 				return err
 			}
-			handler := mcpserver.New(runtime.NewService(store, mcpTenantID), mcpserver.Config{TenantID: mcpTenantID})
+			service := runtime.NewService(store, mcpTenantID)
+			if retriever != nil {
+				service = runtime.NewServiceWithRetriever(store, mcpTenantID, retriever)
+			}
+			handler := mcpserver.New(service, mcpserver.Config{TenantID: mcpTenantID})
 			return mcpserver.NewServer(handler).Run(cmd.Context(), &mcp.StdioTransport{})
 		},
 	}
 	mcpStdioCmd.Flags().StringVar(&mcpDatabaseURL, "database-url", "", "PostgreSQL connection URL")
 	mcpStdioCmd.Flags().StringVar(&mcpTenantID, "tenant-id", "", "server-owned tenant identifier")
+	addSharedRetrievalFlags(mcpStdioCmd, &mcpRetrieval)
 	rootCmd.AddCommand(mcpStdioCmd)
 
 	evalSelfCaseCmd := &cobra.Command{
