@@ -45,7 +45,7 @@ Confirmation only binds this exact root. A rename, worktree, mirror, or new
 path is not inferred to be the same workspace; explicit rebind is a separate
 bridge capability and is not part of this slice.
 
-## Record, Revise, Correct, And Forget
+## Record, Propose, Revise, Correct, And Forget
 
 Every mutation requires an operator-selected `operation_id`. Reusing the same
 ID for a retry is idempotent. Keep the `memory_id` from each JSON receipt: it
@@ -85,6 +85,60 @@ the replacement as a `source_update`. It does not use content similarity to
 choose a target or replace other facts from the source. Use `memory correct`
 instead when the authority is an explicit user correction rather than a new
 trusted source version. Both operations require a named active target.
+
+When a trusted ingestor has a stable fact key but should not activate source
+changes automatically, record the current source with `--key` and submit the
+new revision as a candidate:
+
+```bash
+./bin/vermory memory add-source \
+  --database-url 'postgresql:///vermory_w03?host=/tmp' \
+  --tenant-id local-w03 \
+  --repo-root /fixtures/vermory-w03 \
+  --operation-id signing-v1 \
+  --key release.signing.mode \
+  --source-ref repo:deploy/production.yaml@sha-old \
+  --content 'Production releases use a macOS keychain certificate.'
+
+./bin/vermory memory propose-source \
+  --database-url 'postgresql:///vermory_w03?host=/tmp' \
+  --tenant-id local-w03 \
+  --repo-root /fixtures/vermory-w03 \
+  --operation-id signing-candidate-v2 \
+  --key release.signing.mode \
+  --source-ref repo:deploy/production.yaml@sha-new \
+  --content 'Production releases use GitHub Actions OIDC keyless signing.'
+```
+
+`propose-source` resolves only active facts with the same key in the same
+tenant and confirmed workspace. Zero matches creates a new candidate, one
+different match creates a replacement candidate, identical content records an
+unchanged observation, and multiple active matches abstain. A proposed or
+rejected candidate is visible to `memory inspect` but absent from normal search
+and MCP context.
+
+Review the returned `candidate_memory_id`, then make one explicit decision:
+
+```bash
+./bin/vermory memory accept-candidate \
+  --database-url 'postgresql:///vermory_w03?host=/tmp' \
+  --tenant-id local-w03 \
+  --repo-root /fixtures/vermory-w03 \
+  --operation-id signing-accept-v2 \
+  --memory-id '<candidate-memory-id>'
+
+./bin/vermory memory reject-candidate \
+  --database-url 'postgresql:///vermory_w03?host=/tmp' \
+  --tenant-id local-w03 \
+  --repo-root /fixtures/vermory-w03 \
+  --operation-id signing-reject-v2 \
+  --memory-id '<candidate-memory-id>'
+```
+
+Acceptance atomically supersedes the still-current keyed target and activates
+the candidate. Rejection preserves the candidate as audit history and changes
+no active fact. This path relies on a trusted stable key; it does not extract
+keys or infer general semantic conflicts from arbitrary documents.
 
 Copy the returned v2 `memory_id` into the forget operation:
 
@@ -126,6 +180,8 @@ The Go tests in this repository prove the command and lifecycle contract, but
 a qualifying client replay must still show the client tool calls and the
 corresponding PostgreSQL ledger. A successful Codex replay is recorded in
 [Codex MCP Real-Client Evidence](../evidence/2026-07-14-codex-mcp-real-client.md);
+a keyed source-candidate rejection/acceptance and real Grok replay are recorded
+in [Source Conflict Candidate Runtime Evidence](../evidence/2026-07-14-source-conflict-candidate-runtime.md);
 a failed client attempt remains failure evidence and must not be replaced by a
 scripted pass or a Grok result.
 

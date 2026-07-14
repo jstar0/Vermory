@@ -27,11 +27,11 @@ without allowing source imports or models to silently replace active memory.
 
 ## Task 4: W05 Acceptance And Real Client
 
-- [ ] Run deterministic W05 acceptance before proposal, after proposal, after
+- [x] Run deterministic W05 acceptance before proposal, after proposal, after
   rejection, after acceptance, after rebuild, and against cross-tenant data.
-- [ ] Build an isolated release binary and execute a real Grok MCP task against
+- [x] Build an isolated release binary and execute a real Grok MCP task against
   the accepted current context.
-- [ ] Verify the artifact, PostgreSQL lifecycle/audit rows, write-back status,
+- [x] Verify the artifact, PostgreSQL lifecycle/audit rows, write-back status,
   stale probes, and distractor exclusion.
 
 ## Task 5: Evidence And Delivery

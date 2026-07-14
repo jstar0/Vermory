@@ -59,7 +59,7 @@ Experiment 0 is complete. It provides:
 - nine frozen public cases covering workspace continuity, conversation continuity, Global Defaults, deletion, source injection, durable bridges, OpenClaw everyday-use continuity, authenticated multi-tenant RLS, and PostgreSQL operations recovery;
 - JSON and Markdown Experiment 0 reports.
 
-The repository also contains production-shaped runtime slices for workspace and conversation continuity, Global Defaults, durable bridges, explicit source-authoritative revision, the OpenClaw external-turn lifecycle, an authenticated multi-tenant HTTP profile, native PostgreSQL recovery, and a qualified original LongMemEval oracle sample. The source-revision slice replaces one named active fact, preserves unrelated facts and history, excludes stale content after projection rebuild, and has been consumed through a real Grok MCP task. The authenticated profile uses server-issued digest-only tokens, role-gated routes, a non-owner PostgreSQL runtime identity, tenant-aware foreign keys, and RLS on the served continuity graph. Recovery evidence covers migration replay, native dump/restore, projection rebuild, runtime-role re-provisioning, and bounded database outage recovery. Pull-request CI now starts PostgreSQL 18 and automatically runs the database-backed Go suite, runtime race gates, release build, and the OpenClaw install/check/package chain on a clean Ubuntu runner. The LongMemEval evidence runs six official records through no-context, full-history, plain-retrieval, and production Vermory-packet conditions with a real Grok reader; it is reported as `dataset_sample`, not a full benchmark score. Each evidence document is scoped to the exact client, model, failure mode, and deterministic hard gates it executed; no individual slice is treated as proof that the complete platform is finished.
+The repository also contains production-shaped runtime slices for workspace and conversation continuity, Global Defaults, durable bridges, explicit source-authoritative revision, governed keyed source candidates, the OpenClaw external-turn lifecycle, an authenticated multi-tenant HTTP profile, native PostgreSQL recovery, and a qualified original LongMemEval oracle sample. A source candidate can be proposed without changing current AI context, rejected without changing the active fact, or accepted to atomically replace the still-current keyed target. A real Grok MCP task consumed only the accepted fact after projection rebuild and wrote its result back as proposed. The authenticated profile uses server-issued digest-only tokens, role-gated routes, a non-owner PostgreSQL runtime identity, tenant-aware foreign keys, and RLS on the served continuity graph. Recovery evidence covers migration replay, native dump/restore, projection rebuild, runtime-role re-provisioning, and bounded database outage recovery. Pull-request CI starts PostgreSQL 18 and automatically runs the database-backed Go suite, runtime race gates, release build, and the OpenClaw install/check/package chain on a clean Ubuntu runner. The LongMemEval evidence runs six official records through no-context, full-history, plain-retrieval, and production Vermory-packet conditions with a real Grok reader; it is reported as `dataset_sample`, not a full benchmark score. Each evidence document is scoped to the exact client, model, failure mode, and deterministic hard gates it executed; no individual slice is treated as proof that the complete platform is finished.
 
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
@@ -143,6 +143,14 @@ See [Explicit Source Revision Runtime Evidence](docs/evidence/2026-07-14-source-
 for the frozen software-release case, PostgreSQL lifecycle and rebuild gates,
 real Grok MCP replay, preserved Codex quota/model failures, and exact claim
 boundary.
+
+When an ingestor supplies a trusted stable fact key, `memory propose-source`
+creates a reviewable candidate without changing current retrieval. Operators
+use `memory accept-candidate` or `memory reject-candidate`; ordinary MCP clients
+never receive proposed or rejected content. See
+[Source Conflict Candidate Runtime Evidence](docs/evidence/2026-07-14-source-conflict-candidate-runtime.md)
+for the complete rejection, acceptance, rebuild, cross-tenant, stale-probe, and
+real Grok MCP path.
 
 See [CI Release Gates Evidence](docs/evidence/2026-07-14-ci-release-gates.md)
 for the clean-runner PostgreSQL, race, release-build, and OpenClaw pull-request

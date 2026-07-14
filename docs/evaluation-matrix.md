@@ -168,6 +168,7 @@ go run ./cmd/vermory benchmark-coverage \
 - Internal Ready mock chain: completed
 - LongMemEval original oracle sample with Grok: completed as `dataset_sample`
 - Explicit source revision runtime with Grok MCP: completed
+- Governed source conflict candidate runtime with Grok MCP: completed
 
 ## Completed Runs
 
@@ -181,6 +182,8 @@ go run ./cmd/vermory benchmark-coverage \
 - Internal Ready smoke run ID: `internal-ready-smoke`
 - LongMemEval original sample run ID: `longmemeval-original-sample-grok-20260714-attempt-6`
 - Source revision Grok session: `955B4CA6-68EB-4D0E-9CB4-96BE91AC1776`
+- Source candidate Grok session: `019f5f3c-d836-7d80-a8de-995dcde29ef8`
+- Source candidate stale-probe session: `019f5f3e-4b7f-7510-8cda-a26e0ba89725`
 
 ## Explicit Source Revision Runtime
 
@@ -202,6 +205,30 @@ PostgreSQL and real MCP probes established:
 Official Codex CLI attempts were retained but do not count as a success for
 this slice because unsupported model selections and then the account usage
 limit stopped each run before MCP. See [the scoped runtime evidence](evidence/2026-07-14-source-revision-runtime.md).
+
+## Governed Source Conflict Candidate Runtime
+
+The frozen `107-workspace-source-conflict-candidate` case uses stable key
+`release.signing.mode`. A first source change was proposed and rejected without
+changing current retrieval. A second proposal was accepted, atomically
+superseding the old keychain fact while preserving the independent `800 ms`
+timeout and the rejected candidate as audit history.
+
+A real isolated Grok `grok-4.5` task consumed the accepted workspace through
+MCP, created and deterministically checked `release-signing-check.md`, and
+wrote its result back as `proposed`. Persisted delivery bodies, not model
+self-report, established that:
+
+- proposal alone kept the old current fact and excluded the candidate;
+- cross-tenant acceptance was rejected;
+- rebuild excluded proposed, rejected, and superseded source states;
+- the target task included OIDC and `800 ms` but no keychain or other-tenant fact;
+- exact and paraphrased stale probes returned OIDC and no stale fact;
+- the client result remained a non-authoritative proposed observation.
+
+This is deterministic keyed formation, not arbitrary-document extraction or
+general semantic conflict matching. See
+[the scoped runtime evidence](evidence/2026-07-14-source-conflict-candidate-runtime.md).
 
 ## LongMemEval Original Sample
 
