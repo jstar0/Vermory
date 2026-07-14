@@ -196,6 +196,7 @@ func renderReportMarkdown(report Report) string {
 	fmt.Fprintf(&output, "- Engine: `%s`\n", report.EngineVersion)
 	fmt.Fprintf(&output, "- PostgreSQL schema: `%d`\n", report.SchemaVersion)
 	fmt.Fprintf(&output, "- Embedding: `%s` / `%d` dimensions\n", report.Embedding.Model, report.Embedding.Dimensions)
+	fmt.Fprintf(&output, "- Embedding requests: `%d`\n", report.EmbeddingRequestCount)
 	fmt.Fprintf(&output, "- Hard gates: %s\n", passLabel(report.HardGates.Pass))
 	fmt.Fprintf(&output, "- Projection rebuild equivalent: `%t`\n", report.ProjectionRebuildEquivalent)
 	fmt.Fprintf(&output, "- Qualification: `%s`\n\n", report.QualificationStatus)

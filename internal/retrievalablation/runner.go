@@ -146,6 +146,10 @@ func RunWithDependencies(
 	if implementationRevision == "" {
 		implementationRevision = "unknown"
 	}
+	backendStats, err := backend.Stats(ctx)
+	if err != nil {
+		return Report{}, fmt.Errorf("read vector backend stats: %w", err)
+	}
 	report := Report{
 		RunID:                  options.RunID,
 		CorpusSHA256:           corpusHash,
@@ -158,6 +162,7 @@ func RunWithDependencies(
 			Model:      strings.TrimSpace(options.EmbeddingModel),
 			Dimensions: options.EmbeddingDimensions,
 		},
+		EmbeddingRequestCount:       embeddingRequestCount(backendStats),
 		StartedAt:                   started,
 		Conditions:                  conditions,
 		ProjectionRebuildEquivalent: rebuildEquivalent,
@@ -431,4 +436,21 @@ func authorityFingerprint(ctx context.Context, store *runtime.Store, seeded Seed
 	sort.Strings(lines)
 	digest := sha256.Sum256([]byte(strings.Join(lines, "\n")))
 	return hex.EncodeToString(digest[:]), nil
+}
+
+func embeddingRequestCount(stats memorybackend.Stats) int64 {
+	value, exists := stats.Extra["embedding_requests"]
+	if !exists {
+		return 0
+	}
+	switch count := value.(type) {
+	case int64:
+		return count
+	case int:
+		return int64(count)
+	case float64:
+		return int64(count)
+	default:
+		return 0
+	}
 }

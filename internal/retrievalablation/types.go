@@ -80,6 +80,7 @@ type Report struct {
 	SchemaVersion               int64             `json:"schema_version"`
 	AuthorityFingerprint        string            `json:"authority_fingerprint"`
 	Embedding                   EmbeddingProfile  `json:"embedding"`
+	EmbeddingRequestCount       int64             `json:"embedding_request_count"`
 	StartedAt                   time.Time         `json:"started_at"`
 	Duration                    time.Duration     `json:"duration"`
 	Conditions                  []ConditionReport `json:"conditions"`

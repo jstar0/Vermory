@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -47,35 +48,7 @@ func TestRunUsesNativePostgreSQLVectorBackend(t *testing.T) {
 		t.Skip("VERMORY_TEST_DATABASE_URL is not set")
 	}
 	resetRetrievalRunDatabase(t, databaseURL)
-	root := t.TempDir()
-	caseDir := filepath.Join(root, "casebook", "cases", "101-example")
-	if err := os.MkdirAll(caseDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(caseDir, "source.md"), []byte("fixture"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	corpusDir := filepath.Join(root, "runtime", "cases", "W08-test")
-	if err := os.MkdirAll(corpusDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	corpus := Corpus{
-		Version: "1", Name: "native run",
-		Scopes: []Scope{{ID: "workspace", TenantID: "run-local", Line: "workspace", Anchor: "/fixtures/run/workspace"}},
-		Records: []Record{
-			{ID: "current", ScopeID: "workspace", Content: "Use the current locked command.", Lifecycle: "active", ProvenanceCase: "101-example"},
-			{ID: "distractor", ScopeID: "workspace", Content: "A gardening reminder about tomatoes.", Lifecycle: "active", ProvenanceCase: "101-example"},
-		},
-		Queries: []Query{{ID: "command", ScopeID: "workspace", Text: "current command", Limit: 2, RelevantRecordIDs: []string{"current"}, ForbiddenRecordIDs: []string{"distractor"}, Cohorts: []string{"semantic"}}},
-	}
-	payload, err := json.Marshal(corpus)
-	if err != nil {
-		t.Fatal(err)
-	}
-	corpusPath := filepath.Join(corpusDir, "corpus.json")
-	if err := os.WriteFile(corpusPath, payload, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	corpusPath := writeNativeRunCorpus(t)
 
 	var calls atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
@@ -116,6 +89,45 @@ func TestRunUsesNativePostgreSQLVectorBackend(t *testing.T) {
 	if calls.Load() < 5 {
 		t.Fatalf("embedding calls=%d, expected seed, query, rebuild, and replay calls", calls.Load())
 	}
+	if report.EmbeddingRequestCount != calls.Load() {
+		t.Fatalf("reported embedding requests=%d, observed=%d", report.EmbeddingRequestCount, calls.Load())
+	}
+}
+
+func TestRunNativeVectorOutageDegradesToLexical(t *testing.T) {
+	databaseURL := os.Getenv("VERMORY_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("VERMORY_TEST_DATABASE_URL is not set")
+	}
+	resetRetrievalRunDatabase(t, databaseURL)
+	corpusPath := writeNativeRunCorpus(t)
+	var calls atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		call := calls.Add(1)
+		if call == 3 || call == 6 {
+			http.Error(response, "forced embedding outage", http.StatusServiceUnavailable)
+			return
+		}
+		_ = json.NewEncoder(response).Encode(map[string]any{"data": []any{map[string]any{"embedding": []float64{1, 0, 0}, "index": 0}}, "model": "test-embedding"})
+	}))
+	defer server.Close()
+
+	report, err := Run(context.Background(), Options{
+		DatabaseURL: databaseURL, CorpusPath: corpusPath, RunID: "native-outage",
+		EmbeddingBaseURL: server.URL, EmbeddingAPIKey: "test-key", EmbeddingModel: "test-embedding",
+		EmbeddingDimensions: 3, ImplementationRevision: "test-revision",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.HardGates.Pass || !report.ProjectionRebuildEquivalent || len(report.Failures) != 1 {
+		t.Fatalf("outage report mismatch: %#v", report)
+	}
+	lexical := conditionReport(t, report, ConditionLexical).Queries[0]
+	hybrid := conditionReport(t, report, ConditionHybrid).Queries[0]
+	if !hybrid.DegradedToLexical || !reflect.DeepEqual(recordIDs(lexical.Results), recordIDs(hybrid.Results)) {
+		t.Fatalf("outage did not preserve lexical order: lexical=%#v hybrid=%#v", lexical, hybrid)
+	}
 }
 
 func resetRetrievalRunDatabase(t *testing.T, databaseURL string) {
@@ -149,4 +161,38 @@ func resetRetrievalRunDatabase(t *testing.T, databaseURL string) {
 			pool.Close()
 		}
 	})
+}
+
+func writeNativeRunCorpus(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	caseDir := filepath.Join(root, "casebook", "cases", "101-example")
+	if err := os.MkdirAll(caseDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(caseDir, "source.md"), []byte("fixture"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	corpusDir := filepath.Join(root, "runtime", "cases", "W08-test")
+	if err := os.MkdirAll(corpusDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	corpus := Corpus{
+		Version: "1", Name: "native run",
+		Scopes: []Scope{{ID: "workspace", TenantID: "run-local", Line: "workspace", Anchor: "/fixtures/run/workspace"}},
+		Records: []Record{
+			{ID: "current", ScopeID: "workspace", Content: "Use the current locked command.", Lifecycle: "active", ProvenanceCase: "101-example"},
+			{ID: "distractor", ScopeID: "workspace", Content: "A gardening reminder about tomatoes.", Lifecycle: "active", ProvenanceCase: "101-example"},
+		},
+		Queries: []Query{{ID: "command", ScopeID: "workspace", Text: "current command", Limit: 2, RelevantRecordIDs: []string{"current"}, ForbiddenRecordIDs: []string{"distractor"}, Cohorts: []string{"semantic"}}},
+	}
+	payload, err := json.Marshal(corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	corpusPath := filepath.Join(corpusDir, "corpus.json")
+	if err := os.WriteFile(corpusPath, payload, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return corpusPath
 }
