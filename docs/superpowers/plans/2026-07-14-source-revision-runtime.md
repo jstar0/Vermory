@@ -286,10 +286,10 @@ pnpm -C integrations/openclaw pack --dry-run
 git diff --check
 ```
 
-- [ ] **Step 2: Commit, push, and update Draft PR**
+- [x] **Step 2: Commit, push, and update Draft PR**
 
 Commit evidence and documentation, push the feature branch, update Draft PR 1 with exact evidence and non-claims, and require remote CI success.
 
-- [ ] **Step 3: Complete this plan without closing the platform goal**
+- [x] **Step 3: Complete this plan without closing the platform goal**
 
 Mark every checkbox complete only after the evidence exists on the remote branch. Keep the overall Vermory goal active for automatic formation, broader original benchmarks, source-conflict inference, multi-session aggregation, withheld/sealed evaluation, scale, and final release acceptance.
