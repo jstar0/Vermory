@@ -8,6 +8,7 @@ type GenerateRequest struct {
 	Prompt        string
 	ContextPacket string
 	MaxTokens     int
+	JSONSchema    string
 }
 
 type GenerateResponse struct {

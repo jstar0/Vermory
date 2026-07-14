@@ -148,6 +148,9 @@ func TestSourceFormationServiceFormsBatchAndReplaysWithoutProvider(t *testing.T)
 		t.Fatalf("provider call count=%d", len(llm.calls))
 	}
 	call := llm.calls[0]
+	if !json.Valid([]byte(call.JSONSchema)) || !strings.Contains(call.JSONSchema, `"candidates"`) {
+		t.Fatalf("formation provider request omitted strict JSON schema: %#v", call)
+	}
 	combined := call.System + call.Prompt + call.ContextPacket
 	for _, required := range []string{"untrusted", "exact", "new", "update", "unchanged", "deploy.region.primary", "deploy.retry.max"} {
 		if !strings.Contains(combined, required) {

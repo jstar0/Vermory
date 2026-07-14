@@ -44,6 +44,7 @@ printf '%%s\n' '{"text":"grok response","modelUsage":{"grok-4.5":{}}}'
 		Prompt:        "finish the task",
 		ContextPacket: "confirmed context packet",
 		MaxTokens:     64,
+		JSONSchema:    `{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}`,
 	})
 	if err != nil {
 		t.Fatalf("Generate returned error: %v", err)
@@ -65,6 +66,7 @@ printf '%%s\n' '{"text":"grok response","modelUsage":{"grok-4.5":{}}}'
 	lines := strings.Split(strings.TrimSpace(string(arguments)), "\n")
 	var promptPath string
 	foundMaxTurns := false
+	foundJSONSchema := false
 	for index, line := range lines {
 		if line == "--prompt-file" && index+1 < len(lines) {
 			promptPath = lines[index+1]
@@ -75,9 +77,18 @@ printf '%%s\n' '{"text":"grok response","modelUsage":{"grok-4.5":{}}}'
 			}
 			foundMaxTurns = true
 		}
+		if line == "--json-schema" {
+			if index+1 >= len(lines) || !json.Valid([]byte(lines[index+1])) {
+				t.Fatalf("expected valid JSON schema after --json-schema, got %q", strings.Join(lines, " "))
+			}
+			foundJSONSchema = true
+		}
 	}
 	if !foundMaxTurns {
 		t.Fatalf("expected --max-turns in Grok arguments: %q", strings.Join(lines, " "))
+	}
+	if !foundJSONSchema {
+		t.Fatalf("expected --json-schema in Grok arguments: %q", strings.Join(lines, " "))
 	}
 	for _, want := range []string{
 		"--verbatim",
@@ -90,6 +101,7 @@ printf '%%s\n' '{"text":"grok response","modelUsage":{"grok-4.5":{}}}'
 		"dontAsk",
 		"--output-format",
 		"json",
+		"--json-schema",
 		"--model",
 		"grok-4.5",
 		"--prompt-file",

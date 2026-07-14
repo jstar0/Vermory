@@ -63,6 +63,12 @@ func (p *GrokCLI) Generate(ctx context.Context, req GenerateRequest) (GenerateRe
 	if model := strings.TrimSpace(req.Model); model != "" {
 		args = append(args, "--model", model)
 	}
+	if schema := strings.TrimSpace(req.JSONSchema); schema != "" {
+		if !json.Valid([]byte(schema)) {
+			return GenerateResponse{}, errors.New("provider: Grok CLI JSON schema is invalid")
+		}
+		args = append(args, "--json-schema", schema)
+	}
 	args = append(args, "--prompt-file", promptPath)
 
 	stdout, err := os.CreateTemp("", "vermory-grok-*.json")

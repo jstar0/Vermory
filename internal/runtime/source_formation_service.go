@@ -20,6 +20,32 @@ Return only durable facts that are explicit in an exact source quote. Classify e
 Do not invent facts, infer uncertain policy, select another scope, assign authority, activate memory, bridge continuities, or create Global Defaults.
 Return exactly one JSON object with only candidates and reason. candidates must contain zero to sixteen items. Each item must contain only decision, memory_key, quote, occurrence, content, and reason.`
 
+const sourceFormationJSONSchema = `{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "candidates": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "decision": {"type": "string", "enum": ["new", "update", "unchanged"]},
+          "memory_key": {"type": "string", "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*$", "maxLength": 160},
+          "quote": {"type": "string", "minLength": 1, "maxLength": 2048},
+          "occurrence": {"type": "integer", "minimum": 1},
+          "content": {"type": "string", "minLength": 1, "maxLength": 2048},
+          "reason": {"type": "string", "minLength": 1, "maxLength": 512}
+        },
+        "required": ["decision", "memory_key", "quote", "occurrence", "content", "reason"]
+      }
+    },
+    "reason": {"type": "string", "minLength": 1, "maxLength": 512}
+  },
+  "required": ["candidates", "reason"]
+}`
+
 const maxSourceFormationProviderOutputBytes = 65536
 
 type SourceFormationServiceConfig struct {
@@ -113,6 +139,7 @@ func (s *SourceFormationService) FormDocument(ctx context.Context, repoRoot stri
 		Prompt:        "Extract exact-span governed memory candidates from the trusted document. Return JSON only.",
 		ContextPacket: packet,
 		MaxTokens:     4096,
+		JSONSchema:    sourceFormationJSONSchema,
 	})
 	providerContextErr := providerCtx.Err()
 	cancelProvider()
