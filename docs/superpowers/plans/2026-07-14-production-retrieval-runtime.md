@@ -378,19 +378,19 @@ git commit -m "feat: expose opt-in production retrieval"
 - Consumes: Tasks 1-4 complete runtime surfaces.
 - Produces: frozen workspace semantic, exact technical, linked conversation, lifecycle, outage, lag/rebuild, and restricted-role trajectories with stable IDs and deterministic assertions.
 
-- [ ] **Step 1: Freeze case inputs and expected/forbidden facts before running the implementation.**
+- [x] **Step 1: Freeze case inputs and expected/forbidden facts before running the implementation.**
 
 The case must use software release and deployment workflows, not the legacy
 Bluebridge case. Include Chinese semantic paraphrase, mixed-language path/flag,
 error code, model ID, same-scope distractor, cross-continuity distractor,
 cross-tenant distractor, superseded text, and deleted text.
 
-- [ ] **Step 2: Write acceptance tests that materialize every fact through public runtime APIs and process projections through the worker.**
+- [x] **Step 2: Write acceptance tests that materialize every fact through public runtime APIs and process projections through the worker.**
 
 Direct inserts into vector documents, retrieval audit, or cursor tables are
 forbidden except in explicit corruption/failure setup sections.
 
-- [ ] **Step 3: Require workspace MCP and linked-conversation Web Chat behavior.**
+- [x] **Step 3: Require workspace MCP and linked-conversation Web Chat behavior.**
 
 Tests assert:
 
@@ -402,12 +402,12 @@ cross-scope content          absent
 proposed/superseded/deleted  absent
 ```
 
-- [ ] **Step 4: Require provider outage, lag, late completion, rebuild, RLS, and authority-fingerprint hard gates.**
+- [x] **Step 4: Require provider outage, lag, late completion, rebuild, RLS, and authority-fingerprint hard gates.**
 
 The native restore acceptance must include schema 14, events, cursors, audits,
 and vector row deletion/rebuild while preserving authority.
 
-- [ ] **Step 5: Run focused acceptance, full serial database, race, vet, tidy, and commit.**
+- [x] **Step 5: Run focused acceptance, full serial database, race, vet, tidy, and commit.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
