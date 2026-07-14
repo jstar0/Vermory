@@ -152,7 +152,7 @@ func TestSourceFormationServiceFormsBatchAndReplaysWithoutProvider(t *testing.T)
 		t.Fatalf("formation provider request omitted strict JSON schema: %#v", call)
 	}
 	combined := call.System + call.Prompt + call.ContextPacket
-	for _, required := range []string{"untrusted", "exact", "new", "update", "unchanged", "deploy.region.primary", "deploy.retry.max"} {
+	for _, required := range []string{"untrusted", "exact", "new", "update", "unchanged", "copy the current fact content exactly", "plural concept names", "deploy.region.primary", "deploy.retry.max"} {
 		if !strings.Contains(combined, required) {
 			t.Fatalf("formation provider request omitted %q: %#v", required, call)
 		}
