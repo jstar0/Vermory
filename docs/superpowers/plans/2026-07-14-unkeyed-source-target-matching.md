@@ -128,5 +128,5 @@
 - [x] **Step 2: Run actionlint, GoReleaser check/snapshot, OpenClaw tests/typecheck/build/package dry-run, and release checksum checks.**
 - [x] **Step 3: Run migration replay and native backup/restore with source-match authority, RLS, runtime-role, and projection assertions.**
 - [x] **Step 4: Mark every completed checklist item only after fresh evidence exists.**
-- [ ] **Step 5: Commit, push `agent/grok-cli-runtime`, update Draft PR 1, wait for required CI, download its snapshot artifact, and verify all four archives.**
-- [ ] **Step 6: Keep the overall Vermory goal active for broader formation, hybrid retrieval, scale/fault qualification, sealed evaluation, signing, and final release acceptance.**
+- [x] **Step 5: Commit, push `agent/grok-cli-runtime`, update Draft PR 1, wait for required CI, download its snapshot artifact, and verify all four archives.**
+- [x] **Step 6: Keep the overall Vermory goal active for broader formation, hybrid retrieval, scale/fault qualification, sealed evaluation, signing, and final release acceptance.**
