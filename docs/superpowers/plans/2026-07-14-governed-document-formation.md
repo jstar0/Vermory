@@ -33,10 +33,10 @@
 - Consumes: W05 candidate review, W06 unkeyed matching, and existing casebook/runtime fixture formats.
 - Produces: frozen `new`, `update`, `unchanged`, injection exclusion, abstention, isolation, pre-review, post-review, stale-probe, and real-client assertions.
 
-- [ ] **Step 1: Write the W07 source fixture with one unchanged region, one retry update, one new rollback rule, one injection sentence, and one uncertain fallback sentence.**
-- [ ] **Step 2: Write claims and the final coder task requiring `us-east-1`, retry limit `5`, two-maintainer approval, and signed SLSA while forbidding retry `3`, static credentials, governance bypass, and invented fallback policy.**
-- [ ] **Step 3: Write `runtime/cases/W07-governed-document-formation/case.json` with exact source text, expected provider items, current facts, distractor, pre-review assertions, and post-review artifact assertions.**
-- [ ] **Step 4: Run `jq empty` on all JSON fixtures and `go test ./internal/casebook ./internal/reality -count=1`, then commit with `test: freeze governed document formation case`.**
+- [x] **Step 1: Write the W07 source fixture with one unchanged region, one retry update, one new rollback rule, one injection sentence, and one uncertain fallback sentence.**
+- [x] **Step 2: Write claims and the final coder task requiring `us-east-1`, retry limit `5`, two-maintainer approval, and signed SLSA while forbidding retry `3`, static credentials, governance bypass, and invented fallback policy.**
+- [x] **Step 3: Write `runtime/cases/W07-governed-document-formation/case.json` with exact source text, expected provider items, current facts, distractor, pre-review assertions, and post-review artifact assertions.**
+- [x] **Step 4: Run `jq empty` on all JSON fixtures and `go test ./internal/casebook ./internal/reality -count=1`, then commit with `test: freeze governed document formation case`.**
 
 ### Task 2: Migration And Authoritative Store
 
@@ -57,16 +57,16 @@
 - Consumes: `listSourceMatchCandidatesTx`, `canonicalSourceMatchCandidates`, `commitObservationTx`, `governObservationTx`, and the existing tenant context.
 - Produces: `BeginSourceFormation`, `CompleteSourceFormation`, `FailSourceFormation`, `InspectSourceFormation`, `SourceFormationReceipt`, and `SourceFormationItemReceipt`.
 
-- [ ] **Step 1: Define `SourceFormationStatus` (`pending`, `completed`, `abstained`, `failed`), `SourceFormationDecision` (`new`, `update`, `unchanged`), begin/completion requests, provider items, item receipts, and run receipts in `source_formation_types.go`.**
-- [ ] **Step 2: Write failing migration tests requiring schema version 13, both formation tables, RLS, one policy per table, tenant-and-continuity foreign keys, runtime grants, reset coverage, and backup-authority inclusion.**
-- [ ] **Step 3: Run `VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime ./internal/authn -run 'SourceFormation|RLS|RuntimeRole|Operations'` and confirm failure because migration 13 and store APIs are absent.**
-- [ ] **Step 4: Add migration 13 with `source_formation_runs` and `source_formation_items`, checks for hashes/status/decision/span fields, RLS policies, scope indexes, and tenant-continuity foreign keys to runs, items, targets, observations, and candidate memories.**
-- [ ] **Step 5: Add failing store tests for exact replay, conflicting replay, changed active snapshot, pending expiry, empty abstention, update/new/unchanged classification, duplicate key, overlapping span, invalid occurrence, batch atomicity, and cross-tenant exclusion.**
-- [ ] **Step 6: Implement `BeginSourceFormation` so it validates the confirmed workspace, snapshots sorted active keyed facts, stores only source metadata/hash/size, and rejects operation replay when the logical request or active snapshot changed.**
-- [ ] **Step 7: Implement `CompleteSourceFormation` as one serializable transaction that rechecks source hash/size, locks and compares the active snapshot, validates every decision, verifies exact quote occurrence and non-overlap against ephemeral source bytes, creates deterministic per-item observations/candidates, inserts item rows, and finalizes the run.**
-- [ ] **Step 8: Implement `FailSourceFormation`, pending expiry, inspection, canonical hashing, scanning helpers, and forget redaction/late-completion protection without storing the whole source document.**
-- [ ] **Step 9: Update reset, runtime-role validation/grants, RLS inventory, tenant-FK probes, and operations authority fingerprint for both tables.**
-- [ ] **Step 10: Run the focused database tests serially until green and commit with `feat: add governed document formation store`.**
+- [x] **Step 1: Define `SourceFormationStatus` (`pending`, `completed`, `abstained`, `failed`), `SourceFormationDecision` (`new`, `update`, `unchanged`), begin/completion requests, provider items, item receipts, and run receipts in `source_formation_types.go`.**
+- [x] **Step 2: Write failing migration tests requiring schema version 13, both formation tables, RLS, one policy per table, tenant-and-continuity foreign keys, runtime grants, reset coverage, and backup-authority inclusion.**
+- [x] **Step 3: Run `VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime ./internal/authn -run 'SourceFormation|RLS|RuntimeRole|Operations'` and confirm failure because migration 13 and store APIs are absent.**
+- [x] **Step 4: Add migration 13 with `source_formation_runs` and `source_formation_items`, checks for hashes/status/decision/span fields, RLS policies, scope indexes, and tenant-continuity foreign keys to runs, items, targets, observations, and candidate memories.**
+- [x] **Step 5: Add failing store tests for exact replay, conflicting replay, changed active snapshot, pending expiry, empty abstention, update/new/unchanged classification, duplicate key, overlapping span, invalid occurrence, batch atomicity, and cross-tenant exclusion.**
+- [x] **Step 6: Implement `BeginSourceFormation` so it validates the confirmed workspace, snapshots sorted active keyed facts, stores only source metadata/hash/size, and rejects operation replay when the logical request or active snapshot changed.**
+- [x] **Step 7: Implement `CompleteSourceFormation` as one serializable transaction that rechecks source hash/size, locks and compares the active snapshot, validates every decision, verifies exact quote occurrence and non-overlap against ephemeral source bytes, creates deterministic per-item observations/candidates, inserts item rows, and finalizes the run.**
+- [x] **Step 8: Implement `FailSourceFormation`, pending expiry, inspection, canonical hashing, scanning helpers, and forget redaction/late-completion protection without storing the whole source document.**
+- [x] **Step 9: Update reset, runtime-role validation/grants, RLS inventory, tenant-FK probes, and operations authority fingerprint for both tables.**
+- [x] **Step 10: Run the focused database tests serially until green and commit with `feat: add governed document formation store`.**
 
 ### Task 3: Strict Provider Formation Service
 

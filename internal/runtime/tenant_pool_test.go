@@ -168,6 +168,19 @@ func TestTenantPoolRejectsCrossTenantForeignKeys(t *testing.T) {
               )`,
 			args: []any{graphB.continuityID, graphBSecond.memoryID, graphB.observationID},
 		},
+		{
+			name: "source formation continuity",
+			sql: `INSERT INTO source_formation_runs (
+                tenant_id, continuity_id, operation_id, request_fingerprint,
+                source_ref, source_sha256, source_bytes, active_snapshot,
+                active_snapshot_fingerprint, provider_name, requested_model, status
+              ) VALUES (
+                'identity-b', $1::uuid, 'attack-source-formation', repeat('a', 64),
+                'fixture:attack', repeat('b', 64), 1, '[]'::jsonb,
+                repeat('c', 64), 'test-provider', 'test-model', 'pending'
+              )`,
+			args: []any{graphA.continuityID},
+		},
 	}
 	for _, attack := range attacks {
 		if _, err := runtimeStore.pool.Exec(tenantB, attack.sql, attack.args...); err == nil {
@@ -200,6 +213,15 @@ func TestRuntimeRoleValidationRejectsUnsafeIdentities(t *testing.T) {
 	}
 	if err := runtimeStore.ValidateRuntimeRole(ctx); err == nil {
 		t.Fatal("runtime identity without source_match_decisions access passed validation")
+	}
+	if err := authn.GrantRuntimeRole(ctx, admin.pool, runtimeRole); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.pool.Exec(ctx, "REVOKE ALL ON public.source_formation_items FROM "+pgx.Identifier{runtimeRole}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	if err := runtimeStore.ValidateRuntimeRole(ctx); err == nil {
+		t.Fatal("runtime identity without source_formation_items access passed validation")
 	}
 	if err := authn.GrantRuntimeRole(ctx, admin.pool, runtimeRole); err != nil {
 		t.Fatal(err)

@@ -127,12 +127,14 @@ func TestRuntimeRoleCanLookupButCannotReadAuthOrLegacyTables(t *testing.T) {
 	if err := GrantRuntimeRole(ctx, pool, roleName); err != nil {
 		t.Fatal(err)
 	}
-	var canUseSourceMatchAudit bool
-	if err := pool.QueryRow(ctx, `SELECT has_table_privilege($1, 'public.source_match_decisions', 'SELECT,INSERT,UPDATE,DELETE')`, roleName).Scan(&canUseSourceMatchAudit); err != nil {
-		t.Fatal(err)
-	}
-	if !canUseSourceMatchAudit {
-		t.Fatal("runtime role cannot use source_match_decisions")
+	for _, table := range []string{"source_match_decisions", "source_formation_runs", "source_formation_items"} {
+		var canUseAudit bool
+		if err := pool.QueryRow(ctx, `SELECT has_table_privilege($1, 'public.' || $2, 'SELECT,INSERT,UPDATE,DELETE')`, roleName, table).Scan(&canUseAudit); err != nil {
+			t.Fatal(err)
+		}
+		if !canUseAudit {
+			t.Fatalf("runtime role cannot use %s", table)
+		}
 	}
 
 	conn, err := pool.Acquire(ctx)

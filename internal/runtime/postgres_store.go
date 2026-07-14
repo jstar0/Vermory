@@ -145,7 +145,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 func (s *Store) ResetForTest(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 TRUNCATE vermory_auth.api_tokens,
-  source_match_decisions,
+  source_formation_items, source_formation_runs, source_match_decisions,
   conversation_links, bridge_memory_effects, bridge_events, bridge_operations,
   memory_search_documents, memory_deliveries, governed_memories,
   conversation_turns, observations, conversation_bindings, continuity_bindings, continuity_spaces CASCADE`)
@@ -213,7 +213,7 @@ WHERE rolname = current_user`).Scan(&canLogin, &superuser, &bypassRLS); err != n
 		"continuity_spaces", "continuity_bindings", "conversation_bindings", "observations",
 		"governed_memories", "memory_deliveries", "memory_search_documents", "conversation_turns",
 		"bridge_operations", "bridge_events", "bridge_memory_effects", "conversation_links",
-		"source_match_decisions",
+		"source_match_decisions", "source_formation_runs", "source_formation_items",
 	}
 	var ownedTables int
 	if err := s.pool.QueryRow(validationCtx, `
@@ -643,6 +643,9 @@ WHERE id = $1::uuid`, memoryID); err != nil {
 		return fmt.Errorf("remove deleted search document: %w", err)
 	}
 	if err := redactSourceMatchMemoryTx(ctx, tx, tenantID, continuityID, memoryID, memoryContent); err != nil {
+		return err
+	}
+	if err := redactSourceFormationMemoryTx(ctx, tx, tenantID, continuityID, memoryID); err != nil {
 		return err
 	}
 	if originObservationID != nil {
