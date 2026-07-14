@@ -138,6 +138,7 @@ func TestIdentityRLSMigrationEnablesEveryServedTenantTable(t *testing.T) {
 		"bridge_events",
 		"bridge_memory_effects",
 		"conversation_links",
+		"source_match_decisions",
 	}
 	for _, table := range tables {
 		var enabled bool
@@ -213,6 +214,10 @@ func TestIdentityRLSMigrationAddsTenantAwareForeignKeys(t *testing.T) {
 		"conversation_links_tenant_bridge_fk",
 		"conversation_links_tenant_primary_continuity_fk",
 		"conversation_links_tenant_linked_continuity_fk",
+		"source_match_decisions_tenant_continuity_fk",
+		"source_match_decisions_tenant_target_memory_fk",
+		"source_match_decisions_tenant_observation_fk",
+		"source_match_decisions_tenant_candidate_memory_fk",
 	}
 	for _, name := range constraints {
 		var validated bool

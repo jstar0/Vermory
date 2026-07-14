@@ -26,6 +26,7 @@ var servedTables = []string{
 	"bridge_events",
 	"bridge_memory_effects",
 	"conversation_links",
+	"source_match_decisions",
 }
 
 var forbiddenRuntimeTables = []string{

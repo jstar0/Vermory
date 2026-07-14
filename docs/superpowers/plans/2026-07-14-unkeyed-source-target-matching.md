@@ -52,13 +52,13 @@
 - Consumes: `commitObservationTx`, `governObservationTx`, tenant context, active keyed memory, and source candidate lifecycle.
 - Produces: `BeginSourceMatch`, `FinalizeSourceMatch`, `FailSourceMatch`, `InspectSourceMatch`, canonical candidate snapshots, and replay receipts.
 
-- [ ] **Step 1: Write failing migration tests for schema version 11, RLS, tenant-aware foreign keys, runtime grants, reset, and backup authority inventory.**
-- [ ] **Step 2: Run focused database tests and confirm they fail because migration 11 and store methods are absent.**
-- [ ] **Step 3: Add the minimum migration and store types for pending, matched, abstained, and failed decisions.**
-- [ ] **Step 4: Write failing store tests for exact replay, conflicting replay, closed-set validation, duplicate-key ambiguity, drift, unchanged content, and provider evidence isolation.**
-- [ ] **Step 5: Implement atomic finalization by reusing the existing source-candidate transaction helpers.**
-- [ ] **Step 6: Run focused store, RLS, authn, and operations tests serially until green.**
-- [ ] **Step 7: Commit the migration and store contract.**
+- [x] **Step 1: Write failing migration tests for schema version 11, RLS, tenant-aware foreign keys, runtime grants, reset, and backup authority inventory.**
+- [x] **Step 2: Run focused database tests and confirm they fail because migration 11 and store methods are absent.**
+- [x] **Step 3: Add the minimum migration and store types for pending, matched, abstained, and failed decisions.**
+- [x] **Step 4: Write failing store tests for exact replay, conflicting replay, closed-set validation, duplicate-key ambiguity, drift, unchanged content, and provider evidence isolation.**
+- [x] **Step 5: Implement atomic finalization by reusing the existing source-candidate transaction helpers.**
+- [x] **Step 6: Run focused store, RLS, authn, and operations tests serially until green.**
+- [x] **Step 7: Commit the migration and store contract.**
 
 ### Task 3: Matching Service And Strict Provider Output
 

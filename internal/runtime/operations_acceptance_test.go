@@ -49,8 +49,8 @@ func TestOperationsRecovery(t *testing.T) {
 		if err := admin.pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&schemaVersion); err != nil {
 			t.Fatal(err)
 		}
-		if schemaVersion != 10 {
-			t.Fatalf("expected schema version 10 after replay, got %d", schemaVersion)
+		if schemaVersion != 11 {
+			t.Fatalf("expected schema version 11 after replay, got %d", schemaVersion)
 		}
 
 		continuityID, activeContent, staleContent, deletedContent := seedOperationsProjection(t, admin.pool)
@@ -204,7 +204,7 @@ func TestOperationsRecovery(t *testing.T) {
 		if err := pool.QueryRow(context.Background(), `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&schemaVersion); err != nil {
 			t.Fatal(err)
 		}
-		if schemaVersion != 10 {
+		if schemaVersion != 11 {
 			t.Fatalf("release migration reached schema %d", schemaVersion)
 		}
 	})
@@ -324,6 +324,7 @@ WITH authoritative_rows AS (
   UNION ALL SELECT 'bridge_events', to_jsonb(row_data)::text FROM bridge_events row_data
   UNION ALL SELECT 'bridge_memory_effects', to_jsonb(row_data)::text FROM bridge_memory_effects row_data
   UNION ALL SELECT 'conversation_links', to_jsonb(row_data)::text FROM conversation_links row_data
+	UNION ALL SELECT 'source_match_decisions', to_jsonb(row_data)::text FROM source_match_decisions row_data
   UNION ALL SELECT 'api_tokens', to_jsonb(row_data)::text FROM vermory_auth.api_tokens row_data
 )
 SELECT md5(COALESCE(string_agg(table_name || ':' || row_data, E'\n' ORDER BY table_name, row_data), ''))
