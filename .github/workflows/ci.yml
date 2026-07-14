@@ -42,6 +42,20 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: integrations/openclaw/pnpm-lock.yaml
+      - name: Install PostgreSQL 18 client tools
+        run: |
+          sudo install -d -m 0755 /usr/share/postgresql-common/pgdg
+          curl --fail --silent --show-error \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc >/dev/null
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client-18
+          /usr/lib/postgresql/18/bin/pg_dump --version | grep -E '^pg_dump \(PostgreSQL\) 18\.'
+          /usr/lib/postgresql/18/bin/pg_restore --version | grep -E '^pg_restore \(PostgreSQL\) 18\.'
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
       - name: Test with PostgreSQL
         run: go test -p 1 -count=1 ./...
       - name: Runtime race tests
