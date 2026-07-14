@@ -131,8 +131,19 @@ func (s *Store) searchActiveVectorMemory(ctx context.Context, tenantID string, c
 	rows, err := s.pool.Query(ctx, `
 WITH candidates AS (
   SELECT document.memory_id, document.content_sha256,
-         document.embedding <=> $4::vector AS distance
+         document.embedding <=> $4::vector AS distance,
+         CASE origin.observation_kind
+           WHEN 'user_correction' THEN 4
+           WHEN 'user_confirmation' THEN 4
+           WHEN 'source_update' THEN 3
+           WHEN 'bridge_promote' THEN 2
+           ELSE 1
+         END AS authority_rank
   FROM memory_vector_documents document
+  JOIN governed_memories memory
+    ON memory.tenant_id = $2 AND memory.id = document.memory_id
+  JOIN observations origin
+    ON origin.tenant_id = $2 AND origin.id = memory.origin_observation_id
   WHERE document.profile_id = $1
     AND document.tenant_id = $2
     AND document.continuity_id = ANY($3::uuid[])
@@ -148,7 +159,7 @@ WHERE memory.continuity_id = ANY($3::uuid[])
   AND memory.lifecycle_status = 'active'
   AND memory.content <> '[redacted]'
   AND encode(digest(convert_to(memory.content, 'UTF8'), 'sha256'), 'hex') = candidate.content_sha256
-ORDER BY candidate.distance, memory.id
+ORDER BY candidate.distance, candidate.authority_rank DESC, memory.id
 LIMIT $6`, profileID, tenantID, continuityIDs, retrievalVectorLiteral(queryVector), candidateLimit, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search active vector memory: %w", err)
