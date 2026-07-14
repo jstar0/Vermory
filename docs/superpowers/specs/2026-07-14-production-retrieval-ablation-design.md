@@ -145,8 +145,9 @@ but cannot become delivered context.
 
 ### Hybrid RRF
 
-Hybrid requests up to `max(20, limit * 4)` candidates from each condition,
-capped at 100. It deduplicates by governed memory ID and computes:
+Hybrid requests the production lexical maximum of 12 candidates and requests
+`max(20, limit * 4)` vector candidates capped at 100. It deduplicates by
+governed memory ID and computes:
 
 ```text
 rrf_score = 1 / (60 + lexical_rank) + 1 / (60 + vector_rank)

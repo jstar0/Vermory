@@ -221,7 +221,8 @@ For each query:
 
 1. resolve logical scope to real tenant and continuity IDs;
 2. call production lexical search;
-3. call vector search with `max(20, limit*4)` candidates capped at 100;
+3. retain the production lexical maximum of 12 candidates and call vector
+   search with `max(20, limit*4)` candidates capped at 100;
 4. map memory IDs back to corpus record IDs;
 5. recheck every vector result against current active governed memories;
 6. score lexical, eligible vector, and hybrid outputs;
