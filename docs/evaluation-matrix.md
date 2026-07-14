@@ -313,11 +313,36 @@ the optional `dimensions` request field, and an ANN index containing filtered
 non-active rows changed results after active-only rebuild. Both defects were
 fixed before the final run.
 
-The result supports a later active-only pgvector production integration slice.
-It does not establish an RRF benefit: vector and hybrid quality were identical,
+The result supports an active-only pgvector production integration slice. It
+does not establish an RRF benefit: vector and hybrid quality were identical,
 and hybrid added latency. H-009 is therefore `testing/measured`, not accepted as
 the product default. See
 [the scoped evidence](evidence/2026-07-14-production-retrieval-ablation.md).
+
+## Production Retrieval Runtime
+
+W09 connects the frozen direct SiliconFlow `BAAI/bge-m3` profile to the real
+workspace MCP, conversation Web Chat, and authenticated runtime construction
+paths while retaining lexical as the default. PostgreSQL projection events,
+cursors, active-only vectors, and non-sensitive retrieval audits are durable;
+the worker runs under a fixed tenant and restricted PostgreSQL role.
+
+| Runtime gate | Result |
+|---|---|
+| Real Grok MCP vector consumption and proposed writeback | PASS |
+| Real Grok Web Chat linked-conversation answer | PASS after recorded cursor catch-up |
+| Shadow delivery byte equality with lexical | PASS |
+| Projection-lag degradation | `vector -> lexical / projection_lag` |
+| Provider-outage degradation | `vector -> lexical / embedding_unavailable` |
+| Vector reset/rebuild result IDs and authority | unchanged |
+| Restricted-role no-context and cross-tenant probes | PASS |
+| Native dump/restore and restore-side rebuild | PASS |
+| New credential-shaped artifacts | 0 |
+
+This is `production_path_integrated`, not `accepted_default`. H-009 remains
+`testing` pending a second independent retrieval batch, threshold review,
+source-authority ranking, embedding migration, and scale/fault qualification.
+See [the scoped evidence](evidence/2026-07-14-production-retrieval-runtime.md).
 
 ## LongMemEval Original Sample
 

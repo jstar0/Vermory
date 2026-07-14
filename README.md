@@ -59,7 +59,7 @@ Experiment 0 is complete. It provides:
 - nine frozen public cases covering workspace continuity, conversation continuity, Global Defaults, deletion, source injection, durable bridges, OpenClaw everyday-use continuity, authenticated multi-tenant RLS, and PostgreSQL operations recovery;
 - JSON and Markdown Experiment 0 reports.
 
-The repository also contains production-shaped runtime slices for workspace and conversation continuity, Global Defaults, durable bridges, explicit source-authoritative revision, governed keyed source candidates, provider-assisted closed-set matching for unkeyed trusted source facts, bounded multi-fact formation from trusted documents, the OpenClaw external-turn lifecycle, an authenticated multi-tenant HTTP profile, native PostgreSQL recovery, and a qualified original LongMemEval oracle sample. A source candidate can be proposed without changing current AI context, rejected without changing the active fact, or accepted to atomically replace the still-current keyed target. When a trusted source lacks an internal key, a provider may select exactly one key from the current same-scope closed set or abstain. For one bounded trusted document, a provider may also propose up to sixteen exact-span `new`, `update`, or `unchanged` items; Vermory validates the entire frozen batch and still requires operator acceptance for every new or changed fact. A real Grok MCP task consumed only accepted facts after projection rebuild and wrote its result back as proposed. The authenticated profile uses server-issued digest-only tokens, role-gated routes, a non-owner PostgreSQL runtime identity, tenant-aware foreign keys, and RLS on the served continuity graph. Recovery evidence covers migration replay, native dump/restore, projection rebuild, runtime-role re-provisioning, and bounded database outage recovery. Pull-request CI starts PostgreSQL 18 and automatically runs the database-backed Go suite, runtime race gates, release build, and the OpenClaw install/check/package chain on a clean Ubuntu runner. The LongMemEval evidence runs six official records through no-context, full-history, plain-retrieval, and production Vermory-packet conditions with a real Grok reader; it is reported as `dataset_sample`, not a full benchmark score. Each evidence document is scoped to the exact client, model, failure mode, and deterministic hard gates it executed; no individual slice is treated as proof that the complete platform is finished.
+The repository also contains production-shaped runtime slices for workspace and conversation continuity, Global Defaults, durable bridges, explicit source-authoritative revision, governed keyed source candidates, provider-assisted closed-set matching for unkeyed trusted source facts, bounded multi-fact formation from trusted documents, the OpenClaw external-turn lifecycle, an authenticated multi-tenant HTTP profile, native PostgreSQL recovery, an opt-in active-only pgvector runtime, and a qualified original LongMemEval oracle sample. A source candidate can be proposed without changing current AI context, rejected without changing the active fact, or accepted to atomically replace the still-current keyed target. When a trusted source lacks an internal key, a provider may select exactly one key from the current same-scope closed set or abstain. For one bounded trusted document, a provider may also propose up to sixteen exact-span `new`, `update`, or `unchanged` items; Vermory validates the entire frozen batch and still requires operator acceptance for every new or changed fact. A real Grok MCP task consumed only accepted facts after projection rebuild and wrote its result back as proposed. The production retrieval path uses durable PostgreSQL projection events, a fixed-tenant restricted worker, direct SiliconFlow `BAAI/bge-m3`, explicit lexical/shadow/vector modes, and exact lexical degradation for projection lag or provider outage; lexical remains the default. The authenticated profile uses server-issued digest-only tokens, role-gated routes, a non-owner PostgreSQL runtime identity, tenant-aware foreign keys, and RLS on the served continuity graph. Recovery evidence covers migration replay, native dump/restore, projection rebuild, runtime-role re-provisioning, and bounded database outage recovery. Pull-request CI starts PostgreSQL 18 and automatically runs the database-backed Go suite, runtime race gates, release build, and the OpenClaw install/check/package chain on a clean Ubuntu runner. The LongMemEval evidence runs six official records through no-context, full-history, plain-retrieval, and production Vermory-packet conditions with a real Grok reader; it is reported as `dataset_sample`, not a full benchmark score. Each evidence document is scoped to the exact client, model, failure mode, and deterministic hard gates it executed; no individual slice is treated as proof that the complete platform is finished.
 
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
@@ -224,6 +224,33 @@ numeric, and semantic cohorts while preserving exact identifiers and zero
 scope/lifecycle violations. The measured RRF strategy did not improve over
 vector retrieval and is not the product default. See
 [Production Retrieval Ablation Evidence](docs/evidence/2026-07-14-production-retrieval-ablation.md).
+
+## Production Retrieval Runtime
+
+The W09 runtime exposes the measured active-only pgvector path to workspace
+MCP, local Web Chat, and the authenticated API through explicit `shadow` or
+`vector` mode. A fixed-tenant worker consumes durable PostgreSQL projection
+events; vector documents and retrieval audits remain disposable while governed
+memory stays authoritative.
+
+```bash
+vermory retrieval-worker --once \
+  --database-url "$VERMORY_RUNTIME_DATABASE_URL" \
+  --tenant-id local \
+  --profile-id siliconflow-bge-m3-1024-v1
+
+vermory mcp-stdio \
+  --database-url "$VERMORY_DATABASE_URL" \
+  --tenant-id local \
+  --retrieval-mode vector
+```
+
+The real W09 replay covers Grok MCP consumption and proposed writeback, a
+linked-conversation Web Chat answer, shadow byte parity, cursor-lag and HTTP 503
+fallback, vector reset/rebuild, restricted-role RLS, native dump/restore, and
+restore-side rebuild. This is an opt-in production path, not a default switch
+or scale qualification. See
+[Production Retrieval Runtime Evidence](docs/evidence/2026-07-14-production-retrieval-runtime.md).
 
 See [CI Release Gates Evidence](docs/evidence/2026-07-14-ci-release-gates.md)
 for the clean-runner PostgreSQL, race, release-build, and OpenClaw pull-request

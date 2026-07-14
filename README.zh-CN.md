@@ -105,6 +105,20 @@ go run ./cmd/vermory experiment-0 \
 
 当可信来源只有精确事实与 revision、没有 Vermory 内部 key 时，`memory match-source` 会让已配置 provider 只从当前 workspace 的闭集 key 中选择一个目标或 abstain。provider 不能创造 authority、跨 scope 或直接激活 memory；合法匹配只会形成原有的可审查 source candidate。[无 key 来源目标匹配运行实证](docs/evidence/2026-07-14-unkeyed-source-target-matching-runtime.md)记录了真实 Grok matched/abstained、proposal 隔离、显式接受、RLS 审计、投影重建、stale probes 与真实 MCP coder 回写。该能力是闭集匹配，不是任意文档抽取。
 
+## 生产检索运行线
+
+W09 把 active-only PostgreSQL/pgvector 检索接到了真实 workspace MCP、Web
+Chat 和 authenticated API。固定租户的受限 worker 消费 durable projection
+events；`shadow` 和 `vector` 必须显式启用，默认仍是 lexical。projection
+lag 或 embedding provider 故障时，运行时按原 ID 与顺序退回 lexical，不能
+影响 PostgreSQL authority。
+
+真实回放覆盖了 Grok MCP 语义事实与技术标识消费、proposed 回写、链接会话
+Web Chat、shadow 字节等价、cursor lag、HTTP 503、vector 清空重建、RLS、
+原生 dump/restore 和恢复库重建。该结果只表示 `production_path_integrated`，
+不表示已经切换默认检索，也不表示完成规模、embedding migration 或最终发布
+验收。详见[生产检索运行实证](docs/evidence/2026-07-14-production-retrieval-runtime.md)。
+
 ## 发布产物
 
 每个 Pull Request 都会生成保留 7 天的可下载 snapshot，包括带 SHA-256 校验的 `linux/amd64`、`linux/arm64`、`darwin/amd64`、`darwin/arm64` 归档，以及独立的 `@vermory/openclaw` 包。每个 Go 归档固定包含 `vermory`、`LICENSE`、`README.md` 和 `README.zh-CN.md`。

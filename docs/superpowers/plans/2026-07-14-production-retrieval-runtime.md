@@ -439,32 +439,32 @@ git commit -m "test: freeze production retrieval runtime cases"
 - Consumes: isolated release binary, dedicated PostgreSQL database, restricted runtime role, direct SiliconFlow embeddings, logged-in Grok CLI, frozen W09 cases.
 - Produces: one real projection lifecycle, workspace MCP consumption/writeback, conversation consumption, outage/fallback, rebuild, RLS, and recovery evidence set without changing the default.
 
-- [ ] **Step 1: Build an isolated binary, create a dedicated database, migrate to schema 14, provision a non-owner runtime role, and record only safe versions, hashes, counts, and role boundaries.**
+- [x] **Step 1: Build an isolated binary, create a dedicated database, migrate to schema 14, provision a non-owner runtime role, and record only safe versions, hashes, counts, and role boundaries.**
 
-- [ ] **Step 2: Seed W09 through runtime/operator APIs, run the fixed-tenant worker with direct SiliconFlow `BAAI/bge-m3`, and verify cursor current plus active-only row equality.**
+- [x] **Step 2: Seed W09 through runtime/operator APIs, run the fixed-tenant worker with direct SiliconFlow `BAAI/bge-m3`, and verify cursor current plus active-only row equality.**
 
 The key is supplied through terminal-echo-disabled stdin into a transient
 environment variable. It must never appear in history, files, arguments, or
 artifacts.
 
-- [ ] **Step 3: Run one logged-in Grok MCP workspace task in explicit vector mode.**
+- [x] **Step 3: Run one logged-in Grok MCP workspace task in explicit vector mode.**
 
 Require Grok to call `prepare_context`, consume the Chinese semantic fact plus
 exact technical facts, create and deterministically verify one artifact, and
 call `commit_observation`. Validate the persisted delivery and proposed
 writeback rather than trusting model self-report.
 
-- [ ] **Step 4: Run one real conversation turn and one shadow turn.**
+- [x] **Step 4: Run one real conversation turn and one shadow turn.**
 
 The vector turn must consume the accepted linked-conversation fact. The shadow
 turn must persist a context byte-identical to lexical while the audit contains
 both lexical and vector IDs.
 
-- [ ] **Step 5: Stop the worker, commit a correction, prove cursor-lag fallback, catch up, force HTTP 503 fallback, then delete/rebuild vector rows and require result-ID equivalence plus unchanged authority fingerprint.**
+- [x] **Step 5: Stop the worker, commit a correction, prove cursor-lag fallback, catch up, force HTTP 503 fallback, then delete/rebuild vector rows and require result-ID equivalence plus unchanged authority fingerprint.**
 
-- [ ] **Step 6: Run restricted-role filter-omission and cross-tenant probes, native dump/restore, post-restore vector rebuild, and credential-shaped scans.**
+- [x] **Step 6: Run restricted-role filter-omission and cross-tenant probes, native dump/restore, post-restore vector rebuild, and credential-shaped scans.**
 
-- [ ] **Step 7: Commit normalized JSON/Markdown evidence and update H-009 only to the state justified by W09.**
+- [x] **Step 7: Commit normalized JSON/Markdown evidence and update H-009 only to the state justified by W09.**
 
 H-009 remains `testing` until a second independent retrieval batch and threshold
 review. The evidence may state `production_path_integrated` but must not state
