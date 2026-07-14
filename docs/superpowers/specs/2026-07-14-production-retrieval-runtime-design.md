@@ -134,6 +134,7 @@ One durable audit row per runtime retrieval operation:
 ```text
 id                    uuid
 tenant_id             text
+primary_continuity_id uuid
 continuity_ids        uuid[]
 operation_id          text
 request_fingerprint   text
@@ -153,9 +154,12 @@ created_at            timestamptz
 unique (tenant_id, operation_id)
 ```
 
-The row stores no raw query, context, memory content, provider output, headers,
-database URL, or API key. Replaying the same operation ID requires the same
-request fingerprint. A conflicting replay fails.
+The primary continuity has a tenant-aware foreign key. The full linked set is
+stored for evidence and is recomputed from current bridge authority before
+search; PostgreSQL arrays are not treated as a substitute for relational
+authorization. The row stores no raw query, context, memory content, provider
+output, headers, database URL, or API key. Replaying the same operation ID
+requires the same request fingerprint. A conflicting replay fails.
 
 ## Projection Event Contract
 
@@ -326,8 +330,10 @@ ready.
 ## RLS And Role Boundary
 
 All four W09 tables enable RLS with the existing `vermory.tenant_id` policy.
-Tenant-aware foreign keys reject cross-tenant memory, continuity, vector, event,
-cursor, and audit references.
+Tenant-aware foreign keys reject cross-tenant memory, primary continuity,
+vector, event, and audit references. Cursor rows are tenant-scoped by RLS and
+their composite tenant/profile primary key. Linked audit continuity IDs are
+recomputed and validated against bridge authority before retrieval.
 
 `database grant-runtime` and `ValidateRuntimeRole` include the W09 tables. The
 restricted runtime role must not own them, bypass RLS, access auth token
