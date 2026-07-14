@@ -36,9 +36,9 @@ conditions over the same governed authority.
 
 | Field | Value |
 |---|---|
-| Run | `w10-siliconflow-bge-m3-20260715-v4` |
-| Implementation | `af2be483b01eae3990868d5132a47f464d7388e8` |
-| PostgreSQL schema | `14` |
+| Run | `w10-siliconflow-bge-m3-20260715-v5` |
+| Implementation | `0526ef34f243ad330654b6fb6b65a318c182ad82` |
+| PostgreSQL schema | `15` |
 | Embedding endpoint | `https://api.siliconflow.cn/v1` |
 | Embedding model | `BAAI/bge-m3` |
 | Dimensions | `1024` |
@@ -51,9 +51,9 @@ conditions over the same governed authority.
 
 | Condition | Hit@1 | Recall@K | MRR | nDCG@K | P95 | Forbidden | Ineligible |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `lexical_runtime` | 0.7222 | 0.7593 | 0.7500 | 0.7353 | 1.133 ms | 0 | 0 |
-| `vector_pg` | 1.0000 | 1.0000 | 1.0000 | 0.9919 | 125.291 ms | 0 | 0 |
-| `hybrid_rrf` | 1.0000 | 1.0000 | 1.0000 | 0.9908 | 125.620 ms | 0 | 0 |
+| `lexical_runtime` | 0.7222 | 0.7593 | 0.7500 | 0.7353 | 3.894 ms | 0 | 0 |
+| `vector_pg` | 1.0000 | 1.0000 | 1.0000 | 0.9919 | 154.697 ms | 0 | 0 |
+| `hybrid_rrf` | 1.0000 | 1.0000 | 1.0000 | 0.9908 | 154.953 ms | 0 | 0 |
 
 All hard gates passed. The vector projection was rebuilt from authoritative
 records and produced equivalent result IDs. A second invocation with the same
