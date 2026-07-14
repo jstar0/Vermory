@@ -213,7 +213,7 @@ Use deterministic operation IDs derived from run ID plus record ID. Vector recor
 
 If existing `RebuildScope` ordering is unstable, sort records by ID before embedding and insertion. Do not add lifecycle or authority semantics beyond the existing `Record.Status` filter.
 
-- [ ] **Step 5: Write failing runner tests for all three conditions, vector eligibility recheck, exact lexical fallback on vector error, completed-query preservation after another query fails, exact replay, conflicting replay, and projection reset/rebuild result equivalence.**
+- [ ] **Step 5: Write failing runner tests for all three conditions, vector eligibility recheck, exact lexical fallback on vector error, completed-query preservation after another query fails, and projection reset/rebuild result equivalence.**
 
 - [ ] **Step 6: Implement the runner.**
 
@@ -251,7 +251,7 @@ git commit -m "feat: run governed retrieval ablations"
 - Consumes: Task 3 `Run` and `Report`.
 - Produces: `vermory retrieval-ablation`, `report.json`, and `report.md`.
 
-- [ ] **Step 1: Write failing report tests that require deterministic JSON and Markdown, canonical condition/cohort ordering, corpus hash, implementation revision, schema version, authority fingerprint, embedding profile, engine version, every query trace, hard-gate status, failures, and non-claims.**
+- [ ] **Step 1: Write failing report tests that require deterministic JSON and Markdown, canonical condition/cohort ordering, corpus hash, implementation revision, schema version, authority fingerprint, embedding profile, engine version, every query trace, hard-gate status, failures, non-claims, exact artifact replay, and conflicting replay rejection without reseeding deleted content.**
 
 - [ ] **Step 2: Implement `WriteReport(outputDir string, report Report) (map[string]string, error)` using atomic temporary files followed by rename.**
 
