@@ -2,7 +2,13 @@ package retrievalablation
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -22,6 +28,85 @@ type Options struct {
 	EmbeddingModel         string
 	EmbeddingDimensions    int
 	ImplementationRevision string
+	SchemaVersion          int64
+}
+
+func Run(ctx context.Context, options Options) (Report, error) {
+	if err := validateRunOptions(options); err != nil {
+		return Report{}, err
+	}
+	corpus, err := LoadCorpus(options.CorpusPath)
+	if err != nil {
+		return Report{}, err
+	}
+	repositoryRoot, err := findRepositoryRoot(options.CorpusPath)
+	if err != nil {
+		return Report{}, err
+	}
+	if err := ValidateCorpus(repositoryRoot, corpus); err != nil {
+		return Report{}, err
+	}
+	store, err := runtime.OpenStore(ctx, options.DatabaseURL)
+	if err != nil {
+		return Report{}, err
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx); err != nil {
+		return Report{}, err
+	}
+	schemaVersion, err := store.SchemaVersion(ctx)
+	if err != nil {
+		return Report{}, err
+	}
+	backend, cleanup, err := memorybackend.OpenBackend(ctx, memorybackend.OpenConfig{
+		Name: "native", DatabaseURL: options.DatabaseURL,
+		EmbeddingBaseURL: options.EmbeddingBaseURL, EmbeddingAPIKey: options.EmbeddingAPIKey,
+		EmbeddingModel: options.EmbeddingModel, Dimensions: options.EmbeddingDimensions,
+		HTTPClient: &http.Client{Timeout: 2 * time.Minute},
+	})
+	if err != nil {
+		return Report{}, err
+	}
+	defer cleanup()
+	options.Corpus = corpus
+	options.RepositoryRoot = repositoryRoot
+	options.SchemaVersion = schemaVersion
+	return RunWithDependencies(ctx, options, store, backend)
+}
+
+func validateRunOptions(options Options) error {
+	if strings.TrimSpace(options.DatabaseURL) == "" {
+		return fmt.Errorf("database URL is required")
+	}
+	if strings.TrimSpace(options.CorpusPath) == "" {
+		return fmt.Errorf("corpus path is required")
+	}
+	if strings.TrimSpace(options.RunID) == "" {
+		return fmt.Errorf("run_id is required")
+	}
+	if strings.TrimSpace(options.EmbeddingBaseURL) == "" {
+		return fmt.Errorf("embedding base URL is required")
+	}
+	parsedBaseURL, err := url.Parse(options.EmbeddingBaseURL)
+	if err != nil || (parsedBaseURL.Scheme != "http" && parsedBaseURL.Scheme != "https") || parsedBaseURL.Host == "" {
+		return fmt.Errorf("embedding base URL must be an absolute HTTP(S) URL")
+	}
+	if parsedBaseURL.User != nil || parsedBaseURL.RawQuery != "" || parsedBaseURL.Fragment != "" {
+		return fmt.Errorf("embedding base URL must not include credentials, query, or fragment")
+	}
+	if strings.TrimSpace(options.EmbeddingAPIKey) == "" {
+		return fmt.Errorf("embedding API key is required")
+	}
+	if strings.TrimSpace(options.EmbeddingModel) == "" {
+		return fmt.Errorf("embedding model is required")
+	}
+	if options.EmbeddingDimensions <= 0 || options.EmbeddingDimensions > 4096 {
+		return fmt.Errorf("embedding dimensions must be between 1 and 4096")
+	}
+	if strings.TrimSpace(options.ImplementationRevision) == "" {
+		return fmt.Errorf("implementation revision is required")
+	}
+	return nil
 }
 
 func RunWithDependencies(
@@ -30,6 +115,7 @@ func RunWithDependencies(
 	store *runtime.Store,
 	backend memorybackend.Backend,
 ) (Report, error) {
+	started := time.Now().UTC()
 	if strings.TrimSpace(options.RunID) == "" {
 		return Report{}, fmt.Errorf("run_id is required")
 	}
@@ -52,9 +138,27 @@ func RunWithDependencies(
 	if err != nil {
 		return Report{}, err
 	}
+	authorityFingerprint, err := authorityFingerprint(ctx, store, seeded)
+	if err != nil {
+		return Report{}, err
+	}
+	implementationRevision := strings.TrimSpace(options.ImplementationRevision)
+	if implementationRevision == "" {
+		implementationRevision = "unknown"
+	}
 	report := Report{
-		RunID:                       options.RunID,
-		CorpusSHA256:                corpusHash,
+		RunID:                  options.RunID,
+		CorpusSHA256:           corpusHash,
+		ImplementationRevision: implementationRevision,
+		EngineVersion:          "rrf-v1",
+		SchemaVersion:          options.SchemaVersion,
+		AuthorityFingerprint:   authorityFingerprint,
+		Embedding: EmbeddingProfile{
+			BaseURL:    strings.TrimSpace(options.EmbeddingBaseURL),
+			Model:      strings.TrimSpace(options.EmbeddingModel),
+			Dimensions: options.EmbeddingDimensions,
+		},
+		StartedAt:                   started,
 		Conditions:                  conditions,
 		ProjectionRebuildEquivalent: rebuildEquivalent,
 		Failures:                    failures,
@@ -64,6 +168,19 @@ func RunWithDependencies(
 		report.HardGates.IneligibleCount += condition.Metrics.IneligibleCount
 	}
 	report.HardGates.Pass = report.HardGates.IneligibleCount == 0 && rebuildEquivalent
+	if report.HardGates.Pass {
+		report.QualificationStatus = "measured"
+	} else {
+		report.QualificationStatus = "hard_gate_failed"
+	}
+	report.NonClaims = []string{
+		"not a sealed result",
+		"not a production default switch",
+		"not a source-authority ranking result",
+		"not a scale qualification",
+	}
+	report.Duration = time.Since(started)
+	report.RequestFingerprint = ReportRequestFingerprint(report)
 	return report, nil
 }
 
@@ -269,4 +386,49 @@ func recordIDs(results []RankedResult) []string {
 		ids[index] = result.RecordID
 	}
 	return ids
+}
+
+func findRepositoryRoot(corpusPath string) (string, error) {
+	absolutePath, err := filepath.Abs(corpusPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve corpus path: %w", err)
+	}
+	current := filepath.Dir(absolutePath)
+	for {
+		casebook := filepath.Join(current, "casebook", "cases")
+		if info, err := os.Stat(casebook); err == nil && info.IsDir() {
+			return current, nil
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+	return "", fmt.Errorf("corpus path is not inside a Vermory repository with casebook/cases")
+}
+
+func authorityFingerprint(ctx context.Context, store *runtime.Store, seeded SeededCorpus) (string, error) {
+	scopeIDs := make([]string, 0, len(seeded.Scopes))
+	for scopeID := range seeded.Scopes {
+		scopeIDs = append(scopeIDs, scopeID)
+	}
+	sort.Strings(scopeIDs)
+	lines := make([]string, 0, len(seeded.Records))
+	for _, scopeID := range scopeIDs {
+		scope := seeded.Scopes[scopeID]
+		memories, err := store.ListGovernedMemories(ctx, scope.TenantID, scope.ContinuityID)
+		if err != nil {
+			return "", fmt.Errorf("fingerprint authority scope %q: %w", scopeID, err)
+		}
+		for _, memory := range memories {
+			lines = append(lines, strings.Join([]string{
+				scope.TenantID, scope.ContinuityID, memory.ID, memory.MemoryKey,
+				memory.LifecycleStatus, memory.Content, memory.SupersedesMemoryID,
+			}, "\x1f"))
+		}
+	}
+	sort.Strings(lines)
+	digest := sha256.Sum256([]byte(strings.Join(lines, "\n")))
+	return hex.EncodeToString(digest[:]), nil
 }

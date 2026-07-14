@@ -73,9 +73,30 @@ type RunFailure struct {
 
 type Report struct {
 	RunID                       string            `json:"run_id"`
+	RequestFingerprint          string            `json:"request_fingerprint"`
 	CorpusSHA256                string            `json:"corpus_sha256"`
+	ImplementationRevision      string            `json:"implementation_revision"`
+	EngineVersion               string            `json:"engine_version"`
+	SchemaVersion               int64             `json:"schema_version"`
+	AuthorityFingerprint        string            `json:"authority_fingerprint"`
+	Embedding                   EmbeddingProfile  `json:"embedding"`
+	StartedAt                   time.Time         `json:"started_at"`
+	Duration                    time.Duration     `json:"duration"`
 	Conditions                  []ConditionReport `json:"conditions"`
 	HardGates                   HardGateReport    `json:"hard_gates"`
 	ProjectionRebuildEquivalent bool              `json:"projection_rebuild_equivalent"`
+	QualificationStatus         string            `json:"qualification_status"`
 	Failures                    []RunFailure      `json:"failures,omitempty"`
+	NonClaims                   []string          `json:"non_claims"`
+}
+
+type EmbeddingProfile struct {
+	BaseURL    string `json:"base_url"`
+	Model      string `json:"model"`
+	Dimensions int    `json:"dimensions"`
+}
+
+type ArtifactPaths struct {
+	JSON     string `json:"json"`
+	Markdown string `json:"markdown"`
 }

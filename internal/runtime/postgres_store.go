@@ -142,6 +142,14 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return goose.UpContext(ctx, db, "migrations")
 }
 
+func (s *Store) SchemaVersion(ctx context.Context) (int64, error) {
+	var version int64
+	if err := s.pool.QueryRow(ctx, `SELECT COALESCE(max(version_id) FILTER (WHERE is_applied), 0) FROM goose_db_version`).Scan(&version); err != nil {
+		return 0, fmt.Errorf("read schema version: %w", err)
+	}
+	return version, nil
+}
+
 func (s *Store) ResetForTest(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 TRUNCATE vermory_auth.api_tokens,

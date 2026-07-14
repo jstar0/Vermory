@@ -98,6 +98,7 @@ func newRootCommand() *cobra.Command {
 	rootCmd.AddCommand(newWebChatCommand())
 	rootCmd.AddCommand(newServeCommand())
 	rootCmd.AddCommand(newBenchmarkLongMemEvalCommand())
+	rootCmd.AddCommand(newRetrievalAblationCommand())
 
 	mcpStdioCmd := &cobra.Command{
 		Use:   "mcp-stdio",

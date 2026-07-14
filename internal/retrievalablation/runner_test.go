@@ -22,6 +22,9 @@ func TestRunWithDependenciesExecutesAllConditionsAndRebuild(t *testing.T) {
 	if !report.HardGates.Pass || !report.ProjectionRebuildEquivalent {
 		t.Fatalf("runner gates mismatch: %#v", report)
 	}
+	if len(report.AuthorityFingerprint) != 64 || report.EngineVersion != "rrf-v1" || report.QualificationStatus != "measured" || report.RequestFingerprint != ReportRequestFingerprint(report) {
+		t.Fatalf("runner identity mismatch: %#v", report)
+	}
 	for _, condition := range []string{ConditionLexical, ConditionVector, ConditionHybrid} {
 		got := conditionReport(t, report, condition)
 		if len(got.Queries) != 1 || got.Queries[0].Metrics.RecallAtK != 1 || got.Queries[0].Results[0].RecordID != "current" {
