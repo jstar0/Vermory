@@ -11,6 +11,12 @@ English, mixed-language, exact identifier, path, date, duration, numeric,
 multi-fact, and continuity-isolation queries. Every record points to an
 existing public casebook source for provenance.
 
+`forbidden_record_ids` is reserved for zero-tolerance violations: a different
+scope or tenant, an ineligible lifecycle state, a deleted marker, or a fact
+explicitly excluded by the task. Ordinary same-scope distractors remain
+unforbidden so that ranking quality is measured by Recall, MRR, and nDCG
+instead of incorrectly treating every extra candidate as a safety violation.
+
 The runner must seed the records through Vermory's authoritative runtime and
 must use the direct SiliconFlow OpenAI-compatible embedding endpoint:
 
