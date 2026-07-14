@@ -488,7 +488,7 @@ git commit -m "docs: record production retrieval runtime evidence"
 - Consumes: all W09 implementation and evidence.
 - Produces: green local/protected-CI gates, verified release artifact, clean commits, and an updated Draft PR while the overall Vermory goal remains active.
 
-- [ ] **Step 1: Run the complete serial PostgreSQL suite, selected runtime/new-package race suite, reality race, vet, tidy, module diff, and diff check.**
+- [x] **Step 1: Run the complete serial PostgreSQL suite, selected runtime/new-package race suite, reality race, vet, tidy, module diff, and diff check.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
@@ -503,9 +503,9 @@ git diff --exit-code -- go.mod go.sum
 git diff --check
 ```
 
-- [ ] **Step 2: Run Actionlint, GoReleaser check and four-platform snapshot/checksums, downloaded host archive execution, OpenClaw tests/typecheck/build/package, schema-14 replay, RLS/runtime-role checks, native backup/restore, and zero-match credential scan.**
+- [x] **Step 2: Run Actionlint, GoReleaser check and four-platform snapshot/checksums, downloaded host archive execution, OpenClaw tests/typecheck/build/package, schema-14 replay, RLS/runtime-role checks, native backup/restore, and zero-match credential scan.**
 
-- [ ] **Step 3: Remove every dedicated database, temporary role, provider transcript containing headers, isolated HOME, downloaded artifact, local `dist/`, and temporary release host after normalized evidence is committed.**
+- [x] **Step 3: Remove every dedicated database, temporary role, provider transcript containing headers, isolated HOME, downloaded artifact, local `dist/`, and temporary release host after normalized evidence is committed.**
 
 - [ ] **Step 4: Mark the checklist from fresh evidence, push `agent/grok-cli-runtime`, wait for protected CI, and independently verify the final artifact digest, four archive checksums/layouts, OpenClaw package, and darwin/arm64 execution.**
 
