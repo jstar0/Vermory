@@ -15,7 +15,8 @@
     "evaluation_level": "executable_evaluation",
     "execution_mode": "casebook_translated_proxy",
     "case_ids": ["001-contextmesh-bluebridge-preparation", "102-workspace-rebind-relocation"],
-    "notes": "Maps update-over-stale-context pressure to workspace continuity and rebind cases."
+    "original_execution_evidence": ["docs/evidence/snapshots/2026-07-14-longmemeval-original-sample-execution.json"],
+    "notes": "Maps update-over-stale-context pressure to workspace continuity and rebind cases. The separately registered original execution is a six-record oracle sample with claim_scope=dataset_sample, not a full benchmark score."
   },
   {
     "benchmark": "MemBench",

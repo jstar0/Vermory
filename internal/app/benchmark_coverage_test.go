@@ -6,6 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"vermory/internal/benchmark"
+	"vermory/internal/casebook"
+	"vermory/internal/domain"
 )
 
 func TestBenchmarkCoverageWritesInternalReadyArtifacts(t *testing.T) {
@@ -32,8 +36,17 @@ func TestBenchmarkCoverageWritesInternalReadyArtifacts(t *testing.T) {
 	if report.DesignMappingCount != 3 {
 		t.Fatalf("expected 3 design mappings, got %d", report.DesignMappingCount)
 	}
-	if report.OriginalExecutionCount != 0 {
-		t.Fatalf("coverage map must not invent original executions, got %d", report.OriginalExecutionCount)
+	if report.OriginalExecutionCount != 1 {
+		t.Fatalf("expected one separately registered original sample execution, got %d", report.OriginalExecutionCount)
+	}
+	longMemEvalEvidence := false
+	for _, entry := range report.Entries {
+		if entry.Benchmark == "LongMemEval" && len(entry.OriginalExecutionEvidence) == 1 {
+			longMemEvalEvidence = true
+		}
+	}
+	if !longMemEvalEvidence {
+		t.Fatal("expected LongMemEval original execution evidence to remain separate from its translated proxy")
 	}
 	if len(report.MissingTranslatedTask) != 0 {
 		t.Fatalf("expected no missing translated benchmark mappings, got %v", report.MissingTranslatedTask)
@@ -60,5 +73,45 @@ func TestBenchmarkCoverageWritesInternalReadyArtifacts(t *testing.T) {
 	}
 	if persisted.ExecutableCount != report.ExecutableCount {
 		t.Fatalf("expected persisted executable count %d, got %d", report.ExecutableCount, persisted.ExecutableCount)
+	}
+}
+
+func TestBenchmarkEvidenceRejectsMissingOriginalExecutionReference(t *testing.T) {
+	_, err := countOriginalExecutionEvidence([]casebook.BenchmarkMapEntry{{
+		Benchmark:                 domain.BenchmarkName("LongMemEval"),
+		OriginalExecutionEvidence: []string{"docs/evidence/snapshots/missing.json"},
+	}}, t.TempDir())
+	if err == nil {
+		t.Fatal("expected missing original execution evidence to be rejected")
+	}
+}
+
+func TestBenchmarkEvidenceRejectsMissingFrozenFixture(t *testing.T) {
+	root, err := projectRoot()
+	if err != nil {
+		t.Fatalf("projectRoot returned error: %v", err)
+	}
+	execution, err := benchmark.LoadExecution(filepath.Join(root, "docs/evidence/snapshots/2026-07-14-longmemeval-original-sample-execution.json"))
+	if err != nil {
+		t.Fatalf("load execution snapshot: %v", err)
+	}
+	execution.QualificationPath = filepath.Join(root, execution.QualificationPath)
+	execution.FixturePath = "casebook/benchmarks/fixtures/missing.json"
+
+	executionPath := filepath.Join(t.TempDir(), "execution.json")
+	data, err := json.Marshal(execution)
+	if err != nil {
+		t.Fatalf("marshal execution: %v", err)
+	}
+	if err := os.WriteFile(executionPath, data, 0o600); err != nil {
+		t.Fatalf("write execution: %v", err)
+	}
+
+	_, err = countOriginalExecutionEvidence([]casebook.BenchmarkMapEntry{{
+		Benchmark:                 domain.BenchmarkName("LongMemEval"),
+		OriginalExecutionEvidence: []string{executionPath},
+	}}, root)
+	if err == nil {
+		t.Fatal("expected missing frozen fixture to be rejected")
 	}
 }

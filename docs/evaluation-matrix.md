@@ -110,7 +110,7 @@ Benchmark coverage reports write:
 - `benchmark-coverage/<run-id>/report.json`
 - `benchmark-coverage/<run-id>/report.md`
 
-The benchmark coverage runner validates that all named public benchmarks are at least `translated_task`, at least 4 reach `executable_evaluation`, and executable benchmarks name concrete case ids. The current benchmark map covers 11 public benchmarks and marks 8 as executable translated evaluations.
+The benchmark coverage runner validates that all named public benchmarks are at least `translated_task`, at least 4 reach `executable_evaluation`, and executable benchmarks name concrete case ids. It reports translated proxies, design mappings, and registered original executions as separate counters. Every original evidence path must load a valid execution manifest and qualification; a path string alone is rejected. The current map covers 11 public benchmarks, 8 executable translated evaluations, 3 design mappings, and 1 qualified original-data sample execution.
 
 Internal Ready reports write:
 
@@ -166,6 +166,7 @@ go run ./cmd/vermory benchmark-coverage \
 - Mock matrix: completed
 - Duojie core matrix: completed
 - Internal Ready mock chain: completed
+- LongMemEval original oracle sample with Grok: completed as `dataset_sample`
 
 ## Completed Runs
 
@@ -177,6 +178,26 @@ go run ./cmd/vermory benchmark-coverage \
 - Casebook suite smoke run ID: `casebook-suite-smoke`
 - Benchmark coverage smoke run ID: `benchmark-coverage-smoke`
 - Internal Ready smoke run ID: `internal-ready-smoke`
+- LongMemEval original sample run ID: `longmemeval-original-sample-grok-20260714-attempt-6`
+
+## LongMemEval Original Sample
+
+The committed original-data evidence uses six frozen records from the official
+cleaned oracle artifact. It compares `no_context`, `full_oracle_history`,
+`plain_lexical_retrieval`, and `vermory_packet` with the same isolated Grok
+reader.
+
+| Condition | Completed | Exact | Mean token F1 | Mean answer recall | Abstention |
+|---|---:|---:|---:|---:|---:|
+| `no_context` | 6/6 | 0/6 | 0.0263 | 0.0385 | 1/1 |
+| `full_oracle_history` | 6/6 | 2/6 | 0.5497 | 0.5727 | 1/1 |
+| `plain_lexical_retrieval` | 6/6 | 2/6 | 0.4954 | 0.5154 | 1/1 |
+| `vermory_packet` | 6/6 | 2/6 | 0.5201 | 0.5214 | 1/1 |
+
+These are deterministic local sample metrics, not official LongMemEval GPT-4o
+judge accuracy. The run retained a multi-session counting failure and an
+unresolved source-conflict observation rather than upgrading the result to a
+full benchmark claim. See [the evidence document](evidence/2026-07-14-longmemeval-original-sample.md).
 
 ## Duojie Core Matrix Findings
 

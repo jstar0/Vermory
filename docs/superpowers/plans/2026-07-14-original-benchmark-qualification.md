@@ -166,19 +166,19 @@ git commit -m "feat: run governed LongMemEval sample"
 - Consumes: `vermory benchmark-longmemeval` and the frozen official sample.
 - Produces: reproducible real-provider evidence and an explicit remaining-boundary list.
 
-- [ ] **Step 1: Build a release binary and prepare a dedicated database**
+- [x] **Step 1: Build a release binary and prepare a dedicated database**
 
-Use a new database name and runtime role. Apply embedded migrations and grant runtime privileges through the release binary.
+Use a new dedicated database. Apply embedded migrations through the release binary and keep the benchmark database isolated from existing services.
 
-- [ ] **Step 2: Execute the real Grok slice**
+- [x] **Step 2: Execute the real Grok slice**
 
 Run every frozen record under all four conditions with the locally authenticated Grok CLI. Preserve all failed attempts and retry records without deleting the original failure artifacts.
 
-- [ ] **Step 3: Verify database and artifact invariants**
+- [x] **Step 3: Verify database and artifact invariants**
 
 Query counts for continuities, active source memories, deliveries, completed/failed turns, and cross-record isolation. Verify execution-manifest and snapshot hashes.
 
-- [ ] **Step 4: Run release verification**
+- [x] **Step 4: Run release verification**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
