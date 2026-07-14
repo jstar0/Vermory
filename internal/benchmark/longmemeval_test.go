@@ -103,7 +103,7 @@ func TestScoreAnswerDetectsAbstentionDeterministically(t *testing.T) {
 		QuestionID: "0862e8bf_abs",
 		Answer:     "You did not mention this information.",
 	}
-	score := ScoreAnswer(record, "I cannot determine that because the hamster was not mentioned.")
+	score := ScoreAnswer(record, "It cannot be determined.")
 	if !score.AbstentionExpected || !score.AbstentionDetected {
 		t.Fatalf("expected deterministic abstention detection, got %#v", score)
 	}

@@ -331,6 +331,7 @@ func detectAbstention(normalized string) bool {
 		"insufficient information",
 		"not mentioned",
 		"cannot determine",
+		"cannot be determined",
 		"can t determine",
 		"no information",
 		"not provided",
