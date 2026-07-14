@@ -170,6 +170,7 @@ go run ./cmd/vermory benchmark-coverage \
 - Explicit source revision runtime with Grok MCP: completed
 - Governed source conflict candidate runtime with Grok MCP: completed
 - Provider-assisted unkeyed source target matching with Grok MCP: completed
+- Governed multi-fact trusted-document formation with Grok MCP: completed
 
 ## Completed Runs
 
@@ -187,6 +188,8 @@ go run ./cmd/vermory benchmark-coverage \
 - Source candidate stale-probe session: `019f5f3e-4b7f-7510-8cda-a26e0ba89725`
 - Unkeyed source matching coder session: `019f5fac-feb7-7cf0-a762-15aab01c705a`
 - Unkeyed source matching stale-probe session: `019f5fae-1a0e-7fb0-b72d-6a726f5e9815`
+- Governed document formation coder session: `019f6019-63fc-78e2-8eb6-41ddfabe62d8`
+- Governed document formation stale-probe session: `019f601a-fdfe-7bb0-96ac-376ba8b99515`
 
 ## Explicit Source Revision Runtime
 
@@ -258,6 +261,37 @@ PostgreSQL and real MCP probes established:
 This is closed-set provider matching, not arbitrary-document extraction,
 open-vocabulary conflict discovery, or automatic memory activation. See
 [the scoped runtime evidence](evidence/2026-07-14-unkeyed-source-target-matching-runtime.md).
+
+## Governed Multi-Fact Document Formation
+
+The frozen `109-workspace-multifact-document-formation` case supplies one
+bounded trusted revision with an unchanged region, an updated retry limit, a
+new rollback-approval rule, one embedded instruction, and one uncertain policy
+sentence. A real Grok `grok-4.5` provider returned structured formation output;
+Vermory verified exact byte spans and the unchanged active-fact snapshot before
+creating two proposed candidates and one audit-only unchanged item.
+
+PostgreSQL and real MCP probes established:
+
+- malformed fenced output and incorrect unchanged normalization fail durably
+  with zero formation items;
+- the injection-only and undecided-policy document abstains with zero items;
+- pre-review context retains retry 3 and excludes retry 5 plus rollback;
+- explicit acceptance activates only the reviewed retry and rollback facts;
+- target-tenant projection rebuild preserves four active documents and an
+  identical fingerprint;
+- a real Grok MCP coder creates `deployment-control-policy.md` with region,
+  retry 5, two-maintainer approval, and signed SLSA while excluding stale,
+  injected, cross-tenant, and uncertain text;
+- exact and paraphrased stale probes return only current facts;
+- formation audit tables are RLS protected, and a real provider forget probe
+  leaves zero old/new marker residue in linked run and item text.
+
+The real provider suggested `deploy.rollback.maintainers` while the deterministic
+fixture names the semantic slot `deploy.rollback.approvals`. The candidate was
+operator-reviewed and usable, but this slice does not claim deterministic
+provider-generated ontology naming. See
+[the scoped runtime evidence](evidence/2026-07-14-governed-document-formation-runtime.md).
 
 ## LongMemEval Original Sample
 

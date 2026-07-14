@@ -115,14 +115,14 @@
 - Consumes: dedicated schema-13 PostgreSQL database, isolated release binary, locally authenticated Grok CLI, existing two-tool MCP server, and W07 fixture.
 - Produces: exact real-provider extraction evidence, pre-review isolation, accepted current context, final model artifact/write-back, stale probes, hashes, and non-claims.
 
-- [ ] **Step 1: Build an isolated release binary from the current implementation and migrate a dedicated W07 database to schema 13.**
-- [ ] **Step 2: Seed the three local active facts and one cross-tenant static-credential distractor, then verify pre-formation context and projection fingerprint.**
-- [ ] **Step 3: Run real Grok formation over the W07 document and preserve the run ID, provider artifact hash, active-snapshot fingerprint, exact item spans, and linked candidate IDs.**
-- [ ] **Step 4: Run a real injection-only or irrelevant document and require durable abstention with zero observations and candidates.**
-- [ ] **Step 5: Verify pre-review MCP context still contains retry 3 and excludes retry 5 plus rollback approval; accept both proposed W07 candidates explicitly and rebuild projections.**
-- [ ] **Step 6: Run isolated Grok through Vermory MCP to create and deterministically verify `deployment-control-policy.md`, then call `commit_observation` once and require `agent_result/proposed`.**
-- [ ] **Step 7: Run exact and paraphrased stale probes, cross-tenant checks, lifecycle counts, item/run RLS probes, projection rebuild equivalence, and a forget-redaction probe.**
-- [ ] **Step 8: Commit normalized artifact snapshot, exact commands, versions, IDs, hashes, row counts, corrections, failures, and explicit non-claims with `docs: record governed document formation evidence`.**
+- [x] **Step 1: Build an isolated release binary from the current implementation and migrate a dedicated W07 database to schema 13.**
+- [x] **Step 2: Seed the three local active facts and one cross-tenant static-credential distractor, then verify pre-formation context and projection fingerprint.**
+- [x] **Step 3: Run real Grok formation over the W07 document and preserve the run ID, provider artifact hash, active-snapshot fingerprint, exact item spans, and linked candidate IDs.**
+- [x] **Step 4: Run a real injection-only or irrelevant document and require durable abstention with zero observations and candidates.**
+- [x] **Step 5: Verify pre-review MCP context still contains retry 3 and excludes retry 5 plus rollback approval; accept both proposed W07 candidates explicitly and rebuild projections.**
+- [x] **Step 6: Run isolated Grok through Vermory MCP to create and deterministically verify `deployment-control-policy.md`, then call `commit_observation` once and require `agent_result/proposed`.**
+- [x] **Step 7: Run exact and paraphrased stale probes, cross-tenant checks, lifecycle counts, item/run RLS probes, projection rebuild equivalence, and a forget-redaction probe.**
+- [x] **Step 8: Commit normalized artifact snapshot, exact commands, versions, IDs, hashes, row counts, corrections, failures, and explicit non-claims with `docs: record governed document formation evidence`.**
 
 ### Task 6: Full Verification And Delivery
 
