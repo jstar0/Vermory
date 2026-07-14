@@ -1,0 +1,85 @@
+package runtime
+
+import (
+	"context"
+	"testing"
+)
+
+func TestProductionRetrievalProfileIsFrozen(t *testing.T) {
+	valid := RetrievalProfile{
+		ID:         ProductionRetrievalProfileID,
+		BaseURL:    "https://api.siliconflow.cn/v1",
+		Model:      "BAAI/bge-m3",
+		Dimensions: 1024,
+	}
+	if err := valid.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(*RetrievalProfile){
+		"profile":     func(profile *RetrievalProfile) { profile.ID = "other" },
+		"base URL":    func(profile *RetrievalProfile) { profile.BaseURL = "" },
+		"credentials": func(profile *RetrievalProfile) { profile.BaseURL = "https://user:secret@example.com/v1" },
+		"model":       func(profile *RetrievalProfile) { profile.Model = "other" },
+		"dimensions":  func(profile *RetrievalProfile) { profile.Dimensions = 768 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			profile := valid
+			mutate(&profile)
+			if err := profile.Validate(); err == nil {
+				t.Fatalf("invalid profile was accepted: %#v", profile)
+			}
+		})
+	}
+}
+
+func TestResetVectorProjectionLeavesAuthorityAndLexicalState(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	tenantID := "retrieval-reset"
+	repoRoot := "/fixtures/retrieval-reset"
+	governance := NewGovernanceService(store, tenantID)
+	if _, err := governance.ConfirmWorkspace(ctx, repoRoot); err != nil {
+		t.Fatal(err)
+	}
+	active, err := governance.AddSource(ctx, repoRoot, GovernanceWriteRequest{
+		OperationID: "retrieval-reset-active",
+		MemoryKey:   "release.command",
+		Content:     "Run release-safe --locked.",
+		SourceRef:   "fixture:retrieval-reset",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	continuityID := mustWorkspaceContinuity(t, store, tenantID, repoRoot)
+	if _, err := store.pool.Exec(ctx, `
+INSERT INTO memory_vector_documents (
+  profile_id, tenant_id, continuity_id, memory_id, content_sha256, embedding
+) VALUES (
+  $1, $2, $3::uuid, $4::uuid, repeat('a', 64), array_fill(0::real, ARRAY[1024])::vector
+)`, ProductionRetrievalProfileID, tenantID, continuityID, active.Memory.MemoryID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+INSERT INTO memory_projection_cursors (tenant_id, profile_id, last_event_id, status)
+VALUES ($1, $2, 99, 'idle')`, tenantID, ProductionRetrievalProfileID); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.ResetVectorProjection(ctx, tenantID, ProductionRetrievalProfileID); err != nil {
+		t.Fatal(err)
+	}
+	status, err := store.RetrievalProjectionStatus(ctx, tenantID, ProductionRetrievalProfileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.LastEventID != 0 || status.VectorCount != 0 || status.Status != "idle" {
+		t.Fatalf("unexpected reset status: %#v", status)
+	}
+	memories, err := store.SearchActiveMemory(ctx, tenantID, continuityID, "release-safe --locked", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(memories) != 1 || memories[0].ID != active.Memory.MemoryID {
+		t.Fatalf("reset changed authority or lexical state: %#v", memories)
+	}
+}

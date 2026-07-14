@@ -14,6 +14,14 @@ type openAIEmbedder struct {
 	dimensions int
 }
 
+type Embedder interface {
+	Embed(context.Context, string) ([]float32, error)
+}
+
+func NewOpenAIEmbedder(baseURL, apiKey, model string, dimensions int, client *http.Client) (Embedder, error) {
+	return newOpenAIEmbedder(baseURL, apiKey, model, dimensions, client)
+}
+
 func newOpenAIEmbedder(baseURL, apiKey, model string, dimensions int, client *http.Client) (*openAIEmbedder, error) {
 	if strings.TrimSpace(model) == "" {
 		return nil, fmt.Errorf("embedding model is required")
