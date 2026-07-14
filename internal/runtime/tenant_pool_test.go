@@ -103,6 +103,7 @@ func TestTenantPoolRejectsCrossTenantForeignKeys(t *testing.T) {
 	ctx := context.Background()
 	graphA := seedTenantGraph(t, admin.pool, "identity-a", "a")
 	graphB := seedTenantGraph(t, admin.pool, "identity-b", "b")
+	graphBSecond := seedTenantGraph(t, admin.pool, "identity-b", "b-second")
 
 	roleName, runtimeURL := createTenantPoolRole(t, admin.pool, databaseURL, "foreign_key", "")
 	if err := authn.GrantRuntimeRole(ctx, admin.pool, roleName); err != nil {
@@ -151,6 +152,21 @@ func TestTenantPoolRejectsCrossTenantForeignKeys(t *testing.T) {
 			sql: `INSERT INTO bridge_events (tenant_id, bridge_id, event_type, operation_id)
               VALUES ('identity-b', $1::uuid, 'created', 'attack-bridge')`,
 			args: []any{graphA.bridgeID},
+		},
+		{
+			name: "source match continuity",
+			sql: `INSERT INTO source_match_decisions (
+                tenant_id, continuity_id, operation_id, request_fingerprint,
+                source_ref, source_content, candidate_set, candidate_set_fingerprint,
+                provider_name, requested_model, status, selected_memory_key,
+                target_memory_id, observation_id, completed_at
+              ) VALUES (
+                'identity-b', $1::uuid, 'attack-source-match', repeat('a', 64),
+                'fixture:attack', 'cross continuity attack', '[]'::jsonb, repeat('b', 64),
+                'test-provider', 'test-model', 'matched', 'release.signing.mode',
+                $2::uuid, $3::uuid, now()
+              )`,
+			args: []any{graphB.continuityID, graphBSecond.memoryID, graphB.observationID},
 		},
 	}
 	for _, attack := range attacks {

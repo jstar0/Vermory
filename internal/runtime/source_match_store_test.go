@@ -152,6 +152,77 @@ func TestSourceMatchStoreHandlesUnchangedAbstainedAndFailedDecisions(t *testing.
 	}
 }
 
+func TestSourceMatchReplayRejectsChangedCandidateSnapshot(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	service := NewGovernanceService(store, "source-match-replay-snapshot")
+	repoRoot := "/fixtures/source-match-replay-snapshot"
+	resolution, err := service.ConfirmWorkspace(ctx, repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSourceMatchFact(t, service, repoRoot, "replay-snapshot-signing", "release.signing.mode", "Use signer A.", "fixture:signer:a")
+	request := SourceMatchBeginRequest{
+		OperationID:    "replay-snapshot-match",
+		SourceRef:      "fixture:signer:b",
+		SourceContent:  "Use signer B.",
+		ProviderName:   "test-provider",
+		RequestedModel: "test-model",
+	}
+	begin, err := store.BeginSourceMatch(ctx, "source-match-replay-snapshot", resolution.ContinuityID, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CompleteSourceMatch(ctx, "source-match-replay-snapshot", begin.ID, SourceMatchCompletion{
+		Decision:       SourceMatchAbstained,
+		ResolvedModel:  "test-model",
+		ProviderOutput: `{"decision":"abstained","memory_key":"","reason":"no safe target"}`,
+		Reason:         "no safe target",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	addSourceMatchFact(t, service, repoRoot, "replay-snapshot-timeout", "deploy.api.timeout", "The timeout is 800 ms.", "fixture:timeout")
+	if _, err := store.BeginSourceMatch(ctx, "source-match-replay-snapshot", resolution.ContinuityID, request); err == nil || !strings.Contains(err.Error(), "candidate snapshot has changed") {
+		t.Fatalf("changed candidate snapshot replayed an old decision: %v", err)
+	}
+}
+
+func TestSourceMatchReplayExpiresOrphanedPendingDecision(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	service := NewGovernanceService(store, "source-match-pending-expiry")
+	repoRoot := "/fixtures/source-match-pending-expiry"
+	resolution, err := service.ConfirmWorkspace(ctx, repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addSourceMatchFact(t, service, repoRoot, "pending-expiry-signing", "release.signing.mode", "Use signer A.", "fixture:signer:a")
+	request := SourceMatchBeginRequest{
+		OperationID:    "pending-expiry-match",
+		SourceRef:      "fixture:signer:b",
+		SourceContent:  "Use signer B.",
+		ProviderName:   "test-provider",
+		RequestedModel: "test-model",
+	}
+	begin, err := store.BeginSourceMatch(ctx, "source-match-pending-expiry", resolution.ContinuityID, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+UPDATE source_match_decisions
+SET created_at = now() - interval '10 minutes'
+WHERE id = $1::uuid`, begin.ID); err != nil {
+		t.Fatal(err)
+	}
+	expired, err := store.BeginSourceMatch(ctx, "source-match-pending-expiry", resolution.ContinuityID, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if expired.Status != SourceMatchFailed || expired.FailureCode != "pending_expired" || !expired.Replayed {
+		t.Fatalf("orphaned pending match did not expire: %#v", expired)
+	}
+}
+
 func TestSourceMatchStoreRejectsInvalidAmbiguousAndDriftedTargets(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()
@@ -271,6 +342,56 @@ WHERE tenant_id = 'source-match-redaction' AND operation_id = 'redaction-match'`
 	}
 	if len(candidateFingerprint) != 64 || !strings.Contains(candidateSet, "[redacted]") {
 		t.Fatalf("candidate set redaction/fingerprint mismatch: set=%s fingerprint=%s", candidateSet, candidateFingerprint)
+	}
+	inspected, err := store.InspectSourceMatch(ctx, "source-match-redaction", resolution.ContinuityID, "redaction-match")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, canonicalFingerprint, err := canonicalSourceMatchCandidates(inspected.CandidateSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if candidateFingerprint != canonicalFingerprint {
+		t.Fatalf("redacted candidate fingerprint is not canonical: stored=%s canonical=%s", candidateFingerprint, canonicalFingerprint)
+	}
+}
+
+func TestSourceMatchForgetTerminatesPendingDecisionWithoutProviderRewrite(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	service := NewGovernanceService(store, "source-match-pending-forget")
+	repoRoot := "/fixtures/source-match-pending-forget"
+	resolution, err := service.ConfirmWorkspace(ctx, repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "PENDING-FORGET-SECRET"
+	target := addSourceMatchFact(t, service, repoRoot, "pending-forget-target", "release.signing.mode", secret, "fixture:pending-forget")
+	begin := beginSourceMatchForTest(t, store, "source-match-pending-forget", resolution.ContinuityID, "pending-forget-match", "Use a replacement signer.")
+	if _, err := service.Forget(ctx, repoRoot, target.Memory.MemoryID, "pending-forget-delete"); err != nil {
+		t.Fatal(err)
+	}
+	completed, err := store.CompleteSourceMatch(ctx, "source-match-pending-forget", begin.ID, SourceMatchCompletion{
+		Decision:          SourceMatchMatched,
+		SelectedMemoryKey: "release.signing.mode",
+		ResolvedModel:     "test-model",
+		ProviderOutput:    `{"decision":"matched","memory_key":"release.signing.mode","reason":"PENDING-FORGET-SECRET"}`,
+		Reason:            secret,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.Status != SourceMatchFailed || completed.FailureCode != "referenced_memory_deleted" || !completed.Replayed {
+		t.Fatalf("pending source match was not terminated by deletion: %#v", completed)
+	}
+	inspected, err := store.InspectSourceMatch(ctx, "source-match-pending-forget", resolution.ContinuityID, "pending-forget-match")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{inspected.SourceContent, inspected.ProviderOutput, inspected.Reason} {
+		if strings.Contains(value, secret) {
+			t.Fatalf("pending provider completion restored forgotten content: %#v", inspected)
+		}
 	}
 }
 

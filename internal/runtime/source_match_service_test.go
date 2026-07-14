@@ -218,6 +218,35 @@ func TestSourceMatchingServicePersistsFailureAfterRequestDeadline(t *testing.T) 
 	}
 }
 
+func TestSourceMatchingServiceAppliesProviderTimeout(t *testing.T) {
+	store := openTestStore(t)
+	governance := NewGovernanceService(store, "service-provider-timeout")
+	repoRoot := "/fixtures/source-match-provider-timeout"
+	if _, err := governance.ConfirmWorkspace(context.Background(), repoRoot); err != nil {
+		t.Fatal(err)
+	}
+	addSourceMatchFact(t, governance, repoRoot, "provider-timeout-signing", "release.signing.mode", "Use signer A.", "fixture:signer:a")
+	service := NewSourceMatchingServiceWithConfig(
+		store,
+		"service-provider-timeout",
+		sourceMatchDeadlineProvider{},
+		"test-provider",
+		"test-model",
+		SourceMatchingServiceConfig{ProviderTimeout: 50 * time.Millisecond},
+	)
+	receipt, err := service.MatchSource(context.Background(), repoRoot, SourceMatchRequest{
+		OperationID:   "service-provider-timeout-match",
+		SourceRef:     "fixture:signer:b",
+		SourceContent: "Use signer B.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt.Status != SourceMatchFailed || receipt.FailureCode != "provider_timeout" {
+		t.Fatalf("provider timeout was not persisted: %#v", receipt)
+	}
+}
+
 func TestSourceMatchingServiceFailsWhenCandidateSetChangesDuringProviderCall(t *testing.T) {
 	store := openTestStore(t)
 	ctx := context.Background()

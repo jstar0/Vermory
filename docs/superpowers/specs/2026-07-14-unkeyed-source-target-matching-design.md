@@ -87,6 +87,11 @@ key outside the candidate set, or a non-empty abstained key are invalid. The
 provider cannot create a key, choose another scope, set authority, activate a
 memory, or write global defaults.
 
+For Grok CLI, source and candidate content is written to a mode-`0600`
+temporary prompt file rather than process arguments. The provider call has a
+two-minute deadline. Cancellation kills the entire spawned process group, and
+the prompt file is removed after completion.
+
 ## Durable Audit Contract
 
 A new authoritative `source_match_decisions` table records:
@@ -105,6 +110,11 @@ restricted runtime role boundary. It is authoritative audit data and therefore
 included in backup/restore fingerprints. It is never a search projection and
 never contributes text to model-facing context.
 
+Target memory, observation, and candidate memory references include tenant and
+continuity in their foreign keys. Historical rows with invalid same-tenant
+cross-continuity references are failed and redacted during migration rather
+than deleted.
+
 If a referenced memory is forgotten, deletion wins over diagnostic retention.
 Vermory preserves decision IDs, status, selected-key metadata, and artifact
 hashes, but redacts matching candidate content and source references, redacts
@@ -118,6 +128,12 @@ provider call. Reusing the same operation ID with the same logical request
 returns the stored terminal decision without another provider call. Reusing it
 with changed source content, source reference, provider, model, workspace, or
 candidate snapshot fails.
+
+A pending operation older than the provider deadline plus one minute becomes a
+durable `pending_expired` failure on replay. A memory deletion affecting a
+pending candidate set immediately ends that decision as
+`referenced_memory_deleted`, so an in-flight provider cannot restore deleted
+text when it eventually returns.
 
 Provider failure, timeout, malformed output, invalid selection, empty candidate
 set, or candidate-set drift becomes a durable `failed` or `abstained` terminal
@@ -142,11 +158,15 @@ decision.
 
 - Provider input is limited to one tenant and one confirmed workspace.
 - Provider output can select only one exact key from the frozen closed set.
+- Provider source/candidate text is absent from Grok process arguments, provider
+  runtime is bounded, and cancellation terminates the process group.
 - Ambiguous, unrelated, malformed, timed-out, or injected requests never create
   a candidate.
 - A changed candidate set between provider call and proposal fails atomically.
 - Match replay does not invoke the provider again or create another candidate.
 - Conflicting operation replay fails.
+- Changed candidate snapshots reject old operation replay; orphaned pending
+  operations expire to a terminal audited failure.
 - Proposed match results remain absent from normal retrieval and MCP context.
 - Match audit rows are RLS protected, included in native backup/restore, and
   excluded from projection rebuild.

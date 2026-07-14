@@ -49,8 +49,8 @@ func TestOperationsRecovery(t *testing.T) {
 		if err := admin.pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&schemaVersion); err != nil {
 			t.Fatal(err)
 		}
-		if schemaVersion != 11 {
-			t.Fatalf("expected schema version 11 after replay, got %d", schemaVersion)
+		if schemaVersion != 12 {
+			t.Fatalf("expected schema version 12 after replay, got %d", schemaVersion)
 		}
 
 		continuityID, activeContent, staleContent, deletedContent := seedOperationsProjection(t, admin.pool)
@@ -204,7 +204,7 @@ func TestOperationsRecovery(t *testing.T) {
 		if err := pool.QueryRow(context.Background(), `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&schemaVersion); err != nil {
 			t.Fatal(err)
 		}
-		if schemaVersion != 11 {
+		if schemaVersion != 12 {
 			t.Fatalf("release migration reached schema %d", schemaVersion)
 		}
 	})

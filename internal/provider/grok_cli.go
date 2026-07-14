@@ -9,6 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
+	"time"
 )
 
 // GrokCLIConfig selects the locally authenticated Grok CLI executable.
@@ -34,6 +36,20 @@ func (p *GrokCLI) Generate(ctx context.Context, req GenerateRequest) (GenerateRe
 		return GenerateResponse{}, errors.New("provider: Grok CLI command is required")
 	}
 
+	promptFile, err := os.CreateTemp("", "vermory-grok-prompt-*.txt")
+	if err != nil {
+		return GenerateResponse{}, fmt.Errorf("provider: create Grok CLI prompt file: %w", err)
+	}
+	promptPath := promptFile.Name()
+	defer os.Remove(promptPath)
+	if _, err := promptFile.WriteString(buildGrokCLIPrompt(req)); err != nil {
+		promptFile.Close()
+		return GenerateResponse{}, fmt.Errorf("provider: write Grok CLI prompt file: %w", err)
+	}
+	if err := promptFile.Close(); err != nil {
+		return GenerateResponse{}, fmt.Errorf("provider: close Grok CLI prompt file: %w", err)
+	}
+
 	args := []string{
 		"--verbatim",
 		"--no-memory",
@@ -47,7 +63,7 @@ func (p *GrokCLI) Generate(ctx context.Context, req GenerateRequest) (GenerateRe
 	if model := strings.TrimSpace(req.Model); model != "" {
 		args = append(args, "--model", model)
 	}
-	args = append(args, "--single", buildGrokCLIPrompt(req))
+	args = append(args, "--prompt-file", promptPath)
 
 	stdout, err := os.CreateTemp("", "vermory-grok-*.json")
 	if err != nil {
@@ -67,6 +83,18 @@ func (p *GrokCLI) Generate(ctx context.Context, req GenerateRequest) (GenerateRe
 	}
 	shellArgs = append(shellArgs, args...)
 	cmd := exec.CommandContext(ctx, "/bin/sh", shellArgs...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return os.ErrProcessDone
+		}
+		err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		if err == syscall.ESRCH {
+			return os.ErrProcessDone
+		}
+		return err
+	}
+	cmd.WaitDelay = 2 * time.Second
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	err = cmd.Run()

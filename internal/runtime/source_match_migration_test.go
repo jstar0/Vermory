@@ -93,6 +93,9 @@ WHERE conname = $1`, constraint).Scan(&validated, &definition); err != nil {
 		if !validated || !strings.Contains(definition, "tenant_id") {
 			t.Fatalf("constraint %s is not tenant-aware: validated=%v definition=%q", constraint, validated, definition)
 		}
+		if constraint != "source_match_decisions_tenant_continuity_fk" && !strings.Contains(definition, "continuity_id") {
+			t.Fatalf("constraint %s is not continuity-aware: %q", constraint, definition)
+		}
 	}
 }
 

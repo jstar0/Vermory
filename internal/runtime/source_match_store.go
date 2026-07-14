@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -23,6 +24,8 @@ COALESCE(candidate_memory_id::text, ''), created_at, completed_at`
 type sourceMatchRow interface {
 	Scan(dest ...any) error
 }
+
+const sourceMatchPendingExpiry = defaultSourceMatchProviderTimeout + time.Minute
 
 func (s *Store) BeginSourceMatch(ctx context.Context, tenantID, continuityID string, request SourceMatchBeginRequest) (SourceMatchReceipt, error) {
 	ctx, err := withTenantContext(ctx, tenantID)
@@ -50,6 +53,33 @@ func (s *Store) BeginSourceMatch(ctx context.Context, tenantID, continuityID str
 	if found {
 		if existing.ContinuityID != continuityID || existing.RequestFingerprint != fingerprint {
 			return SourceMatchReceipt{}, fmt.Errorf("operation_id is already bound to another logical source match")
+		}
+		currentCandidates, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, continuityID, false)
+		if err != nil {
+			return SourceMatchReceipt{}, err
+		}
+		_, currentCandidateFingerprint, err := canonicalSourceMatchCandidates(currentCandidates)
+		if err != nil {
+			return SourceMatchReceipt{}, err
+		}
+		if currentCandidateFingerprint != existing.CandidateSetFingerprint {
+			return SourceMatchReceipt{}, fmt.Errorf("operation_id candidate snapshot has changed")
+		}
+		if existing.Status == SourceMatchPending && time.Since(existing.CreatedAt) >= sourceMatchPendingExpiry {
+			expired, err := updateTerminalSourceMatch(ctx, tx, tenantID, existing.ID, SourceMatchCompletion{
+				Decision:      SourceMatchFailed,
+				ResolvedModel: existing.ResolvedModel,
+				Reason:        "previous source match attempt expired before completion",
+				FailureCode:   "pending_expired",
+			}, "", "", "", "", "")
+			if err != nil {
+				return SourceMatchReceipt{}, err
+			}
+			expired.Replayed = true
+			if err := tx.Commit(ctx); err != nil {
+				return SourceMatchReceipt{}, fmt.Errorf("commit expired source match: %w", err)
+			}
+			return expired, nil
 		}
 		existing.Replayed = true
 		if err := tx.Commit(ctx); err != nil {
@@ -498,51 +528,93 @@ func truncateSourceMatchText(value string, limit int) string {
 }
 
 func redactSourceMatchMemoryTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, memoryID, memoryContent string) error {
-	_, err := tx.Exec(ctx, `
-WITH affected AS (
-  SELECT decision.id,
-         jsonb_agg(
-           CASE
-             WHEN candidate.value->>'memory_id' = $3
-             THEN candidate.value || jsonb_build_object(
-               'content', '[redacted]',
-               'source_ref', '[redacted]'
-             )
-             ELSE candidate.value
-           END
-           ORDER BY candidate.ordinality
-         ) AS redacted_candidate_set,
-         (decision.candidate_memory_id = $3::uuid OR decision.source_content = $4) AS redact_source
-  FROM source_match_decisions decision
-  CROSS JOIN LATERAL jsonb_array_elements(decision.candidate_set)
-    WITH ORDINALITY AS candidate(value, ordinality)
-  WHERE decision.tenant_id = $1
-    AND decision.continuity_id = $2::uuid
-    AND (
-      decision.target_memory_id = $3::uuid
-      OR decision.candidate_memory_id = $3::uuid
-      OR EXISTS (
-        SELECT 1
-        FROM jsonb_array_elements(decision.candidate_set) item
-        WHERE item->>'memory_id' = $3
-      )
-    )
-  GROUP BY decision.id, decision.candidate_memory_id, decision.source_content
-)
-UPDATE source_match_decisions decision
-SET candidate_set = affected.redacted_candidate_set,
-    candidate_set_fingerprint = encode(
-      digest(convert_to(affected.redacted_candidate_set::text, 'UTF8'), 'sha256'),
-      'hex'
-    ),
-    source_ref = CASE WHEN affected.redact_source THEN '[redacted]' ELSE decision.source_ref END,
-    source_content = CASE WHEN affected.redact_source THEN '[redacted]' ELSE decision.source_content END,
-    provider_output = '[redacted]',
-    reason = '[redacted]'
-FROM affected
-WHERE decision.id = affected.id`, tenantID, continuityID, memoryID, memoryContent)
+	rows, err := tx.Query(ctx, `
+SELECT id::text, candidate_set, status, source_content,
+       COALESCE(candidate_memory_id::text, '')
+FROM source_match_decisions
+WHERE tenant_id = $1 AND continuity_id = $2::uuid
+  AND (
+    target_memory_id = $3::uuid
+    OR candidate_memory_id = $3::uuid
+    OR candidate_set @> jsonb_build_array(jsonb_build_object('memory_id', $3))
+  )
+FOR UPDATE`, tenantID, continuityID, memoryID)
 	if err != nil {
-		return fmt.Errorf("redact forgotten memory from source match audit: %w", err)
+		return fmt.Errorf("list source match audit rows for redaction: %w", err)
+	}
+	type affectedDecision struct {
+		id                string
+		candidates        []SourceMatchCandidate
+		status            SourceMatchStatus
+		sourceContent     string
+		candidateMemoryID string
+	}
+	affected := make([]affectedDecision, 0)
+	for rows.Next() {
+		var decision affectedDecision
+		var candidateJSON []byte
+		if err := rows.Scan(&decision.id, &candidateJSON, &decision.status, &decision.sourceContent, &decision.candidateMemoryID); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan source match audit row for redaction: %w", err)
+		}
+		if err := json.Unmarshal(candidateJSON, &decision.candidates); err != nil {
+			rows.Close()
+			return fmt.Errorf("decode source match audit candidates for redaction: %w", err)
+		}
+		affected = append(affected, decision)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("iterate source match audit rows for redaction: %w", err)
+	}
+	rows.Close()
+
+	for _, decision := range affected {
+		for index := range decision.candidates {
+			if decision.candidates[index].MemoryID == memoryID {
+				decision.candidates[index].Content = "[redacted]"
+				decision.candidates[index].SourceRef = "[redacted]"
+			}
+		}
+		candidateJSON, candidateFingerprint, err := canonicalSourceMatchCandidates(decision.candidates)
+		if err != nil {
+			return err
+		}
+		redactSource := decision.candidateMemoryID == memoryID || decision.sourceContent == memoryContent
+		status := decision.status
+		failureCode := ""
+		reason := "[redacted]"
+		completePending := false
+		if decision.status == SourceMatchPending {
+			status = SourceMatchFailed
+			failureCode = "referenced_memory_deleted"
+			reason = "referenced memory was deleted during source matching"
+			completePending = true
+		}
+		if _, err := tx.Exec(ctx, `
+UPDATE source_match_decisions
+SET candidate_set = $3::jsonb,
+    candidate_set_fingerprint = $4,
+    source_ref = CASE WHEN $5 THEN '[redacted]' ELSE source_ref END,
+    source_content = CASE WHEN $5 THEN '[redacted]' ELSE source_content END,
+    provider_output = '[redacted]',
+    reason = $6,
+    status = $7,
+    failure_code = $8,
+    completed_at = CASE WHEN $9 THEN now() ELSE completed_at END
+WHERE id = $1::uuid AND tenant_id = $2`,
+			decision.id,
+			tenantID,
+			candidateJSON,
+			candidateFingerprint,
+			redactSource,
+			reason,
+			status,
+			failureCode,
+			completePending,
+		); err != nil {
+			return fmt.Errorf("redact forgotten memory from source match audit: %w", err)
+		}
 	}
 	return nil
 }
