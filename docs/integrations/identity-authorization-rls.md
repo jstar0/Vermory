@@ -169,6 +169,7 @@ bridge_operations
 bridge_events
 bridge_memory_effects
 conversation_links
+source_match_decisions
 ```
 
 Using the runtime role, a missing tenant setting sees zero rows:
@@ -245,7 +246,7 @@ PostgreSQL roles and passwords are cluster-level objects and may require separat
   --database-url "$VERMORY_TARGET_ADMIN_DATABASE_URL"
 ```
 
-The projection rebuild runs in one transaction and inserts only active governed memories. Deleted and superseded content must remain absent from exact and related recall after rebuild.
+The projection rebuild runs in one transaction and inserts only active governed memories. Deleted and superseded content must remain absent from exact and related recall after rebuild. Source-match audit is authoritative rather than a search projection; forgetting a referenced memory redacts its fact text from source fields, candidate snapshots, provider output, and reason text while preserving structural decision metadata.
 
 The reproducible local restore evidence is recorded in [PostgreSQL Operations And Recovery Evidence](../evidence/2026-07-14-postgresql-operations-recovery.md).
 

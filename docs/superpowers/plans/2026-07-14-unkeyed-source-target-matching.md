@@ -124,9 +124,9 @@
 - Consumes: all previous tasks and existing release gates.
 - Produces: green local/remote verification, clean commits, pushed branch, and CI artifact evidence.
 
-- [ ] **Step 1: Run all Go database tests serially, the established race sets, `go vet`, `go mod tidy`, and diff checks.**
-- [ ] **Step 2: Run actionlint, GoReleaser check/snapshot, OpenClaw tests/typecheck/build/package dry-run, and release checksum checks.**
-- [ ] **Step 3: Run migration replay and native backup/restore with source-match authority, RLS, runtime-role, and projection assertions.**
+- [x] **Step 1: Run all Go database tests serially, the established race sets, `go vet`, `go mod tidy`, and diff checks.**
+- [x] **Step 2: Run actionlint, GoReleaser check/snapshot, OpenClaw tests/typecheck/build/package dry-run, and release checksum checks.**
+- [x] **Step 3: Run migration replay and native backup/restore with source-match authority, RLS, runtime-role, and projection assertions.**
 - [ ] **Step 4: Mark every completed checklist item only after fresh evidence exists.**
 - [ ] **Step 5: Commit, push `agent/grok-cli-runtime`, update Draft PR 1, wait for required CI, download its snapshot artifact, and verify all four archives.**
 - [ ] **Step 6: Keep the overall Vermory goal active for broader formation, hybrid retrieval, scale/fault qualification, sealed evaluation, signing, and final release acceptance.**

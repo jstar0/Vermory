@@ -216,6 +216,68 @@ ledger values above use the second independently verified operation.
 | Exact and paraphrased stale probes return OIDC only | PASS |
 | Match audit table is RLS protected and authoritative | PASS |
 
+## Post-Runtime Hardening
+
+The real W06 model run used revision
+`187f47d3fdfa7ab9dfc68181fbde79f56f23c493`. A subsequent review found and
+fixed three lifecycle gaps before full release qualification. Revision
+`04ba8330b16b` adds regression tests and production fixes for:
+
+- persisting a terminal `provider_timeout` or `provider_canceled` decision in a
+  bounded detached database context after the request context expires;
+- requiring `source_match_decisions` privileges during runtime-role startup
+  validation, not only during role provisioning;
+- redacting forgotten source content, matching candidate entries, provider
+  output, and reason text while preserving structural audit IDs and hashes.
+
+These fixes do not change the successful matched/abstained provider contract or
+the explicit candidate acceptance path exercised by W06.
+
+## Native Backup And Restore
+
+The W06 source database, including all three real source-match decisions, was
+dumped with PostgreSQL 18.4 `pg_dump --format=custom --no-owner --no-acl` and
+restored into a fresh database with `pg_restore --exit-on-error`.
+
+```text
+source authority fingerprint: 69b684d76633d499e71ae942b964ec0f
+target authority fingerprint: 69b684d76633d499e71ae942b964ec0f
+dump SHA-256: ae7f305edc2ff588964034af2d664f8f5d3d66bdc26fdc558625bf678a7236a7
+restored schema version: 11
+restored source-match rows: 3
+restored matched rows: 1
+restored abstained rows: 2
+restored RLS: enabled, one policy
+```
+
+The restored projection was deleted and rebuilt through the current release
+binary. It returned four active documents and the same projection fingerprint
+`61e769d60beaa3ce142d35dd28b902bd`; the authority fingerprint remained
+unchanged. A newly created restricted runtime role was provisioned with
+`database grant-runtime`. Direct filter-omission probes against the restored
+audit table returned `0` rows with no tenant setting, `3` for `w06-local`, and
+`0` for `w06-other`.
+
+## Local Release Gates
+
+The final local verification on revision `04ba8330b16b` completed:
+
+```text
+go test -p 1 -count=1 ./...                                      PASS
+go test -race -p 1 (9 runtime/client packages)                   PASS
+go test -race -count=1 ./internal/reality                        PASS
+go vet ./...                                                     PASS
+go mod tidy with zero go.mod/go.sum diff                         PASS
+actionlint v1.7.7, CI and Release workflows                      PASS
+GoReleaser v2.17.0 configuration check                           PASS
+GoReleaser snapshot, four target archives                        PASS
+snapshot SHA-256 verification, four archives                     PASS
+OpenClaw: 5 files, 43 tests, typecheck, build                     PASS
+OpenClaw package dry-run                                         PASS
+git diff --check                                                 PASS
+W06 evidence credential-shaped scan                              0 matches
+```
+
 ## Claim Boundary
 
 This slice proves one closed-set provider-assisted target match, two real
