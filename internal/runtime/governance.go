@@ -10,6 +10,7 @@ const localOperatorSourceRef = "operator:local"
 
 type GovernanceWriteRequest struct {
 	OperationID string
+	MemoryKey   string
 	Content     string
 	SourceRef   string
 }
@@ -68,6 +69,7 @@ func (s *GovernanceService) AddSource(ctx context.Context, repoRoot string, writ
 	return s.commit(ctx, repoRoot, CommitObservationRequest{
 		OperationID: write.OperationID,
 		Kind:        ObservationKindSourceUpdate,
+		MemoryKey:   write.MemoryKey,
 		Content:     write.Content,
 		SourceRef:   write.SourceRef,
 	})

@@ -387,9 +387,9 @@ SELECT EXISTS (
 		return ObservationReceipt{}, fmt.Errorf("continuity is not active for this tenant")
 	}
 
-	var existingID, existingContinuityID, existingKind, existingContent, existingSourceRef string
+	var existingID, existingContinuityID, existingKind, existingContent, existingSourceRef, existingMemoryKey string
 	err := tx.QueryRow(ctx, `
-SELECT id::text, continuity_id::text, observation_kind, content, source_ref
+SELECT id::text, continuity_id::text, observation_kind, content, source_ref, memory_key
 FROM observations
 WHERE tenant_id = $1 AND operation_id = $2`, tenantID, request.OperationID).Scan(
 		&existingID,
@@ -397,12 +397,14 @@ WHERE tenant_id = $1 AND operation_id = $2`, tenantID, request.OperationID).Scan
 		&existingKind,
 		&existingContent,
 		&existingSourceRef,
+		&existingMemoryKey,
 	)
 	if err == nil {
 		if existingContinuityID != continuityID ||
 			existingKind != string(request.Kind) ||
 			existingContent != request.Content ||
-			existingSourceRef != request.SourceRef {
+			existingSourceRef != request.SourceRef ||
+			existingMemoryKey != request.MemoryKey {
 			return ObservationReceipt{}, fmt.Errorf("operation_id is already bound to another logical observation")
 		}
 		return ObservationReceipt{ObservationID: existingID, Replayed: true}, nil
@@ -413,9 +415,9 @@ WHERE tenant_id = $1 AND operation_id = $2`, tenantID, request.OperationID).Scan
 
 	var observationID string
 	if err := tx.QueryRow(ctx, `
-INSERT INTO observations (tenant_id, continuity_id, operation_id, observation_kind, content, source_ref)
-VALUES ($1, $2::uuid, $3, $4, $5, $6)
-RETURNING id::text`, tenantID, continuityID, request.OperationID, request.Kind, request.Content, request.SourceRef).Scan(&observationID); err != nil {
+	INSERT INTO observations (tenant_id, continuity_id, operation_id, observation_kind, content, source_ref, memory_key)
+	VALUES ($1, $2::uuid, $3, $4, $5, $6, $7)
+	RETURNING id::text`, tenantID, continuityID, request.OperationID, request.Kind, request.Content, request.SourceRef, request.MemoryKey).Scan(&observationID); err != nil {
 		return ObservationReceipt{}, fmt.Errorf("insert observation: %w", err)
 	}
 	return ObservationReceipt{ObservationID: observationID}, nil
@@ -516,13 +518,14 @@ SELECT EXISTS (
 		return MemoryReceipt{}, fmt.Errorf("observation does not belong to this continuity")
 	}
 
-	var existingID, existingStatus, existingSupersedesMemoryID string
+	var existingID, existingStatus, existingSupersedesMemoryID, existingMemoryKey string
 	err := tx.QueryRow(ctx, `
-SELECT id::text, lifecycle_status, COALESCE(supersedes_memory_id::text, '')
+SELECT id::text, lifecycle_status, COALESCE(supersedes_memory_id::text, ''), memory_key
 FROM governed_memories
-WHERE origin_observation_id = $1::uuid`, observationID).Scan(&existingID, &existingStatus, &existingSupersedesMemoryID)
+WHERE origin_observation_id = $1::uuid`, observationID).Scan(&existingID, &existingStatus, &existingSupersedesMemoryID, &existingMemoryKey)
 	if err == nil {
-		if existingSupersedesMemoryID != request.SupersedesMemoryID {
+		if existingSupersedesMemoryID != request.SupersedesMemoryID ||
+			(request.MemoryKey != "" && existingMemoryKey != request.MemoryKey) {
 			return MemoryReceipt{}, fmt.Errorf("operation_id is already bound to another supersession target")
 		}
 		return MemoryReceipt{MemoryID: existingID, Status: existingStatus, Replayed: true}, nil
@@ -536,28 +539,50 @@ WHERE origin_observation_id = $1::uuid`, observationID).Scan(&existingID, &exist
 		status = "active"
 	}
 	if request.SupersedesMemoryID != "" {
-		command, err := tx.Exec(ctx, `
-UPDATE governed_memories
-SET lifecycle_status = 'superseded', updated_at = now()
-WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid AND lifecycle_status = 'active'`, request.SupersedesMemoryID, tenantID, continuityID)
-		if err != nil {
-			return MemoryReceipt{}, fmt.Errorf("supersede governed memory: %w", err)
+		var targetMemoryKey string
+		if err := tx.QueryRow(ctx, `
+	SELECT memory_key
+	FROM governed_memories
+	WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid AND lifecycle_status = 'active'
+	FOR UPDATE`, request.SupersedesMemoryID, tenantID, continuityID).Scan(&targetMemoryKey); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return MemoryReceipt{}, fmt.Errorf("superseded memory must be an active fact in the delivery continuity")
+			}
+			return MemoryReceipt{}, fmt.Errorf("lock superseded governed memory: %w", err)
 		}
-		if command.RowsAffected() != 1 {
-			return MemoryReceipt{}, fmt.Errorf("superseded memory must be an active fact in the delivery continuity")
+		if request.Kind == ObservationKindSourceCandidate && request.MemoryKey != targetMemoryKey {
+			return MemoryReceipt{}, fmt.Errorf("source candidate memory_key does not match the active target")
 		}
-		if _, err := tx.Exec(ctx, `DELETE FROM memory_search_documents WHERE memory_id = $1::uuid`, request.SupersedesMemoryID); err != nil {
-			return MemoryReceipt{}, fmt.Errorf("remove superseded search document: %w", err)
+		if request.Kind != ObservationKindSourceCandidate && request.MemoryKey != "" && targetMemoryKey != "" && request.MemoryKey != targetMemoryKey {
+			return MemoryReceipt{}, fmt.Errorf("source candidate memory_key does not match the active target")
+		}
+		if request.MemoryKey == "" {
+			request.MemoryKey = targetMemoryKey
+		}
+		if request.Kind != ObservationKindSourceCandidate {
+			command, err := tx.Exec(ctx, `
+	UPDATE governed_memories
+	SET lifecycle_status = 'superseded', updated_at = now()
+	WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid AND lifecycle_status = 'active'`, request.SupersedesMemoryID, tenantID, continuityID)
+			if err != nil {
+				return MemoryReceipt{}, fmt.Errorf("supersede governed memory: %w", err)
+			}
+			if command.RowsAffected() != 1 {
+				return MemoryReceipt{}, fmt.Errorf("superseded memory must be an active fact in the delivery continuity")
+			}
+			if _, err := tx.Exec(ctx, `DELETE FROM memory_search_documents WHERE memory_id = $1::uuid`, request.SupersedesMemoryID); err != nil {
+				return MemoryReceipt{}, fmt.Errorf("remove superseded search document: %w", err)
+			}
 		}
 	}
 
 	var memoryID string
 	if err := tx.QueryRow(ctx, `
 INSERT INTO governed_memories (
-  tenant_id, continuity_id, origin_observation_id, memory_kind, lifecycle_status, content, supersedes_memory_id
+  tenant_id, continuity_id, origin_observation_id, memory_kind, memory_key, lifecycle_status, content, supersedes_memory_id
 )
-VALUES ($1, $2::uuid, $3::uuid, 'fact', $4, $5, NULLIF($6, '')::uuid)
-RETURNING id::text`, tenantID, continuityID, observationID, status, request.Content, request.SupersedesMemoryID).Scan(&memoryID); err != nil {
+VALUES ($1, $2::uuid, $3::uuid, 'fact', $4, $5, $6, NULLIF($7, '')::uuid)
+RETURNING id::text`, tenantID, continuityID, observationID, request.MemoryKey, status, request.Content, request.SupersedesMemoryID).Scan(&memoryID); err != nil {
 		return MemoryReceipt{}, fmt.Errorf("create governed memory: %w", err)
 	}
 	if status == "active" {

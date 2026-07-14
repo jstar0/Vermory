@@ -51,6 +51,38 @@ func TestCommitObservationRequestRejectsAgentResultSupersession(t *testing.T) {
 	}
 }
 
+func TestSourceCandidateRequiresStableMemoryKeyAndSource(t *testing.T) {
+	request := CommitObservationRequest{
+		OperationID: "source-candidate-1",
+		Kind:        ObservationKindSourceCandidate,
+		Content:     "Use OIDC keyless signing.",
+	}
+	if err := request.Validate(); err == nil || !strings.Contains(err.Error(), "memory_key") {
+		t.Fatalf("missing source candidate key was accepted: %v", err)
+	}
+	request.MemoryKey = "release.signing.mode"
+	if err := request.Validate(); err == nil || !strings.Contains(err.Error(), "source_ref") {
+		t.Fatalf("missing source candidate reference was accepted: %v", err)
+	}
+	request.SourceRef = "repo:deploy/production.yaml@sha-new"
+	request.SupersedesMemoryID = "e6fb79d6-f2cc-48a1-8fe2-595df8f5b316"
+	if err := request.Validate(); err != nil {
+		t.Fatalf("valid source candidate was rejected: %v", err)
+	}
+}
+
+func TestMemoryKeyIsRejectedForUnkeyedObservationKinds(t *testing.T) {
+	request := CommitObservationRequest{
+		OperationID: "agent-result-key",
+		Kind:        ObservationKindAgentResult,
+		MemoryKey:   "release.signing.mode",
+		Content:     "Agent output cannot claim a stable source key.",
+	}
+	if err := request.Validate(); err == nil || !strings.Contains(err.Error(), "memory_key") {
+		t.Fatalf("agent result accepted a source memory key: %v", err)
+	}
+}
+
 func TestPrepareContextRequestClampsMaxItems(t *testing.T) {
 	req := PrepareContextRequest{
 		OperationID: "prepare-1",

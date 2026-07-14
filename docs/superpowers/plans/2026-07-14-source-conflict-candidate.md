@@ -11,12 +11,12 @@ without allowing source imports or models to silently replace active memory.
 
 ## Task 2: Schema And Store Lifecycle
 
-- [ ] Write failing migration, store, replay, lifecycle, projection, ambiguity,
+- [x] Write failing migration, store, replay, lifecycle, projection, ambiguity,
   and cross-scope tests.
-- [ ] Add migration 10 observation kinds and `rejected` lifecycle state.
-- [ ] Add source candidate lookup, proposal replay, accept, and reject store
+- [x] Add migration 10 observation kinds and `rejected` lifecycle state.
+- [x] Add source candidate lookup, proposal replay, accept, and reject store
   operations while reusing governed memory authority.
-- [ ] Verify focused database tests and commit.
+- [x] Verify focused database tests and commit.
 
 ## Task 3: Governance Service And Operator CLI
 
