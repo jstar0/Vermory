@@ -178,6 +178,33 @@ post-task observation, not a source candidate.
 3. The first ledger verification query referenced `context_text`, which is not
    a schema column. The corrected read-only query used the authoritative
    `memory_deliveries.context_body` column.
+4. The first OpenClaw check command single-quoted the entire `PATH` assignment,
+   so `$PATH` did not expand and `pnpm` was not found. The corrected command
+   used the repository's documented double-quoted assignment and passed.
+5. The first snapshot checksum command ran from the repository root even though
+   `checksums.txt` contains archive basenames. Running the same verification
+   from `dist/` returned `OK` for all four archives.
+
+## Local Release Gates
+
+The final local verification completed on revision `10f4df8` after the runtime
+evidence and documentation commit:
+
+```text
+go test -p 1 -count=1 ./...                                      PASS
+go test -race -p 1 (8 runtime/client packages)                   PASS
+go test -race -count=1 ./internal/reality                        PASS
+go vet ./...                                                     PASS
+go mod tidy with zero go.mod/go.sum diff                         PASS
+actionlint v1.7.7, CI and Release workflows                      PASS
+GoReleaser v2.17.0 configuration check                           PASS
+GoReleaser snapshot, four target archives                        PASS
+snapshot SHA-256 verification, four archives                     PASS
+OpenClaw: 5 files, 43 tests, typecheck, build                     PASS
+OpenClaw package dry-run                                         PASS
+git diff --check                                                 PASS
+W05 artifact credential-shaped scan                              0 matches
+```
 
 ## Claim Boundary
 

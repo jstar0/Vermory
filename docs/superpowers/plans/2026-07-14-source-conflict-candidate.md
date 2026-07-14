@@ -36,9 +36,9 @@ without allowing source imports or models to silently replace active memory.
 
 ## Task 5: Evidence And Delivery
 
-- [ ] Run the full database suite, runtime race set, reality race, vet, tidy,
+- [x] Run the full database suite, runtime race set, reality race, vet, tidy,
   actionlint, GoReleaser snapshot, OpenClaw check/package, and diff check.
-- [ ] Record exact revisions, commands, hashes, row counts, failures, model
+- [x] Record exact revisions, commands, hashes, row counts, failures, model
   route, and non-claims in evidence and integration docs.
 - [ ] Commit, push, update Draft PR 1, and require protected CI plus snapshot
   artifact success.
