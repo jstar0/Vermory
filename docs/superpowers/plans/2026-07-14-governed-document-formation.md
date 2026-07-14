@@ -96,12 +96,12 @@
 - Consumes: Task 3 service, existing provider builder, governance connection flags, and existing candidate lifecycle commands.
 - Produces: `memory form-document` and `memory inspect-source-formation` stable JSON commands.
 
-- [ ] **Step 1: Write failing CLI tests for required file/source flags, UTF-8 and size failures, provider construction, completed/abstained/failed JSON, replay, inspection, candidate lifecycle projection, and absence from MCP tools.**
-- [ ] **Step 2: Run focused CLI tests and confirm both commands are absent.**
-- [ ] **Step 3: Factor the existing direct provider builder so `match-source` and `form-document` share `grok-cli`, `openai-compatible`, `siliconflow`, and `duojie` construction without changing current defaults.**
-- [ ] **Step 4: Implement `form-document --source-file` with regular-file validation, one bounded read, explicit `source_ref`, and stable output that excludes full source and raw provider output.**
-- [ ] **Step 5: Implement provider-free `inspect-source-formation` and include linked candidate lifecycle by reading existing governed memories.**
-- [ ] **Step 6: Run `VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/operatorcli ./internal/mcpserver ./cmd/vermory` until green and commit with `feat: expose governed document formation commands`.**
+- [x] **Step 1: Write failing CLI tests for required file/source flags, UTF-8 and size failures, provider construction, completed/abstained/failed JSON, replay, inspection, candidate lifecycle projection, and absence from MCP tools.**
+- [x] **Step 2: Run focused CLI tests and confirm both commands are absent.**
+- [x] **Step 3: Factor the existing direct provider builder so `match-source` and `form-document` share `grok-cli`, `openai-compatible`, `siliconflow`, and `duojie` construction without changing current defaults.**
+- [x] **Step 4: Implement `form-document --source-file` with regular-file validation, one bounded read, explicit `source_ref`, and stable output that excludes full source and raw provider output.**
+- [x] **Step 5: Implement provider-free `inspect-source-formation` and include linked candidate lifecycle by reading existing governed memories.**
+- [x] **Step 6: Run `VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/operatorcli ./internal/mcpserver ./cmd/vermory` until green and commit with `feat: expose governed document formation commands`.**
 
 ### Task 5: W07 Real Grok And MCP Acceptance
 

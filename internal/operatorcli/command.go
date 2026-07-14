@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -68,6 +69,24 @@ type sourceMatchOutput struct {
 	CandidateSetSHA256 string                             `json:"candidate_set_sha256"`
 	ProviderSHA256     string                             `json:"provider_artifact_sha256,omitempty"`
 	Replayed           bool                               `json:"replayed"`
+}
+
+type sourceFormationOutput struct {
+	SourceFormationID      string                               `json:"source_formation_id"`
+	ContinuityID           string                               `json:"continuity_id"`
+	RepoRoot               string                               `json:"repo_root"`
+	Status                 runtime.SourceFormationStatus        `json:"status"`
+	SourceRef              string                               `json:"source_ref"`
+	SourceSHA256           string                               `json:"source_sha256"`
+	SourceBytes            int                                  `json:"source_bytes"`
+	ActiveSnapshotSHA256   string                               `json:"active_snapshot_sha256"`
+	Provider               string                               `json:"provider"`
+	Model                  string                               `json:"model"`
+	ProviderArtifactSHA256 string                               `json:"provider_artifact_sha256,omitempty"`
+	FailureCode            string                               `json:"failure_code,omitempty"`
+	Reason                 string                               `json:"reason,omitempty"`
+	Items                  []runtime.SourceFormationItemReceipt `json:"items"`
+	Replayed               bool                                 `json:"replayed"`
 }
 
 func NewWorkspaceCommand() *cobra.Command {
@@ -217,7 +236,7 @@ func NewMemoryCommand() *cobra.Command {
 		Short: "Match an unkeyed trusted source fact to the current closed set",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			llm, providerName, model, err := buildSourceMatchProvider(
+			llm, providerName, model, err := buildDirectProvider(
 				matchProvider,
 				matchModel,
 				matchBaseURL,
@@ -269,6 +288,70 @@ func NewMemoryCommand() *cobra.Command {
 	inspectSourceMatch.Flags().StringVar(&inspectMatchRoot, "repo-root", "", "absolute workspace root")
 	inspectSourceMatch.Flags().StringVar(&inspectMatchOperationID, "operation-id", "", "source match idempotency key")
 	markRequired(inspectSourceMatch, "repo-root", "operation-id")
+
+	var formRoot, formOperationID, formSourceFile, formSourceRef string
+	var formProvider, formModel, formBaseURL, formAPIKeyEnv, formGrokCommand string
+	formDocument := &cobra.Command{
+		Use:   "form-document",
+		Short: "Form reviewable memory candidates from one trusted document",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			document, err := readSourceFormationFile(formSourceFile)
+			if err != nil {
+				return err
+			}
+			llm, providerName, model, err := buildDirectProvider(
+				formProvider,
+				formModel,
+				formBaseURL,
+				formAPIKeyEnv,
+				formGrokCommand,
+			)
+			if err != nil {
+				return err
+			}
+			return withSourceFormation(cmd.Context(), options, llm, providerName, model, func(store *runtime.Store, service *runtime.SourceFormationService) error {
+				receipt, err := service.FormDocument(cmd.Context(), formRoot, runtime.SourceFormationRequest{
+					OperationID:    formOperationID,
+					SourceRef:      formSourceRef,
+					SourceDocument: document,
+				})
+				if err != nil {
+					return err
+				}
+				return writeSourceFormationJSON(cmd, store, options.tenantID, formRoot, receipt)
+			})
+		},
+	}
+	formDocument.Flags().StringVar(&formRoot, "repo-root", "", "absolute workspace root")
+	formDocument.Flags().StringVar(&formOperationID, "operation-id", "", "idempotency key")
+	formDocument.Flags().StringVar(&formSourceFile, "source-file", "", "trusted UTF-8 source file")
+	formDocument.Flags().StringVar(&formSourceRef, "source-ref", "", "opaque source revision reference")
+	formDocument.Flags().StringVar(&formProvider, "provider", "grok-cli", "provider: grok-cli, openai-compatible, siliconflow, or duojie")
+	formDocument.Flags().StringVar(&formModel, "model", "", "provider model name")
+	formDocument.Flags().StringVar(&formBaseURL, "base-url", "", "direct provider base URL")
+	formDocument.Flags().StringVar(&formAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
+	formDocument.Flags().StringVar(&formGrokCommand, "grok-command", "", "authenticated Grok CLI command")
+	markRequired(formDocument, "repo-root", "operation-id", "source-file", "source-ref")
+
+	var inspectFormationRoot, inspectFormationOperationID string
+	inspectSourceFormation := &cobra.Command{
+		Use:   "inspect-source-formation",
+		Short: "Inspect one durable source document formation run",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withSourceFormation(cmd.Context(), options, nil, "", "", func(store *runtime.Store, service *runtime.SourceFormationService) error {
+				receipt, err := service.InspectSourceFormation(cmd.Context(), inspectFormationRoot, inspectFormationOperationID)
+				if err != nil {
+					return err
+				}
+				return writeSourceFormationJSON(cmd, store, options.tenantID, inspectFormationRoot, receipt)
+			})
+		},
+	}
+	inspectSourceFormation.Flags().StringVar(&inspectFormationRoot, "repo-root", "", "absolute workspace root")
+	inspectSourceFormation.Flags().StringVar(&inspectFormationOperationID, "operation-id", "", "source formation idempotency key")
+	markRequired(inspectSourceFormation, "repo-root", "operation-id")
 
 	var acceptRoot, acceptOperationID, acceptMemoryID string
 	acceptCandidate := &cobra.Command{
@@ -380,7 +463,7 @@ func NewMemoryCommand() *cobra.Command {
 	forget.Flags().StringVar(&forgetMemoryID, "memory-id", "", "memory to redact")
 	markRequired(forget, "repo-root", "operation-id", "memory-id")
 
-	command.AddCommand(inspect, addSource, proposeSource, matchSource, inspectSourceMatch, acceptCandidate, rejectCandidate, reviseSource, correct, forget)
+	command.AddCommand(inspect, addSource, proposeSource, matchSource, inspectSourceMatch, formDocument, inspectSourceFormation, acceptCandidate, rejectCandidate, reviseSource, correct, forget)
 	return command
 }
 
@@ -729,7 +812,32 @@ func withSourceMatching(
 	return run(store, runtime.NewSourceMatchingService(store, options.tenantID, llm, providerName, model))
 }
 
-func buildSourceMatchProvider(name, model, baseURL, apiKeyEnv, grokCommand string) (provider.Provider, string, string, error) {
+func withSourceFormation(
+	ctx context.Context,
+	options connectionOptions,
+	llm provider.Provider,
+	providerName string,
+	model string,
+	run func(*runtime.Store, *runtime.SourceFormationService) error,
+) error {
+	if strings.TrimSpace(options.databaseURL) == "" {
+		return fmt.Errorf("--database-url is required")
+	}
+	if strings.TrimSpace(options.tenantID) == "" {
+		return fmt.Errorf("--tenant-id is required")
+	}
+	store, err := runtime.OpenStore(ctx, options.databaseURL)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx); err != nil {
+		return err
+	}
+	return run(store, runtime.NewSourceFormationService(store, options.tenantID, llm, providerName, model))
+}
+
+func buildDirectProvider(name, model, baseURL, apiKeyEnv, grokCommand string) (provider.Provider, string, string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		name = "grok-cli"
@@ -776,8 +884,38 @@ func buildSourceMatchProvider(name, model, baseURL, apiKeyEnv, grokCommand strin
 		}
 		return provider.NewOpenAICompatible(provider.Config{BaseURL: baseURL, APIKey: apiKey}), name, model, nil
 	default:
-		return nil, "", "", fmt.Errorf("unsupported source match provider %q", name)
+		return nil, "", "", fmt.Errorf("unsupported direct provider %q", name)
 	}
+}
+
+func readSourceFormationFile(path string) ([]byte, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil, fmt.Errorf("--source-file is required")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open source file: %w", err)
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("inspect source file: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("source file must be a regular file")
+	}
+	if info.Size() <= 0 || info.Size() > 65536 {
+		return nil, fmt.Errorf("source file must contain between 1 and 65536 bytes")
+	}
+	document, err := io.ReadAll(io.LimitReader(file, 65537))
+	if err != nil {
+		return nil, fmt.Errorf("read source file: %w", err)
+	}
+	if len(document) == 0 || len(document) > 65536 {
+		return nil, fmt.Errorf("source file must contain between 1 and 65536 bytes")
+	}
+	return document, nil
 }
 
 func writeJSON(cmd *cobra.Command, value any) error {
@@ -847,5 +985,44 @@ func writeSourceMatchJSON(cmd *cobra.Command, store *runtime.Store, tenantID, re
 		CandidateSetSHA256: receipt.CandidateSetFingerprint,
 		ProviderSHA256:     receipt.ProviderArtifactSHA256,
 		Replayed:           receipt.Replayed,
+	})
+}
+
+func writeSourceFormationJSON(cmd *cobra.Command, store *runtime.Store, tenantID, repoRoot string, receipt runtime.SourceFormationReceipt) error {
+	governance := runtime.NewGovernanceService(store, tenantID)
+	resolution, memories, err := governance.ListWorkspaceMemories(cmd.Context(), repoRoot)
+	if err != nil {
+		return err
+	}
+	statusByMemoryID := make(map[string]string, len(memories))
+	for _, memory := range memories {
+		statusByMemoryID[memory.ID] = memory.LifecycleStatus
+	}
+	items := append([]runtime.SourceFormationItemReceipt(nil), receipt.Items...)
+	for index := range items {
+		if items[index].CandidateMemoryID != "" {
+			items[index].CandidateStatus = statusByMemoryID[items[index].CandidateMemoryID]
+		}
+	}
+	model := receipt.ResolvedModel
+	if model == "" {
+		model = receipt.RequestedModel
+	}
+	return writeJSON(cmd, sourceFormationOutput{
+		SourceFormationID:      receipt.ID,
+		ContinuityID:           resolution.ContinuityID,
+		RepoRoot:               resolution.RepoRoot,
+		Status:                 receipt.Status,
+		SourceRef:              receipt.SourceRef,
+		SourceSHA256:           receipt.SourceSHA256,
+		SourceBytes:            receipt.SourceBytes,
+		ActiveSnapshotSHA256:   receipt.ActiveSnapshotFingerprint,
+		Provider:               receipt.ProviderName,
+		Model:                  model,
+		ProviderArtifactSHA256: receipt.ProviderArtifactSHA256,
+		FailureCode:            receipt.FailureCode,
+		Reason:                 receipt.Reason,
+		Items:                  items,
+		Replayed:               receipt.Replayed,
 	})
 }
