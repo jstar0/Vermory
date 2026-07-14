@@ -172,7 +172,11 @@ func RunWithDependencies(
 		report.HardGates.ForbiddenCount += condition.Metrics.ForbiddenCount
 		report.HardGates.IneligibleCount += condition.Metrics.IneligibleCount
 	}
-	report.HardGates.Pass = report.HardGates.IneligibleCount == 0 && rebuildEquivalent
+	// Forbidden results are a constitutional failure just like ineligible
+	// rows. Keep the aggregate counters for diagnosis, but never qualify a
+	// run that delivered a declared forbidden memory.
+	report.HardGates.Pass = report.HardGates.ForbiddenCount == 0 &&
+		report.HardGates.IneligibleCount == 0 && rebuildEquivalent
 	if report.HardGates.Pass {
 		report.QualificationStatus = "measured"
 	} else {

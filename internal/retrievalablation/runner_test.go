@@ -57,6 +57,22 @@ func TestRunWithDependenciesRejectsIneligibleVectorCandidates(t *testing.T) {
 	}
 }
 
+func TestRunWithDependenciesRejectsForbiddenDeliveredResults(t *testing.T) {
+	store := openRetrievalTestStore(t)
+	backend := newScriptedBackend()
+	backend.orders["current command"] = []string{"current"}
+
+	corpus := seedTestCorpus()
+	corpus.Queries[0].ForbiddenRecordIDs = []string{"current"}
+	report, err := RunWithDependencies(context.Background(), Options{RunID: "runner-forbidden", Corpus: corpus}, store, backend)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.HardGates.Pass || report.HardGates.ForbiddenCount != 3 {
+		t.Fatalf("forbidden hard gate mismatch: gates=%#v", report.HardGates)
+	}
+}
+
 func TestRunWithDependenciesDegradesOnlyFailedVectorQueries(t *testing.T) {
 	store := openRetrievalTestStore(t)
 	backend := newScriptedBackend()
