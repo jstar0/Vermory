@@ -210,7 +210,7 @@ func TestOperationsRecovery(t *testing.T) {
 		}
 	})
 
-	t.Run("schema 14 retrieval dump restore and disposable rebuild", func(t *testing.T) {
+	t.Run("schema 15 retrieval dump restore and disposable rebuild", func(t *testing.T) {
 		testProductionRetrievalDumpRestore(t, databaseURL)
 	})
 }
@@ -281,11 +281,11 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 	pgRestore := postgresTestTool(t, "pg_restore")
 	dump := exec.Command(pgDump, "--format=custom", "--file", dumpPath, sourceURL)
 	if output, err := dump.CombinedOutput(); err != nil {
-		t.Fatalf("dump schema 14 retrieval database: %v\n%s", err, output)
+		t.Fatalf("dump schema 15 retrieval database: %v\n%s", err, output)
 	}
 	restore := exec.Command(pgRestore, "--no-owner", "--dbname", targetURL, dumpPath)
 	if output, err := restore.CombinedOutput(); err != nil {
-		t.Fatalf("restore schema 14 retrieval database: %v\n%s", err, output)
+		t.Fatalf("restore schema 15 retrieval database: %v\n%s", err, output)
 	}
 
 	target, err := OpenStore(ctx, targetURL)

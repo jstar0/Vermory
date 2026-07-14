@@ -236,7 +236,7 @@ func TestProductionRetrievalMigrationSeedsExistingGovernedMemory(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		if err := goose.UpToContext(context.Background(), db, "migrations", 14); err != nil {
-			t.Errorf("restore schema 14: %v", err)
+			t.Errorf("restore schema 15: %v", err)
 		}
 	})
 
