@@ -209,7 +209,7 @@ git commit -m "feat: process durable retrieval projections"
 - Consumes: existing lexical workspace/conversation search, linked-conversation scope resolution, Task 2 embedder, projection status, vector documents, and Task 1 audit table.
 - Produces: `RetrievalMode`, `MemoryRetriever`, `RetrievalRequest`, `RetrievalResult`, `NewRetrievalCoordinator`, workspace/linked-conversation semantic search, exact lexical fallback, and idempotent `memory_retrieval_runs` records.
 
-- [ ] **Step 1: Define the coordinator contract.**
+- [x] **Step 1: Define the coordinator contract.**
 
 ```go
 type RetrievalMode string
@@ -243,28 +243,28 @@ type MemoryRetriever interface {
 func NewRetrievalCoordinator(store *Store, embedder Embedder, profile RetrievalProfile) (*RetrievalCoordinator, error)
 ```
 
-- [ ] **Step 2: Write failing pure and PostgreSQL tests for mode validation, exact shadow byte-equivalence, vector delivery, cursor-lag fallback, provider fallback, empty-vector operational fallback, authority/content-hash filtering, and audit replay conflict.**
+- [x] **Step 2: Write failing pure and PostgreSQL tests for mode validation, exact shadow byte-equivalence, vector delivery, cursor-lag fallback, provider fallback, empty-vector operational fallback, authority/content-hash filtering, and audit replay conflict.**
 
 Every fallback compares stable memory IDs and order to the already completed
 lexical result. The audit stores SHA-256 and IDs only.
 
-- [ ] **Step 3: Add one store method that resolves the existing linked conversation root into a sorted authorized continuity-ID set.**
+- [x] **Step 3: Add one store method that resolves the existing linked conversation root into a sorted authorized continuity-ID set.**
 
 Do not duplicate bridge/link SQL inside the coordinator. Workspace passes its
 single confirmed continuity; conversation obtains the set through the store.
 
-- [ ] **Step 4: Implement vector search with the frozen profile, tenant and authorized continuity filters, cosine ordering, deterministic ID tie break, and PostgreSQL authority/content-hash recheck.**
+- [x] **Step 4: Implement vector search with the frozen profile, tenant and authorized continuity filters, cosine ordering, deterministic ID tie break, and PostgreSQL authority/content-hash recheck.**
 
 Request `max(20, limit*4)` candidates capped at 100, then truncate eligible
 results to the caller limit. Do not fuse with lexical.
 
-- [ ] **Step 5: Implement idempotent non-sensitive audit recording.**
+- [x] **Step 5: Implement idempotent non-sensitive audit recording.**
 
 The request fingerprint covers tenant, sorted continuity IDs, query SHA-256,
 limit, requested mode, and profile. Replaying the same operation returns the
 same audit identity; changing any field fails.
 
-- [ ] **Step 6: Run coordinator, conversation-link, RLS, race tests, and commit.**
+- [x] **Step 6: Run coordinator, conversation-link, RLS, race tests, and commit.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
