@@ -33,7 +33,7 @@ func newOpenAIEmbedder(baseURL, apiKey, model string, dimensions int, client *ht
 }
 
 func (e *openAIEmbedder) Embed(ctx context.Context, text string) ([]float32, error) {
-	body := map[string]any{"model": e.model, "input": text, "dimensions": e.dimensions}
+	body := map[string]any{"model": e.model, "input": text}
 	var response struct {
 		Data []struct {
 			Embedding []float32 `json:"embedding"`

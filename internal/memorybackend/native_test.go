@@ -38,6 +38,9 @@ func TestOpenAIEmbedderUsesConfiguredModel(t *testing.T) {
 	if request["model"] != "bge-m3" || request["input"] != "中文 mixed identifier checkout_eta_v2" {
 		t.Fatalf("unexpected embedding request: %#v", request)
 	}
+	if _, exists := request["dimensions"]; exists {
+		t.Fatalf("fixed-dimension embedding request must not send optional dimensions: %#v", request)
+	}
 }
 
 func TestVectorLiteral(t *testing.T) {
