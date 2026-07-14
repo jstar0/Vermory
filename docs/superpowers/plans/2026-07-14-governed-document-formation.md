@@ -78,12 +78,12 @@
 - Consumes: `provider.Provider`, `provider.GenerateRequest`, and Task 2 store methods.
 - Produces: `NewSourceFormationService`, `NewSourceFormationServiceWithConfig`, `FormDocument`, and `InspectSourceFormation`.
 
-- [ ] **Step 1: Write failing parser tests for exact JSON, zero-item abstention, 17 items, unknown fields, trailing JSON, invalid decisions, invalid key syntax, empty quote/content/reason, out-of-range occurrence, duplicate keys, and prompt injection.**
-- [ ] **Step 2: Write failing service tests for provider success, timeout, cancellation, malformed output, source too large, invalid UTF-8, NUL input, replay without provider recall, active-snapshot drift, and detached terminal failure persistence.**
-- [ ] **Step 3: Implement a strict system prompt that treats document and active facts as untrusted data, permits only `new/update/unchanged`, and requests no source text beyond selected exact quotes.**
-- [ ] **Step 4: Implement bounded source validation, SHA-256 request identity, strict decoder with unknown-field rejection and EOF enforcement, item normalization, and provider artifact hashing.**
-- [ ] **Step 5: Reuse the two-minute provider deadline and detached five-second completion context; map timeout, cancellation, malformed output, invalid spans, and drift to durable failure codes.**
-- [ ] **Step 6: Run `VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime -run 'SourceFormation'` until green and commit with `feat: form governed memory from trusted documents`.**
+- [x] **Step 1: Write failing parser tests for exact JSON, zero-item abstention, 17 items, unknown fields, trailing JSON, invalid decisions, invalid key syntax, empty quote/content/reason, out-of-range occurrence, duplicate keys, and prompt injection.**
+- [x] **Step 2: Write failing service tests for provider success, timeout, cancellation, malformed output, source too large, invalid UTF-8, NUL input, replay without provider recall, active-snapshot drift, and detached terminal failure persistence.**
+- [x] **Step 3: Implement a strict system prompt that treats document and active facts as untrusted data, permits only `new/update/unchanged`, and requests no source text beyond selected exact quotes.**
+- [x] **Step 4: Implement bounded source validation, SHA-256 request identity, strict decoder with unknown-field rejection and EOF enforcement, item normalization, and provider artifact hashing.**
+- [x] **Step 5: Reuse the two-minute provider deadline and detached five-second completion context; map timeout, cancellation, malformed output, invalid spans, and drift to durable failure codes.**
+- [x] **Step 6: Run `VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./internal/runtime -run 'SourceFormation'` until green and commit with `feat: form governed memory from trusted documents`.**
 
 ### Task 4: Trusted Operator CLI
 
