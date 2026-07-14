@@ -167,6 +167,7 @@ go run ./cmd/vermory benchmark-coverage \
 - Duojie core matrix: completed
 - Internal Ready mock chain: completed
 - LongMemEval original oracle sample with Grok: completed as `dataset_sample`
+- Explicit source revision runtime with Grok MCP: completed
 
 ## Completed Runs
 
@@ -179,6 +180,28 @@ go run ./cmd/vermory benchmark-coverage \
 - Benchmark coverage smoke run ID: `benchmark-coverage-smoke`
 - Internal Ready smoke run ID: `internal-ready-smoke`
 - LongMemEval original sample run ID: `longmemeval-original-sample-grok-20260714-attempt-6`
+- Source revision Grok session: `955B4CA6-68EB-4D0E-9CB4-96BE91AC1776`
+
+## Explicit Source Revision Runtime
+
+The frozen `106-workspace-source-revision` case replaces one named release
+command from a newer trusted source while preserving an independent `800 ms`
+timeout. A real Grok `grok-4.5` coding task consumed the current workspace
+context through MCP, generated and deterministically checked
+`release-source-check.md`, and wrote the task result back as `proposed`.
+
+PostgreSQL and real MCP probes established:
+
+- the old command is `superseded` and has no search projection;
+- the replacement is `active` and points to the old memory;
+- the independent timeout remains `active`;
+- the other-workspace distractor is absent from all three deliveries;
+- target-task, exact-stale, and paraphrased-stale deliveries contain no stale command;
+- projection rebuild preserves three active documents and the same fingerprint.
+
+Official Codex CLI attempts were retained but do not count as a success for
+this slice because unsupported model selections and then the account usage
+limit stopped each run before MCP. See [the scoped runtime evidence](evidence/2026-07-14-source-revision-runtime.md).
 
 ## LongMemEval Original Sample
 

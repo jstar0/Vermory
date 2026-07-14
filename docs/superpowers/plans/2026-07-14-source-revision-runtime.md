@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an explicit source-authoritative revision path that atomically replaces one named active workspace fact, preserves unrelated facts and history, excludes the stale fact from future retrieval, and is exercised by an official Codex MCP task.
+**Goal:** Add an explicit source-authoritative revision path that atomically replaces one named active workspace fact, preserves unrelated facts and history, excludes the stale fact from future retrieval, and is exercised by a real coding-client MCP task.
 
 **Architecture:** Reuse the existing PostgreSQL `source_update` observation, `supersedes_memory_id` relation, lifecycle transaction, and disposable search projection. Add one governance-service operation and one trusted local CLI command; do not add semantic auto-matching, a fact-key schema, document-wide overwrite behavior, or model-owned authority. Freeze a software-release case in which a canonical source revises one command while an independent timeout fact remains current.
 
@@ -208,19 +208,19 @@ git add internal/operatorcli/command.go internal/operatorcli/command_test.go cmd
 git commit -m "feat: expose trusted source revision CLI"
 ```
 
-### Task 4: Official Codex MCP Replay
+### Task 4: Real Coding-Client MCP Replay
 
 **Files:**
-- Create: `docs/evidence/2026-07-14-source-revision-codex.md`
-- Create: `docs/evidence/snapshots/2026-07-14-source-revision-codex-release-check.md`
+- Create: `docs/evidence/2026-07-14-source-revision-runtime.md`
+- Create: `docs/evidence/snapshots/2026-07-14-source-revision-grok-release-check.md`
 - Modify: `docs/evaluation-matrix.md`
 - Modify: Draft PR 1 body
 
 **Interfaces:**
 - Consumes: release `vermory` binary, dedicated PostgreSQL database, `memory add-source`, `memory revise-source`, and `mcp-stdio`.
-- Produces: preserved official Codex client/tool artifacts, downstream repository artifact, lifecycle/database assertions, and a scoped evidence report.
+- Produces: preserved client/tool artifacts, downstream repository artifact, lifecycle/database assertions, and a scoped evidence report. Official Codex failures remain explicit when the account path stops before MCP; a successful Grok replay is not relabeled as Codex.
 
-- [ ] **Step 1: Prepare an isolated runtime**
+- [x] **Step 1: Prepare an isolated runtime**
 
 Build a `-trimpath` release binary, create a dedicated database, apply embedded migrations, confirm a disposable workspace, and ingest:
 
@@ -229,9 +229,9 @@ Build a `-trimpath` release binary, create a dedicated database, apply embedded 
 3. unrelated distractor fact in a different workspace;
 4. source revision replacing only the old release command.
 
-- [ ] **Step 2: Execute official Codex through MCP**
+- [x] **Step 2: Execute a real coding client through MCP**
 
-Configure only the disposable Vermory MCP server and ask Codex to:
+Configure only the disposable Vermory MCP server and ask the coding client to:
 
 1. call `prepare_context`;
 2. create `release-source-check.md`;
@@ -239,9 +239,13 @@ Configure only the disposable Vermory MCP server and ask Codex to:
 4. verify the file deterministically;
 5. call `commit_observation` with the task result.
 
-Preserve failed attempts. Do not use Gemini CLI, Mac mini NewAPI, or provider API credentials.
+Official Codex was attempted first and stopped before MCP because of unsupported
+account models and then the account usage limit. The successful replay uses the
+logged-in Grok CLI with an isolated `HOME`, user-scoped MCP configuration, and
+`grok-4.5`. Preserve failed attempts. Do not use Gemini CLI, Mac mini NewAPI,
+or provider API credentials.
 
-- [ ] **Step 3: Verify hard gates**
+- [x] **Step 3: Verify hard gates**
 
 Require:
 
@@ -254,13 +258,13 @@ Require:
 - replacement has `supersedes_memory_id=<old id>`;
 - old memory has no search projection;
 - distractor workspace content is absent;
-- Codex write-back is `proposed`;
+- successful client write-back is `proposed`;
 - projection rebuild preserves these assertions;
 - exact and paraphrased stale probes do not return the old command.
 
-- [ ] **Step 4: Publish evidence**
+- [x] **Step 4: Publish evidence**
 
-Record exact binary/client revisions, commands, artifact hashes, PostgreSQL counts, lifecycle rows, failed attempts, and non-claims. This slice proves explicit source revision through one real coder; it does not prove automatic conflict detection or general formation quality.
+Record exact binary/client revisions, commands, artifact hashes, PostgreSQL counts, lifecycle rows, failed attempts, and non-claims. This slice proves explicit source revision through one real Grok coder; it does not prove Codex success, automatic conflict detection, or general formation quality.
 
 ### Task 5: Release Verification And Delivery
 
@@ -268,7 +272,7 @@ Record exact binary/client revisions, commands, artifact hashes, PostgreSQL coun
 - Modify: `docs/superpowers/plans/2026-07-14-source-revision-runtime.md`
 - Modify: Draft PR 1 body
 
-- [ ] **Step 1: Run full release gates**
+- [x] **Step 1: Run full release gates**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
