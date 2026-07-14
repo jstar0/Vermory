@@ -225,7 +225,7 @@ func newRetrievalStatusCommand() *cobra.Command {
 			if strings.TrimSpace(tenantID) == "" {
 				return fmt.Errorf("--tenant-id is required")
 			}
-			if strings.TrimSpace(profileID) != runtime.ProductionRetrievalProfileID {
+			if !runtime.IsSupportedRetrievalProfileID(profileID) {
 				return fmt.Errorf("unsupported retrieval profile")
 			}
 			store, err := runtime.OpenStoreWithOptions(command.Context(), databaseURL, runtime.StoreOptions{EnforceTenantContext: true})
@@ -259,7 +259,7 @@ func newRetrievalRebuildCommand() *cobra.Command {
 			if strings.TrimSpace(tenantID) == "" {
 				return fmt.Errorf("--tenant-id is required")
 			}
-			if strings.TrimSpace(profileID) != runtime.ProductionRetrievalProfileID {
+			if !runtime.IsSupportedRetrievalProfileID(profileID) {
 				return fmt.Errorf("unsupported retrieval profile")
 			}
 			store, err := runtime.OpenStore(command.Context(), databaseURL)

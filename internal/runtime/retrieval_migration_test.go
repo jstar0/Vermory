@@ -114,11 +114,27 @@ WHERE conrelid IN (
 	joined := strings.Join(checks, " ")
 	for _, expected := range []string{
 		"active", "absent", "idle", "running", "failed", "lexical", "shadow", "vector",
-		"siliconflow-bge-m3-1024-v1", "64",
+		"64",
 	} {
 		if !strings.Contains(joined, expected) {
 			t.Fatalf("retrieval checks do not constrain %q: %s", expected, joined)
 		}
+	}
+	var profileCount int
+	if err := store.pool.QueryRow(ctx, `SELECT count(*) FROM memory_retrieval_profiles`).Scan(&profileCount); err != nil {
+		t.Fatal(err)
+	}
+	if profileCount != 2 {
+		t.Fatalf("retrieval profile registry count=%d, want 2", profileCount)
+	}
+	var candidateModel string
+	if err := store.pool.QueryRow(ctx, `
+SELECT model FROM memory_retrieval_profiles
+WHERE profile_id = $1 AND lifecycle_status = 'candidate'`, MigrationRetrievalProfileID).Scan(&candidateModel); err != nil {
+		t.Fatal(err)
+	}
+	if candidateModel != "BAAI/bge-large-zh-v1.5" {
+		t.Fatalf("unexpected migration profile model %q", candidateModel)
 	}
 
 	var triggerCount, hnswCount int

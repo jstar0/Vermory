@@ -9,7 +9,38 @@ import (
 	"time"
 )
 
-const ProductionRetrievalProfileID = "siliconflow-bge-m3-1024-v1"
+const (
+	ProductionRetrievalProfileID = "siliconflow-bge-m3-1024-v1"
+	MigrationRetrievalProfileID  = "siliconflow-bge-large-zh-1024-v2"
+)
+
+type RetrievalProfileSpec struct {
+	ID         string
+	BaseURL    string
+	Model      string
+	Dimensions int
+	Status     string
+}
+
+func SupportedRetrievalProfile(id string) (RetrievalProfileSpec, bool) {
+	specs := map[string]RetrievalProfileSpec{
+		ProductionRetrievalProfileID: {
+			ID: ProductionRetrievalProfileID, BaseURL: "https://api.siliconflow.cn/v1",
+			Model: "BAAI/bge-m3", Dimensions: 1024, Status: "active",
+		},
+		MigrationRetrievalProfileID: {
+			ID: MigrationRetrievalProfileID, BaseURL: "https://api.siliconflow.cn/v1",
+			Model: "BAAI/bge-large-zh-v1.5", Dimensions: 1024, Status: "candidate",
+		},
+	}
+	spec, ok := specs[strings.TrimSpace(id)]
+	return spec, ok
+}
+
+func IsSupportedRetrievalProfileID(id string) bool {
+	_, ok := SupportedRetrievalProfile(id)
+	return ok
+}
 
 type RetrievalMode string
 
@@ -96,22 +127,23 @@ type RetrievalProfile struct {
 }
 
 func (p RetrievalProfile) Validate() error {
-	if strings.TrimSpace(p.ID) != ProductionRetrievalProfileID {
-		return fmt.Errorf("retrieval profile must be %s", ProductionRetrievalProfileID)
+	spec, ok := SupportedRetrievalProfile(p.ID)
+	if !ok {
+		return fmt.Errorf("unsupported retrieval profile %q", p.ID)
 	}
 	baseURL := strings.TrimRight(strings.TrimSpace(p.BaseURL), "/")
 	parsed, err := url.Parse(baseURL)
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
 		return fmt.Errorf("embedding base URL is invalid or contains credentials")
 	}
-	if baseURL != "https://api.siliconflow.cn/v1" {
+	if baseURL != spec.BaseURL {
 		return fmt.Errorf("embedding base URL must use direct SiliconFlow v1")
 	}
-	if strings.TrimSpace(p.Model) != "BAAI/bge-m3" {
-		return fmt.Errorf("embedding model must be BAAI/bge-m3")
+	if strings.TrimSpace(p.Model) != spec.Model {
+		return fmt.Errorf("embedding model must be %s", spec.Model)
 	}
-	if p.Dimensions != 1024 {
-		return fmt.Errorf("embedding dimensions must be 1024")
+	if p.Dimensions != spec.Dimensions {
+		return fmt.Errorf("embedding dimensions must be %d", spec.Dimensions)
 	}
 	return nil
 }

@@ -22,7 +22,7 @@ type retrievalStatusQuerier interface {
 }
 
 func retrievalProjectionStatus(ctx context.Context, querier retrievalStatusQuerier, tenantID, profileID string) (ProjectionStatus, error) {
-	if profileID != ProductionRetrievalProfileID {
+	if !IsSupportedRetrievalProfileID(profileID) {
 		return ProjectionStatus{}, fmt.Errorf("unsupported retrieval profile")
 	}
 	status := ProjectionStatus{
@@ -67,7 +67,7 @@ func (s *Store) ResetVectorProjection(ctx context.Context, tenantID, profileID s
 	if err != nil {
 		return err
 	}
-	if profileID != ProductionRetrievalProfileID {
+	if !IsSupportedRetrievalProfileID(profileID) {
 		return fmt.Errorf("unsupported retrieval profile")
 	}
 	connection, err := s.pool.Acquire(ctx)

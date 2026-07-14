@@ -65,7 +65,7 @@ func (c *RetrievalCoordinator) Retrieve(ctx context.Context, request RetrievalRe
 		return RetrievalResult{}, fmt.Errorf("semantic retrieval is not configured")
 	}
 
-	fingerprint, querySHA256, err := retrievalRequestFingerprint(normalized)
+	fingerprint, querySHA256, err := retrievalRequestFingerprint(normalized, c.profile.ID)
 	if err != nil {
 		return RetrievalResult{}, err
 	}
@@ -168,7 +168,7 @@ type retrievalAuditInput struct {
 	VectorLatency       time.Duration
 }
 
-func retrievalRequestFingerprint(request RetrievalRequest) (string, string, error) {
+func retrievalRequestFingerprint(request RetrievalRequest, profileID string) (string, string, error) {
 	queryDigest := sha256.Sum256([]byte(request.Query))
 	querySHA256 := hex.EncodeToString(queryDigest[:])
 	payload := struct {
@@ -184,7 +184,7 @@ func retrievalRequestFingerprint(request RetrievalRequest) (string, string, erro
 		QuerySHA256:   querySHA256,
 		Limit:         request.Limit,
 		Mode:          request.Mode,
-		ProfileID:     ProductionRetrievalProfileID,
+		ProfileID:     profileID,
 	}
 	canonical, err := json.Marshal(payload)
 	if err != nil {
