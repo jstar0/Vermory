@@ -40,7 +40,7 @@ without allowing source imports or models to silently replace active memory.
   actionlint, GoReleaser snapshot, OpenClaw check/package, and diff check.
 - [x] Record exact revisions, commands, hashes, row counts, failures, model
   route, and non-claims in evidence and integration docs.
-- [ ] Commit, push, update Draft PR 1, and require protected CI plus snapshot
+- [x] Commit, push, update Draft PR 1, and require protected CI plus snapshot
   artifact success.
-- [ ] Keep the overall Vermory goal active for unkeyed formation, broader
+- [x] Keep the overall Vermory goal active for unkeyed formation, broader
   benchmarks, scale, sealed evaluation, signing, and final release acceptance.

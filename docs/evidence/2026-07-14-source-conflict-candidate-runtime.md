@@ -206,6 +206,36 @@ git diff --check                                                 PASS
 W05 artifact credential-shaped scan                              0 matches
 ```
 
+## Remote Pull Request Gate
+
+GitHub Actions run
+[`29311201470`](https://github.com/jstar0/Vermory/actions/runs/29311201470)
+tested branch head `c6b50cd849527a297b046c5e3317d6cdc966711b`. Job
+`87015135131` passed all 19 main steps in `3m28s`, including PostgreSQL tests,
+runtime and reality race tests, module drift, OpenClaw, release snapshot,
+artifact upload, and clean diff.
+
+The run uploaded artifact `8302182898`:
+
+```text
+name: vermory-pr-snapshot-74d961d9473656187fe115abf5721cbdd9a7b572
+bytes: 20297161
+digest: sha256:a220aa810411b47cb48327aa43cb2d787f34d588be25df08c7b4802c588e462d
+expires: 2026-07-21T06:26:44Z
+```
+
+The artifact was downloaded and independently checked. All four archive
+entries in `checksums.txt` returned `OK`; every Go archive contains `vermory`,
+`LICENSE`, `README.md`, and `README.zh-CN.md`; the OpenClaw tarball contains the
+compiled JavaScript, declarations, plugin manifest, and package metadata. The
+darwin/arm64 binary executed on the host and reported snapshot revision
+`74d961d9473656187fe115abf5721cbdd9a7b572`.
+
+Draft PR 1 remained `CLEAN` and `MERGEABLE`, with required check `test` at
+`SUCCESS`. The repository still had zero tags and zero GitHub Releases. The
+only workflow annotation was GitHub's Node.js 20 action-runtime deprecation
+notice; the workflow forced those actions to run on Node.js 24 and passed.
+
 ## Claim Boundary
 
 This slice proves deterministic keyed proposal, rejection, acceptance,
