@@ -38,7 +38,7 @@
 - Consumes: existing `governed_memories`, tenant-aware keys, `vermory.tenant_id`, `GrantRuntimeRole`, `ValidateRuntimeRole`, migration 13.
 - Produces: `memory_projection_events`, `memory_projection_cursors`, `memory_vector_documents`, `memory_retrieval_runs`, trigger `enqueue_memory_projection_event`, schema version 14, and restricted-role access to the new served tables.
 
-- [ ] **Step 1: Write migration tests that require the four tables, exact checks, tenant-aware foreign keys, RLS policies, HNSW cosine index, governed-memory trigger, and one seed event per existing governed memory.**
+- [x] **Step 1: Write migration tests that require the four tables, exact checks, tenant-aware foreign keys, RLS policies, HNSW cosine index, governed-memory trigger, and one seed event per existing governed memory.**
 
 The tests must migrate a schema-13 fixture containing active, proposed,
 superseded, deleted, and Global Defaults rows, apply migration 14, and assert:
@@ -59,12 +59,12 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 
 Expected: FAIL because migration 14 and its tables do not exist.
 
-- [ ] **Step 2: Add runtime-role and RLS tests for no-context, selected-tenant, other-tenant, cross-tenant foreign-key, ownership, required privilege, and forbidden legacy-table behavior.**
+- [x] **Step 2: Add runtime-role and RLS tests for no-context, selected-tenant, other-tenant, cross-tenant foreign-key, ownership, required privilege, and forbidden legacy-table behavior.**
 
 The restricted role must have served-table privileges but must not own tables,
 bypass RLS, or read `vermory_auth.api_tokens` or Phase 1 legacy tables.
 
-- [ ] **Step 3: Implement migration 14.**
+- [x] **Step 3: Implement migration 14.**
 
 Use these canonical status/profile values:
 
@@ -80,13 +80,13 @@ The trigger must append an event only when the projected state may have changed.
 The migration seed insert must order by governed-memory creation and ID so tests
 can reproduce the event stream.
 
-- [ ] **Step 4: Add all four tables to test reset, runtime-role grant, runtime-role validation, RLS matrix, and database command acceptance.**
+- [x] **Step 4: Add all four tables to test reset, runtime-role grant, runtime-role validation, RLS matrix, and database command acceptance.**
 
 `ResetForTest` truncates child projection/audit tables before authority tables.
 `ValidateRuntimeRole` requires the same CRUD boundary as the other served
 runtime tables and still rejects table owners and inherited forbidden access.
 
-- [ ] **Step 5: Run migration, RLS, role, command, and full serial database tests, then commit.**
+- [x] **Step 5: Run migration, RLS, role, command, and full serial database tests, then commit.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
