@@ -76,10 +76,35 @@ release build, OpenClaw install/check/package, and clean-diff verification.
 This is stronger evidence than the previous CI result because the database URL
 was present and the PostgreSQL service was healthy before tests began.
 
+## Main Branch Enforcement
+
+The public repository previously had no branch protection. After the clean
+remote run, `main` was configured with this minimal single-maintainer policy:
+
+```json
+{
+  "required_check": "test",
+  "strict": true,
+  "pull_request_required": true,
+  "required_approving_reviews": 0,
+  "required_conversation_resolution": true,
+  "enforce_admins": false,
+  "allow_force_pushes": false,
+  "allow_deletions": false
+}
+```
+
+The policy requires a branch to be current with `main` and the expanded `test`
+job to pass before a normal merge. It does not require a second maintainer's
+approval and does not prevent repository administrators from emergency
+recovery. After protection was enabled, Draft PR 1 reported `CLEAN` and
+`MERGEABLE` with the required `test` check completed successfully.
+
 ## Claim Boundary
 
 This result proves that the current PR automatically executes the repository's
-database-backed and OpenClaw release gates on a clean Ubuntu runner. It does
-not prove production scale, a published GitHub Release, artifact signing,
-container deployment, macOS/Windows portability, external sealed evaluation,
-or final open-source release acceptance.
+database-backed and OpenClaw release gates on a clean Ubuntu runner and that
+normal `main` integration is protected by that check. It does not prove
+production scale, a published GitHub Release, artifact signing, container
+deployment, macOS/Windows portability, external sealed evaluation, or final
+open-source release acceptance.
