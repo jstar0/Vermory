@@ -148,6 +148,25 @@ See [CI Release Gates Evidence](docs/evidence/2026-07-14-ci-release-gates.md)
 for the clean-runner PostgreSQL, race, release-build, and OpenClaw pull-request
 gates.
 
+## Release Packaging
+
+Every pull request now builds a seven-day downloadable snapshot containing
+checksummed `linux/amd64`, `linux/arm64`, `darwin/amd64`, and `darwin/arm64`
+archives plus the independent `@vermory/openclaw` package. Each Go archive
+contains `vermory`, `LICENSE`, `README.md`, and `README.zh-CN.md`.
+
+```bash
+vermory version
+```
+
+Release binaries report the injected version, full revision, build date, and
+Go runtime version. A manual Release workflow builds a non-publishing snapshot;
+only a `v*` tag may create a draft GitHub Release. The current Draft PR creates
+neither a tag nor a GitHub Release. See
+[Release Packaging Evidence](docs/evidence/2026-07-14-release-packaging.md) for
+the exact checksums, two-run reproducibility result, downloaded Actions
+artifact, host execution, and explicit non-claims.
+
 Run the qualified LongMemEval oracle sample after obtaining the official source
 artifact and preparing a dedicated PostgreSQL database:
 

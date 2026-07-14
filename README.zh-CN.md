@@ -101,6 +101,16 @@ go run ./cmd/vermory experiment-0 \
 
 可信来源发生变化时，`memory revise-source` 会替代一个被明确指定的当前事实；它不会用语义相似度猜测目标，也不会覆盖同工作区中的无关事实。[显式来源修订运行实证](docs/evidence/2026-07-14-source-revision-runtime.md)记录了软件发布命令更新、投影重建、旧事实精确与改写探针、真实 Grok MCP 消费回写，以及本轮 Codex 因模型或账户配额在 MCP 前失败的边界。
 
+## 发布产物
+
+每个 Pull Request 都会生成保留 7 天的可下载 snapshot，包括带 SHA-256 校验的 `linux/amd64`、`linux/arm64`、`darwin/amd64`、`darwin/arm64` 归档，以及独立的 `@vermory/openclaw` 包。每个 Go 归档固定包含 `vermory`、`LICENSE`、`README.md` 和 `README.zh-CN.md`。
+
+```bash
+vermory version
+```
+
+发布二进制会输出注入的版本、完整 revision、构建时间和 Go runtime 版本。手动 Release workflow 只生成不发布的 snapshot；只有 `v*` tag 可以创建 draft GitHub Release。当前 Draft PR 不创建 tag，也不创建 GitHub Release。精确 checksum、两次构建可复现性、Actions 下载产物、本机执行和明确不承诺项见[发布打包实证](docs/evidence/2026-07-14-release-packaging.md)。
+
 ## OpenClaw 接入
 
 `@vermory/openclaw` 使用 OpenClaw 的 canonical `sessionKey` 和 `runId`：在 `before_prompt_build` 注入当前有效的语义上下文，在 `agent_end` 记录最终 turn lifecycle。它不替代 OpenClaw 的 transcript、memory slot、渠道或模型路由。

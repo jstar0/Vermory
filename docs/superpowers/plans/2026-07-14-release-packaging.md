@@ -119,15 +119,15 @@ git commit -m "build: add multi-architecture release archives"
 - Produces: manual/tag release workflow with GitHub Release publication only for a `v*` tag.
 - Produces: OpenClaw `.tgz` beside Go archives and checksums.
 
-- [ ] **Step 1: Add PR snapshot packaging**
+- [x] **Step 1: Add PR snapshot packaging**
 
 After tests pass, install GoReleaser `v2.17.0`, run a snapshot, pack OpenClaw, collect the archives/checksums/tgz, and upload them with 7-day retention.
 
-- [ ] **Step 2: Add tag/manual release workflow**
+- [x] **Step 2: Add tag/manual release workflow**
 
 `workflow_dispatch` performs a non-publishing snapshot. `push.tags: ['v*']` performs a real GoReleaser release and uploads the OpenClaw package to the matching GitHub Release using the repository token. Use `contents: write` only in this workflow.
 
-- [ ] **Step 3: Validate workflow syntax**
+- [x] **Step 3: Validate workflow syntax**
 
 Run:
 
@@ -135,7 +135,7 @@ Run:
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/ci.yml .github/workflows/release.yml
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .github/workflows/ci.yml .github/workflows/release.yml
@@ -153,11 +153,11 @@ git commit -m "ci: package snapshot and tagged releases"
 **Interfaces:**
 - Produces: exact archive inventory, checksums, version outputs, target metadata, workflow revisions, remote run IDs, and non-claims.
 
-- [ ] **Step 1: Run full local release gates**
+- [x] **Step 1: Run full local release gates**
 
 Run the database-backed Go suite, runtime race set, vet, tidy diff, snapshot release, OpenClaw check/package, actionlint, and `git diff --check`.
 
-- [ ] **Step 2: Commit and push evidence**
+- [x] **Step 2: Commit and push evidence**
 
 ```bash
 git add README.md README.zh-CN.md docs/evidence/2026-07-14-release-packaging.md docs/superpowers/plans/2026-07-14-release-packaging.md
