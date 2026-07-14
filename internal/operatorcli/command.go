@@ -36,6 +36,18 @@ type memoryListOutput struct {
 	Memories     []runtime.GovernedMemory `json:"memories"`
 }
 
+type sourceCandidateOutput struct {
+	ContinuityID      string                             `json:"continuity_id"`
+	RepoRoot          string                             `json:"repo_root"`
+	Disposition       runtime.SourceCandidateDisposition `json:"disposition"`
+	MemoryKey         string                             `json:"memory_key"`
+	TargetMemoryID    string                             `json:"target_memory_id,omitempty"`
+	ObservationID     string                             `json:"observation_id"`
+	CandidateMemoryID string                             `json:"candidate_memory_id,omitempty"`
+	CandidateStatus   string                             `json:"candidate_status,omitempty"`
+	Replayed          bool                               `json:"replayed"`
+}
+
 func NewWorkspaceCommand() *cobra.Command {
 	options := connectionOptions{}
 	command := &cobra.Command{
@@ -122,7 +134,7 @@ func NewMemoryCommand() *cobra.Command {
 	inspect.Flags().StringVar(&inspectRoot, "repo-root", "", "absolute workspace root")
 	_ = inspect.MarkFlagRequired("repo-root")
 
-	var sourceRoot, sourceOperationID, sourceContent, sourceRef string
+	var sourceRoot, sourceOperationID, sourceKey, sourceContent, sourceRef string
 	addSource := &cobra.Command{
 		Use:   "add-source",
 		Short: "Record a trusted source fact",
@@ -131,6 +143,7 @@ func NewMemoryCommand() *cobra.Command {
 			return withGovernance(cmd.Context(), options, func(service *runtime.GovernanceService) error {
 				receipt, err := service.AddSource(cmd.Context(), sourceRoot, runtime.GovernanceWriteRequest{
 					OperationID: sourceOperationID,
+					MemoryKey:   sourceKey,
 					Content:     sourceContent,
 					SourceRef:   sourceRef,
 				})
@@ -143,9 +156,77 @@ func NewMemoryCommand() *cobra.Command {
 	}
 	addSource.Flags().StringVar(&sourceRoot, "repo-root", "", "absolute workspace root")
 	addSource.Flags().StringVar(&sourceOperationID, "operation-id", "", "idempotency key")
+	addSource.Flags().StringVar(&sourceKey, "key", "", "stable source fact key")
 	addSource.Flags().StringVar(&sourceContent, "content", "", "trusted source fact")
 	addSource.Flags().StringVar(&sourceRef, "source-ref", "", "opaque source reference")
 	markRequired(addSource, "repo-root", "operation-id", "content", "source-ref")
+
+	var proposeRoot, proposeOperationID, proposeKey, proposeContent, proposeSourceRef string
+	proposeSource := &cobra.Command{
+		Use:   "propose-source",
+		Short: "Propose a keyed source fact for operator review",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withGovernance(cmd.Context(), options, func(service *runtime.GovernanceService) error {
+				receipt, err := service.ProposeSourceCandidate(cmd.Context(), proposeRoot, runtime.GovernanceWriteRequest{
+					OperationID: proposeOperationID,
+					MemoryKey:   proposeKey,
+					Content:     proposeContent,
+					SourceRef:   proposeSourceRef,
+				})
+				if err != nil {
+					return err
+				}
+				return writeSourceCandidateJSON(cmd, service, proposeRoot, receipt)
+			})
+		},
+	}
+	proposeSource.Flags().StringVar(&proposeRoot, "repo-root", "", "absolute workspace root")
+	proposeSource.Flags().StringVar(&proposeOperationID, "operation-id", "", "idempotency key")
+	proposeSource.Flags().StringVar(&proposeKey, "key", "", "stable source fact key")
+	proposeSource.Flags().StringVar(&proposeContent, "content", "", "candidate source fact")
+	proposeSource.Flags().StringVar(&proposeSourceRef, "source-ref", "", "opaque source revision reference")
+	markRequired(proposeSource, "repo-root", "operation-id", "key", "content", "source-ref")
+
+	var acceptRoot, acceptOperationID, acceptMemoryID string
+	acceptCandidate := &cobra.Command{
+		Use:   "accept-candidate",
+		Short: "Accept one proposed source candidate",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withGovernance(cmd.Context(), options, func(service *runtime.GovernanceService) error {
+				receipt, err := service.AcceptCandidate(cmd.Context(), acceptRoot, acceptMemoryID, acceptOperationID)
+				if err != nil {
+					return err
+				}
+				return writeMutationJSON(cmd, service, acceptRoot, receipt)
+			})
+		},
+	}
+	acceptCandidate.Flags().StringVar(&acceptRoot, "repo-root", "", "absolute workspace root")
+	acceptCandidate.Flags().StringVar(&acceptOperationID, "operation-id", "", "idempotency key")
+	acceptCandidate.Flags().StringVar(&acceptMemoryID, "memory-id", "", "proposed source candidate")
+	markRequired(acceptCandidate, "repo-root", "operation-id", "memory-id")
+
+	var rejectRoot, rejectOperationID, rejectMemoryID string
+	rejectCandidate := &cobra.Command{
+		Use:   "reject-candidate",
+		Short: "Reject one proposed source candidate",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withGovernance(cmd.Context(), options, func(service *runtime.GovernanceService) error {
+				receipt, err := service.RejectCandidate(cmd.Context(), rejectRoot, rejectMemoryID, rejectOperationID)
+				if err != nil {
+					return err
+				}
+				return writeMutationJSON(cmd, service, rejectRoot, receipt)
+			})
+		},
+	}
+	rejectCandidate.Flags().StringVar(&rejectRoot, "repo-root", "", "absolute workspace root")
+	rejectCandidate.Flags().StringVar(&rejectOperationID, "operation-id", "", "idempotency key")
+	rejectCandidate.Flags().StringVar(&rejectMemoryID, "memory-id", "", "proposed source candidate")
+	markRequired(rejectCandidate, "repo-root", "operation-id", "memory-id")
 
 	var reviseSourceRoot, reviseSourceOperationID, reviseSourceMemoryID, reviseSourceContent, reviseSourceRef string
 	reviseSource := &cobra.Command{
@@ -217,7 +298,7 @@ func NewMemoryCommand() *cobra.Command {
 	forget.Flags().StringVar(&forgetMemoryID, "memory-id", "", "memory to redact")
 	markRequired(forget, "repo-root", "operation-id", "memory-id")
 
-	command.AddCommand(inspect, addSource, reviseSource, correct, forget)
+	command.AddCommand(inspect, addSource, proposeSource, acceptCandidate, rejectCandidate, reviseSource, correct, forget)
 	return command
 }
 
@@ -556,5 +637,23 @@ func writeMutationJSON(cmd *cobra.Command, service *runtime.GovernanceService, r
 		MemoryID:      receipt.Memory.MemoryID,
 		MemoryStatus:  receipt.Memory.Status,
 		Replayed:      receipt.Observation.Replayed || receipt.Memory.Replayed,
+	})
+}
+
+func writeSourceCandidateJSON(cmd *cobra.Command, service *runtime.GovernanceService, repoRoot string, receipt runtime.SourceCandidateReceipt) error {
+	resolution, err := service.InspectWorkspace(cmd.Context(), repoRoot)
+	if err != nil {
+		return err
+	}
+	return writeJSON(cmd, sourceCandidateOutput{
+		ContinuityID:      resolution.ContinuityID,
+		RepoRoot:          resolution.RepoRoot,
+		Disposition:       receipt.Disposition,
+		MemoryKey:         receipt.MemoryKey,
+		TargetMemoryID:    receipt.TargetMemoryID,
+		ObservationID:     receipt.Observation.ObservationID,
+		CandidateMemoryID: receipt.Candidate.MemoryID,
+		CandidateStatus:   receipt.Candidate.Status,
+		Replayed:          receipt.Replayed,
 	})
 }

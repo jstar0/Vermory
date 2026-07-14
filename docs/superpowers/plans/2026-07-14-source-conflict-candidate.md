@@ -20,10 +20,10 @@ without allowing source imports or models to silently replace active memory.
 
 ## Task 3: Governance Service And Operator CLI
 
-- [ ] Write failing service and CLI tests for `--key`, `propose-source`,
+- [x] Write failing service and CLI tests for `--key`, `propose-source`,
   `accept-candidate`, `reject-candidate`, inspect, and conflicting replay.
-- [ ] Implement the minimum service and CLI surface.
-- [ ] Verify focused tests and commit.
+- [x] Implement the minimum service and CLI surface.
+- [x] Verify focused tests and commit.
 
 ## Task 4: W05 Acceptance And Real Client
 

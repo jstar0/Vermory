@@ -26,6 +26,18 @@ type commandMemoryList struct {
 	Memories     []runtime.GovernedMemory `json:"memories"`
 }
 
+type commandSourceCandidateReceipt struct {
+	ContinuityID      string                             `json:"continuity_id"`
+	RepoRoot          string                             `json:"repo_root"`
+	Disposition       runtime.SourceCandidateDisposition `json:"disposition"`
+	MemoryKey         string                             `json:"memory_key"`
+	TargetMemoryID    string                             `json:"target_memory_id"`
+	ObservationID     string                             `json:"observation_id"`
+	CandidateMemoryID string                             `json:"candidate_memory_id"`
+	CandidateStatus   string                             `json:"candidate_status"`
+	Replayed          bool                               `json:"replayed"`
+}
+
 type commandDefaultList struct {
 	ContinuityID string                   `json:"continuity_id"`
 	Defaults     []runtime.GovernedMemory `json:"defaults"`
@@ -160,6 +172,143 @@ func TestMemorySourceRevisionCommandKeepsIndependentFact(t *testing.T) {
 	assertActiveSearchContains(t, store, confirmed.ContinuityID, "API timeout", "800 ms")
 }
 
+func TestMemorySourceCandidateCommandsCompleteReviewLifecycle(t *testing.T) {
+	databaseURL := resetCommandStore(t)
+	repoRoot := "/repo/release-control"
+	runJSONCommand(t, databaseURL, "workspace", "confirm", "--repo-root", repoRoot)
+
+	old := runJSONCommand(t, databaseURL,
+		"memory", "add-source",
+		"--repo-root", repoRoot,
+		"--operation-id", "cli-signing-old",
+		"--key", "release.signing.mode",
+		"--source-ref", "repo:deploy/production.yaml@sha-old",
+		"--content", "Production releases use a macOS keychain certificate.")
+	timeout := runJSONCommand(t, databaseURL,
+		"memory", "add-source",
+		"--repo-root", repoRoot,
+		"--operation-id", "cli-timeout-current",
+		"--key", "deploy.api.timeout",
+		"--source-ref", "repo:deploy/runtime.yaml@sha-stable",
+		"--content", "The deployment API timeout is 800 ms.")
+
+	proposalArgs := []string{
+		"memory", "propose-source",
+		"--repo-root", repoRoot,
+		"--operation-id", "cli-signing-candidate-one",
+		"--key", "release.signing.mode",
+		"--source-ref", "repo:deploy/production.yaml@sha-new",
+		"--content", "Production releases use GitHub Actions OIDC keyless signing.",
+	}
+	first := runSourceCandidateJSONCommand(t, databaseURL, proposalArgs...)
+	if first.ContinuityID == "" || first.RepoRoot != repoRoot ||
+		first.Disposition != runtime.SourceCandidateReplacement ||
+		first.MemoryKey != "release.signing.mode" ||
+		first.TargetMemoryID != old.MemoryID ||
+		first.ObservationID == "" || first.CandidateMemoryID == "" ||
+		first.CandidateStatus != "proposed" {
+		t.Fatalf("unexpected source candidate command receipt: %#v", first)
+	}
+	listed := runMemoryListCommand(t, databaseURL, repoRoot)
+	if !containsKeyedMemory(listed.Memories, old.MemoryID, "release.signing.mode", "active") ||
+		!containsKeyedMemory(listed.Memories, timeout.MemoryID, "deploy.api.timeout", "active") ||
+		!containsKeyedMemory(listed.Memories, first.CandidateMemoryID, "release.signing.mode", "proposed") {
+		t.Fatalf("proposal changed or hid lifecycle state: %#v", listed)
+	}
+
+	replay := runSourceCandidateJSONCommand(t, databaseURL, proposalArgs...)
+	if !replay.Replayed || replay.CandidateMemoryID != first.CandidateMemoryID {
+		t.Fatalf("proposal replay changed candidate identity: first=%#v replay=%#v", first, replay)
+	}
+	conflictingProposal := append([]string(nil), proposalArgs...)
+	conflictingProposal[len(conflictingProposal)-1] = "Production releases use static cloud credentials."
+	if err := runCommand(t, databaseURL, conflictingProposal...); err == nil || !strings.Contains(err.Error(), "another logical source candidate") {
+		t.Fatalf("conflicting source proposal replay was accepted: %v", err)
+	}
+
+	rejected := runJSONCommand(t, databaseURL,
+		"memory", "reject-candidate",
+		"--repo-root", repoRoot,
+		"--operation-id", "cli-signing-reject-one",
+		"--memory-id", first.CandidateMemoryID)
+	if rejected.MemoryID != first.CandidateMemoryID || rejected.MemoryStatus != "rejected" {
+		t.Fatalf("unexpected candidate rejection: %#v", rejected)
+	}
+	rejectReplay := runJSONCommand(t, databaseURL,
+		"memory", "reject-candidate",
+		"--repo-root", repoRoot,
+		"--operation-id", "cli-signing-reject-one",
+		"--memory-id", first.CandidateMemoryID)
+	if !rejectReplay.Replayed {
+		t.Fatalf("candidate rejection did not replay: %#v", rejectReplay)
+	}
+
+	secondArgs := append([]string(nil), proposalArgs...)
+	secondArgs[5] = "cli-signing-candidate-two"
+	second := runSourceCandidateJSONCommand(t, databaseURL, secondArgs...)
+	if second.CandidateMemoryID == first.CandidateMemoryID || second.TargetMemoryID != old.MemoryID {
+		t.Fatalf("second proposal did not target the current source fact: %#v", second)
+	}
+
+	store, err := runtime.OpenStore(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(store.Close)
+	if _, err := runtime.NewGovernanceService(store, "other-tenant").ConfirmWorkspace(context.Background(), repoRoot); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.NewGovernanceService(store, "local").ConfirmWorkspace(context.Background(), "/repo/release-control-other"); err != nil {
+		t.Fatal(err)
+	}
+	if err := runCommandForTenant(t, databaseURL, "other-tenant",
+		"memory", "accept-candidate",
+		"--repo-root", repoRoot,
+		"--operation-id", "cli-cross-tenant-accept",
+		"--memory-id", second.CandidateMemoryID); err == nil || !strings.Contains(err.Error(), "does not belong") {
+		t.Fatalf("cross-tenant candidate acceptance was not rejected: %v", err)
+	}
+	if err := runCommand(t, databaseURL,
+		"memory", "accept-candidate",
+		"--repo-root", "/repo/release-control-other",
+		"--operation-id", "cli-cross-workspace-accept",
+		"--memory-id", second.CandidateMemoryID); err == nil || !strings.Contains(err.Error(), "does not belong") {
+		t.Fatalf("cross-workspace candidate acceptance was not rejected: %v", err)
+	}
+	if err := runCommand(t, databaseURL,
+		"memory", "reject-candidate",
+		"--repo-root", repoRoot,
+		"--operation-id", "cli-signing-reject-one",
+		"--memory-id", second.CandidateMemoryID); err == nil || !strings.Contains(err.Error(), "another logical") {
+		t.Fatalf("candidate decision operation id was reused: %v", err)
+	}
+
+	accepted := runJSONCommand(t, databaseURL,
+		"memory", "accept-candidate",
+		"--repo-root", repoRoot,
+		"--operation-id", "cli-signing-accept-two",
+		"--memory-id", second.CandidateMemoryID)
+	if accepted.MemoryID != second.CandidateMemoryID || accepted.MemoryStatus != "active" {
+		t.Fatalf("unexpected candidate acceptance: %#v", accepted)
+	}
+	acceptReplay := runJSONCommand(t, databaseURL,
+		"memory", "accept-candidate",
+		"--repo-root", repoRoot,
+		"--operation-id", "cli-signing-accept-two",
+		"--memory-id", second.CandidateMemoryID)
+	if !acceptReplay.Replayed {
+		t.Fatalf("candidate acceptance did not replay: %#v", acceptReplay)
+	}
+
+	listed = runMemoryListCommand(t, databaseURL, repoRoot)
+	if !containsKeyedMemory(listed.Memories, old.MemoryID, "release.signing.mode", "superseded") ||
+		!containsKeyedMemory(listed.Memories, first.CandidateMemoryID, "release.signing.mode", "rejected") ||
+		!containsKeyedMemory(listed.Memories, second.CandidateMemoryID, "release.signing.mode", "active") ||
+		!containsKeyedMemory(listed.Memories, timeout.MemoryID, "deploy.api.timeout", "active") {
+		t.Fatalf("unexpected accepted source lifecycle: %#v", listed)
+	}
+}
+
 func TestMemoryCommandsRejectUnconfirmedWorkspace(t *testing.T) {
 	databaseURL := resetCommandStore(t)
 	err := runCommand(t, databaseURL,
@@ -170,6 +319,16 @@ func TestMemoryCommandsRejectUnconfirmedWorkspace(t *testing.T) {
 		"--content", "Must not persist.")
 	if err == nil || !strings.Contains(err.Error(), "workspace requires confirmation") {
 		t.Fatalf("unexpected mutation error: %v", err)
+	}
+	err = runCommand(t, databaseURL,
+		"memory", "propose-source",
+		"--repo-root", "/repo/unconfirmed",
+		"--operation-id", "cli-reject-proposal",
+		"--key", "release.signing.mode",
+		"--source-ref", "fixture:reject:proposal",
+		"--content", "Must not persist as a source candidate.")
+	if err == nil || !strings.Contains(err.Error(), "workspace requires confirmation") {
+		t.Fatalf("unexpected candidate proposal error: %v", err)
 	}
 }
 
@@ -327,10 +486,15 @@ func resetCommandStore(t *testing.T) string {
 
 func runCommand(t *testing.T, databaseURL string, args ...string) error {
 	t.Helper()
+	return runCommandForTenant(t, databaseURL, "local", args...)
+}
+
+func runCommandForTenant(t *testing.T, databaseURL, tenantID string, args ...string) error {
+	t.Helper()
 	root := newTestRoot()
 	root.SetOut(&bytes.Buffer{})
 	root.SetErr(&bytes.Buffer{})
-	root.SetArgs(append(args, "--database-url", databaseURL, "--tenant-id", "local"))
+	root.SetArgs(append(args, "--database-url", databaseURL, "--tenant-id", tenantID))
 	return root.Execute()
 }
 
@@ -366,6 +530,23 @@ func runMemoryListCommand(t *testing.T, databaseURL, repoRoot string) commandMem
 		t.Fatal(err)
 	}
 	return listed
+}
+
+func runSourceCandidateJSONCommand(t *testing.T, databaseURL string, args ...string) commandSourceCandidateReceipt {
+	t.Helper()
+	var output bytes.Buffer
+	root := newTestRoot()
+	root.SetOut(&output)
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs(append(args, "--database-url", databaseURL, "--tenant-id", "local"))
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var receipt commandSourceCandidateReceipt
+	if err := json.Unmarshal(output.Bytes(), &receipt); err != nil {
+		t.Fatal(err)
+	}
+	return receipt
 }
 
 func runDefaultListCommand(t *testing.T, databaseURL string) commandDefaultList {
@@ -443,6 +624,15 @@ func containsMemory(memories []runtime.GovernedMemory, id, status string) bool {
 func containsMemoryRevision(memories []runtime.GovernedMemory, id, status, supersedes string) bool {
 	for _, memory := range memories {
 		if memory.ID == id && memory.LifecycleStatus == status && memory.SupersedesMemoryID == supersedes {
+			return true
+		}
+	}
+	return false
+}
+
+func containsKeyedMemory(memories []runtime.GovernedMemory, id, key, status string) bool {
+	for _, memory := range memories {
+		if memory.ID == id && memory.MemoryKey == key && memory.LifecycleStatus == status {
 			return true
 		}
 	}
