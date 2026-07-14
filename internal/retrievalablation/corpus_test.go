@@ -185,6 +185,60 @@ func TestW08CorpusCoverageAndLifecycleCounts(t *testing.T) {
 	}
 }
 
+func TestW10IndependentCorpusCoverageAndLifecycleCounts(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "runtime", "cases", "W10-independent-retrieval-batch", "corpus.json")
+	corpus, err := LoadCorpus(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateCorpus(root, corpus); err != nil {
+		t.Fatal(err)
+	}
+	if len(corpus.Scopes) != 6 || len(corpus.Records) != 39 || len(corpus.Queries) != 18 {
+		t.Fatalf("unexpected corpus size: scopes=%d records=%d queries=%d", len(corpus.Scopes), len(corpus.Records), len(corpus.Queries))
+	}
+	counts := map[string]int{}
+	tenants := map[string]struct{}{}
+	cohorts := map[string]struct{}{}
+	for _, scope := range corpus.Scopes {
+		tenants[scope.TenantID] = struct{}{}
+	}
+	for _, record := range corpus.Records {
+		counts[record.Lifecycle]++
+	}
+	for _, query := range corpus.Queries {
+		for _, cohort := range query.Cohorts {
+			cohorts[cohort] = struct{}{}
+		}
+	}
+	wantCounts := map[string]int{"active": 30, "proposed": 3, "superseded": 3, "deleted": 3}
+	for lifecycle, want := range wantCounts {
+		if counts[lifecycle] != want {
+			t.Fatalf("lifecycle %s count=%d, want %d", lifecycle, counts[lifecycle], want)
+		}
+	}
+	if len(tenants) != 4 {
+		t.Fatalf("tenant count=%d, want 4", len(tenants))
+	}
+	for _, cohort := range []string{
+		"exact_identifier", "path", "feature_flag", "error_code", "chinese_semantic",
+		"semantic_paraphrase", "mixed_language", "date", "duration", "numeric_constraint",
+		"multi_fact", "continuity_isolation", "technical_command",
+	} {
+		if _, exists := cohorts[cohort]; !exists {
+			t.Fatalf("missing required cohort %q; present=%v", cohort, sortedKeys(cohorts))
+		}
+	}
+	digest, err := CorpusSHA256(corpus)
+	if err != nil || len(digest) != 64 {
+		t.Fatalf("corpus digest=%q error=%v", digest, err)
+	}
+}
+
 func writeCorpusTestFile(t *testing.T, payload string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "corpus.json")
