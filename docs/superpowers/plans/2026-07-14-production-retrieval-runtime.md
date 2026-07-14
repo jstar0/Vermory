@@ -300,7 +300,7 @@ git commit -m "feat: coordinate governed runtime retrieval"
 - Consumes: Task 3 `MemoryRetriever`, Task 2 worker/status/reset, existing MCP and Web Chat services.
 - Produces: shared retrieval CLI flags, `retrieval-worker`, `retrieval-status`, `retrieval-rebuild`, opt-in retrieval for `mcp-stdio`, `web-chat`, and `serve`, with unchanged public MCP/Web Chat output schemas.
 
-- [ ] **Step 1: Write failing CLI tests for default lexical behavior, required non-lexical flags, frozen profile validation, missing API-key environment variable, secret-free errors, worker/status/rebuild registration, and absence of internal fields from MCP/Web Chat output.**
+- [x] **Step 1: Write failing CLI tests for default lexical behavior, required non-lexical flags, frozen profile validation, missing API-key environment variable, secret-free errors, worker/status/rebuild registration, and absence of internal fields from MCP/Web Chat output.**
 
 Required shared flags:
 
@@ -313,7 +313,7 @@ embedding-model
 embedding-dimensions
 ```
 
-- [ ] **Step 2: Add optional retriever injection while preserving all existing constructors.**
+- [x] **Step 2: Add optional retriever injection while preserving all existing constructors.**
 
 ```go
 func NewService(store *Store, tenantID string) *Service
@@ -323,32 +323,32 @@ func NewServiceWithRetriever(store *Store, tenantID string, retriever MemoryRetr
 Add `Retriever MemoryRetriever` to `ConversationServiceConfig`; its zero value
 continues to call `SearchActiveConversationMemory` directly.
 
-- [ ] **Step 3: Modify workspace and conversation preparation to use the retriever only when configured.**
+- [x] **Step 3: Modify workspace and conversation preparation to use the retriever only when configured.**
 
 Workspace operation ID is `workspace-retrieval:` plus the request operation ID.
 Conversation operation ID is `conversation-retrieval:` plus the turn operation
 ID. Delivery context remains semantic text only.
 
-- [ ] **Step 4: Implement shared command-side option validation and coordinator construction.**
+- [x] **Step 4: Implement shared command-side option validation and coordinator construction.**
 
 Lexical mode must not read an embedding environment variable or open a provider
 client. Shadow/vector mode reads the key once into memory, creates the exported
 embedder, and never prints configuration values containing credentials or the
 database URL.
 
-- [ ] **Step 5: Implement the worker, status, and rebuild commands.**
+- [x] **Step 5: Implement the worker, status, and rebuild commands.**
 
 `retrieval-status` writes one JSON object. `retrieval-rebuild` resets only the
 selected tenant/profile vector rows and cursor. `retrieval-worker --once`
 writes processed count, final cursor, lag, status, and bounded failure code.
 
-- [ ] **Step 6: Wire MCP, local Web Chat, and authenticated API to the same coordinator.**
+- [x] **Step 6: Wire MCP, local Web Chat, and authenticated API to the same coordinator.**
 
 The authenticated handler passes each authenticated principal tenant to the
 coordinator. It does not start a cross-tenant worker. A missing/currently stale
 tenant projection falls back to lexical.
 
-- [ ] **Step 7: Run command, MCP, Web Chat, authn, runtime, and race tests, then commit.**
+- [x] **Step 7: Run command, MCP, Web Chat, authn, runtime, and race tests, then commit.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
