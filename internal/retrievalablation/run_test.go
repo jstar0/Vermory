@@ -184,7 +184,7 @@ func writeNativeRunCorpus(t *testing.T) string {
 			{ID: "current", ScopeID: "workspace", Content: "Use the current locked command.", Lifecycle: "active", ProvenanceCase: "101-example"},
 			{ID: "distractor", ScopeID: "workspace", Content: "A gardening reminder about tomatoes.", Lifecycle: "active", ProvenanceCase: "101-example"},
 		},
-		Queries: []Query{{ID: "command", ScopeID: "workspace", Text: "current command", Limit: 2, RelevantRecordIDs: []string{"current"}, ForbiddenRecordIDs: []string{"distractor"}, Cohorts: []string{"semantic"}}},
+		Queries: []Query{{ID: "command", ScopeID: "workspace", Text: "current command", Limit: 1, RelevantRecordIDs: []string{"current"}, ForbiddenRecordIDs: []string{"distractor"}, Cohorts: []string{"semantic"}}},
 	}
 	payload, err := json.Marshal(corpus)
 	if err != nil {
