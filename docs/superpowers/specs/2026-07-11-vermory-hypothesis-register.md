@@ -110,12 +110,14 @@ Exact state names and transition edges are not frozen.
 
 ### H-009: Hybrid native retrieval
 
-- Status: `proposed`
+- Status: `testing` (`measured` on W08 public corpus)
 - Candidate: continuity and lifecycle filtering followed by lexical, exact structured, trigram, and pgvector candidate generation with versioned fusion and optional reranking.
 - Reason: pure vector Top-K is weak for technical identifiers and cannot itself encode source authority or lifecycle.
+- Existing evidence: W08 ran 24 frozen mixed-language and technical queries over 48 active memories plus proposed, superseded, deleted, cross-continuity, and cross-tenant controls using direct SiliconFlow `BAAI/bge-m3`. Active-only pgvector and exact-guarded RRF both reached Recall@K `1.0000` and MRR `0.9792`, compared with lexical Recall@K `0.6875` and MRR `0.6806`; exact identifiers remained `1.0000`. All scope/lifecycle hard gates and projection rebuild equivalence passed.
+- Current interpretation: the measured pgvector candidate path deserves a separate production-integration experiment. The current RRF formula is not accepted because it matched vector quality exactly and added latency rather than demonstrating an independent gain.
 - Evidence needed: compare pure vector, lexical, hybrid, and optional rerank variants on real Chinese, English, code, path, flag, date, and numeric cases.
 - Falsifier: a simpler measured strategy matches quality, task success, cost, and failure behavior; or the candidate strategy cannot meet calibrated latency.
-- Decision gate: after retrieval ablation on the first two batches.
+- Decision gate: after a second independent retrieval batch, calibrated latency/quality thresholds, and a production outage/fallback slice.
 
 No ranking algorithm or weight is accepted before ablation.
 

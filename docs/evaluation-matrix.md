@@ -293,6 +293,32 @@ operator-reviewed and usable, but this slice does not claim deterministic
 provider-generated ontology naming. See
 [the scoped runtime evidence](evidence/2026-07-14-governed-document-formation-runtime.md).
 
+## Production Retrieval Ablation
+
+W08 materializes 48 active, four proposed, four superseded, and four deleted
+governed memories across four tenants and eight continuities, then executes 24
+frozen retrieval queries through the unchanged lexical runtime, direct
+SiliconFlow `BAAI/bge-m3` PostgreSQL/pgvector, and exact-guarded RRF.
+
+| Condition | Hit@1 | Recall@K | MRR | nDCG@K | P95 | Forbidden | Ineligible |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `lexical_runtime` | 0.6667 | 0.6875 | 0.6806 | 0.6526 | 2.871 ms | 0 | 0 |
+| `vector_pg` | 0.9583 | 1.0000 | 0.9792 | 0.9623 | 126.526 ms | 0 | 0 |
+| `hybrid_rrf` | 0.9583 | 1.0000 | 0.9792 | 0.9623 | 130.134 ms | 0 | 0 |
+
+The final run used 152 direct embedding requests and passed active-only
+projection set equality plus delete/rebuild result-ID equivalence. The first
+provider probe and first complete run remain documented: SiliconFlow rejected
+the optional `dimensions` request field, and an ANN index containing filtered
+non-active rows changed results after active-only rebuild. Both defects were
+fixed before the final run.
+
+The result supports a later active-only pgvector production integration slice.
+It does not establish an RRF benefit: vector and hybrid quality were identical,
+and hybrid added latency. H-009 is therefore `testing/measured`, not accepted as
+the product default. See
+[the scoped evidence](evidence/2026-07-14-production-retrieval-ablation.md).
+
 ## LongMemEval Original Sample
 
 The committed original-data evidence uses six frozen records from the official

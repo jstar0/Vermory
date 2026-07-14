@@ -198,6 +198,33 @@ acceptance, RLS, stale probes, real MCP artifact creation, and forget redaction.
 This is bounded trusted-document formation, not arbitrary crawling or proven
 ontology discovery.
 
+## Retrieval Ablation
+
+`vermory retrieval-ablation` compares the unchanged lexical runtime, direct
+PostgreSQL/pgvector retrieval, and deterministic exact-guarded RRF over one
+versioned, lifecycle-aware corpus. PostgreSQL remains authoritative; the ANN
+projection contains active eligible memories only, can be deleted and rebuilt,
+and is rechecked before scoring or delivery.
+
+```bash
+vermory retrieval-ablation \
+  --database-url "$VERMORY_DATABASE_URL" \
+  --corpus runtime/cases/W08-production-retrieval-ablation/corpus.json \
+  --run-id retrieval-public-v1 \
+  --output-dir artifacts/retrieval-public-v1 \
+  --embedding-base-url https://api.siliconflow.cn/v1 \
+  --embedding-api-key-env SILICONFLOW_API_KEY \
+  --embedding-model BAAI/bge-m3 \
+  --embedding-dimensions 1024 \
+  --implementation-revision "$(git rev-parse HEAD)"
+```
+
+The first public run found a strong pgvector gain on Chinese, mixed-language,
+numeric, and semantic cohorts while preserving exact identifiers and zero
+scope/lifecycle violations. The measured RRF strategy did not improve over
+vector retrieval and is not the product default. See
+[Production Retrieval Ablation Evidence](docs/evidence/2026-07-14-production-retrieval-ablation.md).
+
 See [CI Release Gates Evidence](docs/evidence/2026-07-14-ci-release-gates.md)
 for the clean-runner PostgreSQL, race, release-build, and OpenClaw pull-request
 gates.
