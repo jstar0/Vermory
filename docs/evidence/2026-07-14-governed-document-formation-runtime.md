@@ -266,6 +266,72 @@ strings.
 | Forget redacts linked formation evidence | PASS |
 | Ordinary MCP still exposes exactly two normal-flow tools | PASS |
 
+## Native Backup And Restore
+
+The dedicated W07 source database was dumped with PostgreSQL 18.4 using custom
+format, `--no-owner`, and `--no-acl`, then restored into a fresh database with
+`pg_restore --exit-on-error`. Migration replay ran twice against both databases;
+all four commands reported schema 13 with no migrations left to apply.
+
+```text
+source database: vermory_w07_20260714175236
+restore database: vermory_w07_restore_20260714175236
+source authority fingerprint: 57a7cb60c58a48734de49b2b685e92a7
+restore authority fingerprint: 57a7cb60c58a48734de49b2b685e92a7
+dump SHA-256: 91571cfc7218b234fe94fdee39fa98b8ab6f97d2db074b9a9803f2f344fb79bc
+restored schema version: 13
+restored formation runs: 6
+restored formation items: 4
+restored target projection: 4 documents, accc818c9dbb062d234fd380048cdd77
+restricted restore role: vermory_w07_restore_runtime_20260714175236
+```
+
+The authority fingerprint includes formation runs and items in addition to the
+served continuity graph and auth metadata. Deleting and rebuilding the restored
+search projection preserved both its four-document target-tenant fingerprint
+and the authority fingerprint. Restored formation RLS had one policy per table;
+filter-omission probes returned `0/0`, target-tenant `5/3`, then other-tenant
+`0/0` for runs/items.
+
+## Local Release Gates
+
+Fresh local gates ran from documentation revision
+`988ef6069cc41a51d97d5bbb56303e6d77aab877` after the runtime evidence was
+recorded:
+
+```text
+go test -p 1 -count=1 ./...                                      PASS
+go test -race -p 1 across 8 runtime/client/provider packages      PASS
+go test -race -count=1 ./internal/reality                         PASS
+go vet ./...                                                      PASS
+go mod tidy with zero go.mod/go.sum diff                          PASS
+actionlint v1.7.7, CI and Release workflows                       PASS
+GoReleaser v2.17.0 configuration check                            PASS
+GoReleaser snapshot, four target archives                         PASS
+snapshot SHA-256 verification, four archives                      PASS
+host darwin/arm64 archive execution                               PASS
+OpenClaw: 5 files, 43 tests, typecheck, build                      PASS
+OpenClaw package dry-run                                           PASS
+schema 13 migration replay on source and restore                  PASS
+native dump/restore authority, projection, role, and RLS checks    PASS
+git diff --check                                                   PASS
+W07 evidence credential-shaped scan                               0 matches
+```
+
+The snapshot archives cover `darwin/amd64`, `darwin/arm64`,
+`linux/amd64`, and `linux/arm64`. Every archive independently contained exactly
+`vermory`, `LICENSE`, `README.md`, and `README.zh-CN.md`; all checksums matched.
+The host archive reported version `0.0.0-SNAPSHOT-988ef60` and revision
+`988ef6069cc41a51d97d5bbb56303e6d77aab877`.
+
+## Cleanup
+
+After evidence capture, both dedicated databases, both temporary runtime roles,
+the custom dump, the isolated Grok home, and its copied login material were
+removed and verified absent. The ignored non-secret runtime JSON and transcripts
+remain local. The shared `vermory_test` database and unrelated user MCP
+configuration were not removed or modified.
+
 ## Claim Boundary
 
 This slice proves bounded trusted-document formation, exact-span validation,

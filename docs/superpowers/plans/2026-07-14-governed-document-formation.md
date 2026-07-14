@@ -134,7 +134,7 @@
 - Consumes: all previous tasks and existing release gates.
 - Produces: green local and protected-CI verification, downloaded snapshot checksums, clean commits, and an updated Draft PR while the overall Vermory goal remains active.
 
-- [ ] **Step 1: Run all Go database tests serially, the established race package set, reality race, `go vet`, `go mod tidy`, module diff, and `git diff --check`.**
-- [ ] **Step 2: Run actionlint, GoReleaser check/snapshot/checksums, OpenClaw install/check/package dry-run, migration replay, and native backup/restore with formation authority/RLS/runtime-role assertions.**
+- [x] **Step 1: Run all Go database tests serially, the established race package set, reality race, `go vet`, `go mod tidy`, module diff, and `git diff --check`.**
+- [x] **Step 2: Run actionlint, GoReleaser check/snapshot/checksums, OpenClaw install/check/package dry-run, migration replay, and native backup/restore with formation authority/RLS/runtime-role assertions.**
 - [ ] **Step 3: Commit and push `agent/grok-cli-runtime`, update Draft PR 1 with the W07 result and non-claims, wait for required CI, download its artifact, verify the GitHub digest and all four Go archives, then close every checklist item only from fresh evidence.**
-- [ ] **Step 4: Keep the overall Vermory goal active for broader formation quality, source authority ranking, hybrid retrieval, scale/fault qualification, withheld/sealed evaluation, signing, and final release acceptance.**
+- [x] **Step 4: Keep the overall Vermory goal active for broader formation quality, source authority ranking, hybrid retrieval, scale/fault qualification, withheld/sealed evaluation, signing, and final release acceptance.**
