@@ -36,14 +36,14 @@ func TestSeedCorpusMaterializesGovernedLifecycleAndVectorProjection(t *testing.T
 	if old.Lifecycle != "superseded" || proposed.Lifecycle != "proposed" || deleted.Lifecycle != "deleted" {
 		t.Fatalf("seeded lifecycle mismatch: old=%#v proposed=%#v deleted=%#v", old, proposed, deleted)
 	}
-	if got := backend.status(old.MemoryID); got != "superseded" {
-		t.Fatalf("vector old status=%q", got)
-	}
-	if got := backend.status(proposed.MemoryID); got != "proposed" {
-		t.Fatalf("vector proposed status=%q", got)
-	}
-	if backend.has(deleted.MemoryID) {
-		t.Fatal("deleted memory remained in vector projection")
+	for recordID, memoryID := range map[string]string{
+		"superseded": old.MemoryID,
+		"proposed":   proposed.MemoryID,
+		"deleted":    deleted.MemoryID,
+	} {
+		if backend.has(memoryID) {
+			t.Fatalf("%s memory remained in active vector projection", recordID)
+		}
 	}
 }
 
@@ -62,7 +62,7 @@ func TestSeedW08CorpusMaterializesAllRecords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(seeded.Records) != 60 || len(backend.records) != 56 {
+	if len(seeded.Records) != 60 || len(backend.records) != 48 {
 		t.Fatalf("full seed counts mismatch: authority=%d vector=%d", len(seeded.Records), len(backend.records))
 	}
 	for _, record := range corpus.Records {
@@ -145,10 +145,11 @@ func assertRuntimeSearchExcludes(t *testing.T, store *runtime.Store, tenantID, c
 
 type recordingBackend struct {
 	records map[string]memorybackend.Record
+	archive map[string]memorybackend.Record
 }
 
 func newRecordingBackend() *recordingBackend {
-	return &recordingBackend{records: map[string]memorybackend.Record{}}
+	return &recordingBackend{records: map[string]memorybackend.Record{}, archive: map[string]memorybackend.Record{}}
 }
 
 func (b *recordingBackend) Name() string                 { return "recording" }
@@ -164,6 +165,9 @@ func (b *recordingBackend) Update(ctx context.Context, record memorybackend.Reco
 	return b.Put(ctx, record)
 }
 func (b *recordingBackend) Delete(_ context.Context, _ memorybackend.Scope, recordID string) error {
+	if record, exists := b.records[recordID]; exists {
+		b.archive[recordID] = record
+	}
 	delete(b.records, recordID)
 	return nil
 }

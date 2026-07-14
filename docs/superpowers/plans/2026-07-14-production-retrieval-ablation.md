@@ -207,7 +207,11 @@ Expected: FAIL because seeding and the runner are absent.
 
 - [ ] **Step 3: Implement corpus seeding with `ConfirmWorkspaceBinding`, `ResolveOrCreateConversation`, `CommitGovernedObservation`, supersession, and `DeleteMemory`.**
 
-Use deterministic operation IDs derived from run ID plus record ID. Vector records use the returned governed memory IDs. Never insert directly into authoritative runtime tables or `memory_search_documents`.
+Use deterministic operation IDs derived from run ID plus record ID. Active
+vector records use the returned governed memory IDs. Proposed records are never
+inserted into the ANN projection; superseded and deleted records exercise a
+put/delete transition and must be absent from the final index. Never insert
+directly into authoritative runtime tables or `memory_search_documents`.
 
 - [ ] **Step 4: Make native backend scope rebuild deterministic and expose no authority mutation.**
 

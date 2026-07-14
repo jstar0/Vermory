@@ -126,6 +126,11 @@ func (b *scriptedBackend) Search(_ context.Context, query memorybackend.Query) (
 			byRecordID[record.Metadata["record_id"]] = record
 		}
 	}
+	for _, record := range b.archive {
+		if record.Scope == query.Scope {
+			byRecordID[record.Metadata["record_id"]] = record
+		}
+	}
 	order := b.orders[query.Text]
 	results := make([]memorybackend.Result, 0, len(order))
 	for index, recordID := range order {

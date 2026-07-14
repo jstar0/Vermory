@@ -118,27 +118,22 @@ func SeedCorpus(
 			Content:       record.Content,
 			Metadata:      map[string]string{"record_id": record.ID},
 		}
-		if record.Lifecycle == "deleted" {
+		switch record.Lifecycle {
+		case "proposed":
+			continue
+		case "superseded", "deleted":
 			backendRecord.Status = "active"
 			if err := backend.Put(ctx, backendRecord); err != nil {
-				return SeededCorpus{}, fmt.Errorf("seed deleted vector record %q: %w", record.ID, err)
+				return SeededCorpus{}, fmt.Errorf("seed removable vector record %q: %w", record.ID, err)
 			}
 			if err := backend.Delete(ctx, scope.BackendScope, backendRecord.ID); err != nil {
-				return SeededCorpus{}, fmt.Errorf("delete vector record %q: %w", record.ID, err)
+				return SeededCorpus{}, fmt.Errorf("remove ineligible vector record %q: %w", record.ID, err)
 			}
 			continue
-		}
-		if record.Lifecycle == "superseded" {
-			backendRecord.Status = "active"
+		case "active":
 			if err := backend.Put(ctx, backendRecord); err != nil {
-				return SeededCorpus{}, fmt.Errorf("seed superseded vector record %q: %w", record.ID, err)
+				return SeededCorpus{}, fmt.Errorf("seed vector record %q: %w", record.ID, err)
 			}
-			backendRecord.Status = "superseded"
-			if err := backend.Update(ctx, backendRecord); err != nil {
-				return SeededCorpus{}, fmt.Errorf("supersede vector record %q: %w", record.ID, err)
-			}
-		} else if err := backend.Put(ctx, backendRecord); err != nil {
-			return SeededCorpus{}, fmt.Errorf("seed vector record %q: %w", record.ID, err)
 		}
 		seeded.BackendRecords[record.ScopeID] = append(seeded.BackendRecords[record.ScopeID], backendRecord)
 	}

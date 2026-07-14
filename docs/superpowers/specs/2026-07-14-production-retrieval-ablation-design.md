@@ -104,10 +104,14 @@ Corpus lifecycle is materialized through existing operations:
 - separate anchors create cross-continuity distractors;
 - separate tenants create cross-tenant distractors.
 
-The vector backend receives the same runtime memory IDs and lifecycle states.
-Its state remains a disposable projection. A record cannot become eligible for
-vector or hybrid retrieval unless the authoritative governed memory is active
-for the requested tenant and continuity.
+The vector backend uses the same runtime memory IDs, but its final ANN
+projection contains only active eligible records. Supersession and deletion are
+replayed as projection deletion, while proposed records are never inserted.
+This avoids leaving ineligible rows inside the HNSW graph, where post-scan
+filtering can change recall after rebuild. The state remains disposable, and a
+record cannot become eligible for vector or hybrid retrieval unless the
+authoritative governed memory is active for the requested tenant and
+continuity.
 
 ## Real Embedding Contract
 
