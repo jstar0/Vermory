@@ -4,11 +4,89 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 )
 
 const ProductionRetrievalProfileID = "siliconflow-bge-m3-1024-v1"
+
+type RetrievalMode string
+
+const (
+	RetrievalLexical RetrievalMode = "lexical"
+	RetrievalShadow  RetrievalMode = "shadow"
+	RetrievalVector  RetrievalMode = "vector"
+)
+
+type RetrievalRequest struct {
+	OperationID   string
+	TenantID      string
+	ContinuityIDs []string
+	Query         string
+	Limit         int
+	Mode          RetrievalMode
+}
+
+func (r RetrievalRequest) normalized() (RetrievalRequest, error) {
+	r.OperationID = strings.TrimSpace(r.OperationID)
+	r.TenantID = strings.TrimSpace(r.TenantID)
+	r.Query = strings.TrimSpace(r.Query)
+	if r.Mode == "" {
+		r.Mode = RetrievalLexical
+	}
+	if r.Mode != RetrievalLexical && r.Mode != RetrievalShadow && r.Mode != RetrievalVector {
+		return RetrievalRequest{}, fmt.Errorf("retrieval mode must be lexical, shadow, or vector")
+	}
+	if r.Mode != RetrievalLexical && r.OperationID == "" {
+		return RetrievalRequest{}, fmt.Errorf("retrieval operation ID is required")
+	}
+	if r.TenantID == "" {
+		return RetrievalRequest{}, fmt.Errorf("retrieval tenant ID is required")
+	}
+	if len(r.ContinuityIDs) == 0 || len(r.ContinuityIDs) > 50 {
+		return RetrievalRequest{}, fmt.Errorf("retrieval requires between 1 and 50 continuity IDs")
+	}
+	continuityIDs := make([]string, 0, len(r.ContinuityIDs))
+	seen := make(map[string]struct{}, len(r.ContinuityIDs))
+	for _, continuityID := range r.ContinuityIDs {
+		continuityID = strings.TrimSpace(continuityID)
+		if continuityID == "" {
+			return RetrievalRequest{}, fmt.Errorf("retrieval continuity ID is required")
+		}
+		if _, exists := seen[continuityID]; exists {
+			return RetrievalRequest{}, fmt.Errorf("retrieval continuity IDs must be unique")
+		}
+		seen[continuityID] = struct{}{}
+		continuityIDs = append(continuityIDs, continuityID)
+	}
+	sort.Strings(continuityIDs)
+	r.ContinuityIDs = continuityIDs
+	if r.Query == "" {
+		return RetrievalRequest{}, fmt.Errorf("retrieval query is required")
+	}
+	if r.Limit < 0 {
+		return RetrievalRequest{}, fmt.Errorf("retrieval limit cannot be negative")
+	}
+	if r.Limit == 0 {
+		r.Limit = defaultContextItems
+	}
+	if r.Limit > maxContextItems {
+		r.Limit = maxContextItems
+	}
+	return r, nil
+}
+
+type RetrievalResult struct {
+	Memories  []Memory
+	Effective RetrievalMode
+	Degraded  bool
+	AuditID   string
+}
+
+type MemoryRetriever interface {
+	Retrieve(context.Context, RetrievalRequest) (RetrievalResult, error)
+}
 
 type RetrievalProfile struct {
 	ID         string

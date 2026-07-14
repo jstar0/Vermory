@@ -106,6 +106,65 @@ LIMIT $4`, tenantID, continuityID, query, limit)
 	return memories, nil
 }
 
+func (s *Store) ResolveLinkedConversationContinuityIDs(ctx context.Context, tenantID, continuityID string) ([]string, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.pool.Query(ctx, `
+WITH requested AS (
+  SELECT id
+  FROM continuity_spaces
+  WHERE tenant_id = $1 AND id = $2::uuid
+    AND continuity_line = 'conversation' AND state = 'active'
+), link_root AS (
+  SELECT COALESCE(
+    (
+      SELECT primary_continuity_id
+      FROM conversation_links
+      WHERE tenant_id = $1
+        AND linked_continuity_id = requested.id
+        AND link_state = 'active'
+      LIMIT 1
+    ),
+    requested.id
+  ) AS continuity_id
+  FROM requested
+), scope AS (
+  SELECT continuity_id FROM link_root
+  UNION
+  SELECT link.linked_continuity_id
+  FROM conversation_links link
+  JOIN link_root root ON root.continuity_id = link.primary_continuity_id
+  WHERE link.tenant_id = $1 AND link.link_state = 'active'
+)
+SELECT continuity.id::text
+FROM scope
+JOIN continuity_spaces continuity
+  ON continuity.tenant_id = $1 AND continuity.id = scope.continuity_id
+WHERE continuity.continuity_line = 'conversation' AND continuity.state = 'active'
+ORDER BY continuity.id::text`, tenantID, continuityID)
+	if err != nil {
+		return nil, fmt.Errorf("resolve linked conversation scope: %w", err)
+	}
+	defer rows.Close()
+	continuityIDs := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan linked conversation scope: %w", err)
+		}
+		continuityIDs = append(continuityIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate linked conversation scope: %w", err)
+	}
+	if len(continuityIDs) == 0 {
+		return nil, fmt.Errorf("active conversation continuity was not found")
+	}
+	return continuityIDs, nil
+}
+
 const conversationUserSourceRef = "conversation:user"
 
 func (s *Store) ResolveConversation(ctx context.Context, tenantID string, anchor ConversationAnchor) (ConversationResolution, error) {
