@@ -153,6 +153,7 @@ func (s *Store) SchemaVersion(ctx context.Context) (int64, error) {
 func (s *Store) ResetForTest(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 TRUNCATE vermory_auth.api_tokens,
+  memory_retrieval_runs, memory_vector_documents, memory_projection_cursors, memory_projection_events,
   source_formation_items, source_formation_runs, source_match_decisions,
   conversation_links, bridge_memory_effects, bridge_events, bridge_operations,
   memory_search_documents, memory_deliveries, governed_memories,
@@ -222,6 +223,7 @@ WHERE rolname = current_user`).Scan(&canLogin, &superuser, &bypassRLS); err != n
 		"governed_memories", "memory_deliveries", "memory_search_documents", "conversation_turns",
 		"bridge_operations", "bridge_events", "bridge_memory_effects", "conversation_links",
 		"source_match_decisions", "source_formation_runs", "source_formation_items",
+		"memory_projection_events", "memory_projection_cursors", "memory_vector_documents", "memory_retrieval_runs",
 	}
 	var ownedTables int
 	if err := s.pool.QueryRow(validationCtx, `
@@ -245,7 +247,8 @@ SELECT
     AND has_table_privilege(current_user, 'public.' || required.table_name, 'UPDATE')
     AND has_table_privilege(current_user, 'public.' || required.table_name, 'DELETE')
   ), false)
-  AND has_sequence_privilege(current_user, 'public.observations_observation_seq_seq', 'USAGE')
+	  AND has_sequence_privilege(current_user, 'public.observations_observation_seq_seq', 'USAGE')
+	  AND has_sequence_privilege(current_user, 'public.memory_projection_events_event_id_seq', 'USAGE')
   AND has_function_privilege(current_user, 'vermory_auth.authenticate_token(text,bytea)', 'EXECUTE')
 FROM unnest($1::text[]) AS required(table_name)`, tables).Scan(&hasRequiredPrivileges); err != nil {
 		return fmt.Errorf("validate runtime required privileges: %w", err)

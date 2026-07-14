@@ -181,6 +181,36 @@ func TestTenantPoolRejectsCrossTenantForeignKeys(t *testing.T) {
               )`,
 			args: []any{graphA.continuityID},
 		},
+		{
+			name: "projection event memory",
+			sql: `INSERT INTO memory_projection_events (
+                tenant_id, continuity_id, memory_id, desired_state, authority_version
+              ) VALUES ('identity-b', $1::uuid, $2::uuid, 'active', now())`,
+			args: []any{graphB.continuityID, graphA.memoryID},
+		},
+		{
+			name: "vector document memory",
+			sql: `INSERT INTO memory_vector_documents (
+                profile_id, tenant_id, continuity_id, memory_id, content_sha256, embedding
+              ) VALUES (
+                'siliconflow-bge-m3-1024-v1', 'identity-b', $1::uuid, $2::uuid,
+                repeat('a', 64), array_fill(0::real, ARRAY[1024])::vector
+              )`,
+			args: []any{graphB.continuityID, graphA.memoryID},
+		},
+		{
+			name: "retrieval audit continuity",
+			sql: `INSERT INTO memory_retrieval_runs (
+                tenant_id, primary_continuity_id, continuity_ids, operation_id,
+                request_fingerprint, requested_mode, effective_mode, profile_id,
+                query_sha256, projection_current, degraded
+              ) VALUES (
+                'identity-b', $1::uuid, ARRAY[$1::uuid], 'attack-retrieval-run',
+                repeat('a', 64), 'vector', 'vector', 'siliconflow-bge-m3-1024-v1',
+                repeat('b', 64), true, false
+              )`,
+			args: []any{graphA.continuityID},
+		},
 	}
 	for _, attack := range attacks {
 		if _, err := runtimeStore.pool.Exec(tenantB, attack.sql, attack.args...); err == nil {
@@ -222,6 +252,15 @@ func TestRuntimeRoleValidationRejectsUnsafeIdentities(t *testing.T) {
 	}
 	if err := runtimeStore.ValidateRuntimeRole(ctx); err == nil {
 		t.Fatal("runtime identity without source_formation_items access passed validation")
+	}
+	if err := authn.GrantRuntimeRole(ctx, admin.pool, runtimeRole); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.pool.Exec(ctx, "REVOKE ALL ON public.memory_vector_documents FROM "+pgx.Identifier{runtimeRole}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	if err := runtimeStore.ValidateRuntimeRole(ctx); err == nil {
+		t.Fatal("runtime identity without memory_vector_documents access passed validation")
 	}
 	if err := authn.GrantRuntimeRole(ctx, admin.pool, runtimeRole); err != nil {
 		t.Fatal(err)

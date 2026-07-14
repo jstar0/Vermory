@@ -29,6 +29,10 @@ var servedTables = []string{
 	"source_match_decisions",
 	"source_formation_runs",
 	"source_formation_items",
+	"memory_projection_events",
+	"memory_projection_cursors",
+	"memory_vector_documents",
+	"memory_retrieval_runs",
 }
 
 var forbiddenRuntimeTables = []string{
@@ -99,6 +103,7 @@ WHERE r.rolname = $1
 		"GRANT USAGE ON SCHEMA public, vermory_auth TO " + roleSQL,
 		"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE " + strings.Join(servedSQL, ", ") + " TO " + roleSQL,
 		"GRANT USAGE, SELECT ON SEQUENCE public.observations_observation_seq_seq TO " + roleSQL,
+		"GRANT USAGE, SELECT ON SEQUENCE public.memory_projection_events_event_id_seq TO " + roleSQL,
 		"GRANT EXECUTE ON FUNCTION vermory_auth.authenticate_token(TEXT, BYTEA) TO " + roleSQL,
 		"REVOKE ALL PRIVILEGES ON TABLE " + strings.Join(forbiddenSQL, ", ") + " FROM " + roleSQL,
 	}

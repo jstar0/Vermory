@@ -141,6 +141,10 @@ func TestIdentityRLSMigrationEnablesEveryServedTenantTable(t *testing.T) {
 		"source_match_decisions",
 		"source_formation_runs",
 		"source_formation_items",
+		"memory_projection_events",
+		"memory_projection_cursors",
+		"memory_vector_documents",
+		"memory_retrieval_runs",
 	}
 	for _, table := range tables {
 		var enabled bool
@@ -225,6 +229,11 @@ func TestIdentityRLSMigrationAddsTenantAwareForeignKeys(t *testing.T) {
 		"source_formation_items_tenant_target_memory_fk",
 		"source_formation_items_tenant_observation_fk",
 		"source_formation_items_tenant_candidate_memory_fk",
+		"memory_projection_events_tenant_continuity_fk",
+		"memory_projection_events_tenant_memory_fk",
+		"memory_vector_documents_tenant_continuity_fk",
+		"memory_vector_documents_tenant_memory_fk",
+		"memory_retrieval_runs_tenant_primary_continuity_fk",
 	}
 	for _, name := range constraints {
 		var validated bool

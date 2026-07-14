@@ -163,6 +163,22 @@ SELECT has_function_privilege($1, 'vermory_auth.authenticate_token(text,bytea)',
 	if !canExecute {
 		t.Fatal("grant-runtime did not grant authenticate_token execution")
 	}
+	for _, table := range []string{
+		"memory_projection_events", "memory_projection_cursors",
+		"memory_vector_documents", "memory_retrieval_runs",
+	} {
+		var canSelect, canInsert, canUpdate, canDelete bool
+		if err := pool.QueryRow(context.Background(), `
+SELECT has_table_privilege($1, 'public.' || $2, 'SELECT'),
+       has_table_privilege($1, 'public.' || $2, 'INSERT'),
+       has_table_privilege($1, 'public.' || $2, 'UPDATE'),
+       has_table_privilege($1, 'public.' || $2, 'DELETE')`, roleName, table).Scan(&canSelect, &canInsert, &canUpdate, &canDelete); err != nil {
+			t.Fatal(err)
+		}
+		if !canSelect || !canInsert || !canUpdate || !canDelete {
+			t.Fatalf("grant-runtime did not grant served privileges on %s: select=%v insert=%v update=%v delete=%v", table, canSelect, canInsert, canUpdate, canDelete)
+		}
+	}
 }
 
 func resetIdentityCLIStore(t *testing.T) string {
