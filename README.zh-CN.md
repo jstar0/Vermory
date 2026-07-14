@@ -55,7 +55,7 @@ Experiment 0 已完成，当前仓库已经具备：
 - 9 个覆盖 workspace、conversation、Global Defaults、删除、source injection、durable bridge、OpenClaw 日常事务连续性、authenticated multi-tenant RLS 与 PostgreSQL 运维恢复的公开冻结案例；
 - JSON 和 Markdown 实验报告。
 
-仓库同时已经包含 workspace、conversation、Global Defaults、durable bridge、显式可信来源修订、OpenClaw external-turn lifecycle、authenticated multi-tenant HTTP profile 和原生 PostgreSQL 恢复的生产形态运行切片。来源修订切片可以用新来源替代一个被明确指定的当前事实，同时保留无关事实和历史，并保证旧事实在投影重建后仍不会进入当前上下文；该链路已由真实 Grok MCP 任务消费和回写。认证 profile 使用服务端发行且只保存 digest 的 token、角色路由、非 owner PostgreSQL runtime identity、tenant-aware foreign keys，以及覆盖当前 continuity graph 的 RLS。恢复证据覆盖迁移重放、原生 dump/restore、投影重建、runtime role 重建和有界数据库中断恢复。每份证据只对实际执行过的客户端、模型、故障条件和确定性硬门负责，任何单一切片都不被当成“整个平台已经完成”的证明。
+仓库同时已经包含 workspace、conversation、Global Defaults、durable bridge、显式可信来源修订、OpenClaw external-turn lifecycle、authenticated multi-tenant HTTP profile 和原生 PostgreSQL 恢复的生产形态运行切片。来源修订切片可以用新来源替代一个被明确指定的当前事实，同时保留无关事实和历史，并保证旧事实在投影重建后仍不会进入当前上下文；该链路已由真实 Grok MCP 任务消费和回写。认证 profile 使用服务端发行且只保存 digest 的 token、角色路由、非 owner PostgreSQL runtime identity、tenant-aware foreign keys，以及覆盖当前 continuity graph 的 RLS。恢复证据覆盖迁移重放、原生 dump/restore、投影重建、runtime role 重建和有界数据库中断恢复。Pull Request CI 现在会在干净 Ubuntu runner 上启动 PostgreSQL 18，并自动执行数据库 Go 测试、关键 runtime race、release build 和 OpenClaw 安装/检查/打包链路。每份证据只对实际执行过的客户端、模型、故障条件和确定性硬门负责，任何单一切片都不被当成“整个平台已经完成”的证明。
 
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
