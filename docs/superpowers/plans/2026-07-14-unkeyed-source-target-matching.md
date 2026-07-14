@@ -71,11 +71,11 @@
 - Consumes: `provider.Provider`, `provider.GenerateRequest`, and Task 2 store methods.
 - Produces: `NewSourceMatchingService` and `MatchSource` with terminal audit receipts.
 
-- [ ] **Step 1: Write failing service tests for correct match, abstain, empty set, invalid key, malformed JSON, trailing output, timeout, replay without provider recall, candidate drift, cross-tenant exclusion, and prompt injection.**
-- [ ] **Step 2: Run the focused service tests and confirm behavior failures, not fixture errors.**
-- [ ] **Step 3: Implement the strict JSON parser, bounded prompt, source/candidate data separation, artifact hashing, and durable failure mapping.**
-- [ ] **Step 4: Implement match orchestration without adding retry, extraction, ranking, or automatic activation.**
-- [ ] **Step 5: Run focused runtime tests serially until green and commit.**
+- [x] **Step 1: Write failing service tests for correct match, abstain, empty set, invalid key, malformed JSON, trailing output, timeout, replay without provider recall, candidate drift, cross-tenant exclusion, and prompt injection.**
+- [x] **Step 2: Run the focused service tests and confirm behavior failures, not fixture errors.**
+- [x] **Step 3: Implement the strict JSON parser, bounded prompt, source/candidate data separation, artifact hashing, and durable failure mapping.**
+- [x] **Step 4: Implement match orchestration without adding retry, extraction, ranking, or automatic activation.**
+- [x] **Step 5: Run focused runtime tests serially until green and commit.**
 
 ### Task 4: Operator CLI
 
