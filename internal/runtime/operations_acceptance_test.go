@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -208,6 +209,195 @@ func TestOperationsRecovery(t *testing.T) {
 			t.Fatalf("release migration reached schema %d", schemaVersion)
 		}
 	})
+
+	t.Run("schema 14 retrieval dump restore and disposable rebuild", func(t *testing.T) {
+		testProductionRetrievalDumpRestore(t, databaseURL)
+	})
+}
+
+func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
+	t.Helper()
+	ctx := context.Background()
+	sourceURL, _, _ := createOperationsDatabase(t, baseURL)
+	targetURL, _, _ := createOperationsDatabase(t, baseURL)
+	source, err := OpenStore(ctx, sourceURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(source.Close)
+	if err := source.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	governance := NewGovernanceService(source, "ops-retrieval-tenant")
+	if _, err := governance.ConfirmWorkspace(ctx, "/fixtures/ops-retrieval"); err != nil {
+		t.Fatal(err)
+	}
+	active, err := governance.AddSource(ctx, "/fixtures/ops-retrieval", GovernanceWriteRequest{
+		OperationID: "ops-retrieval-source",
+		MemoryKey:   "release.rollback.approval",
+		Content:     "Rollback requires two maintainers.",
+		SourceRef:   "fixture:ops-retrieval",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolution, err := source.ResolveWorkspace(ctx, "ops-retrieval-tenant", WorkspaceAnchor{RepoRoot: "/fixtures/ops-retrieval"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	embedder := &projectionTestEmbedder{vector: testVector1024(0.25)}
+	worker := mustProjectionWorker(t, source, embedder, "ops-retrieval-tenant", 16)
+	if _, err := worker.RunOnce(ctx); err != nil {
+		t.Fatal(err)
+	}
+	coordinator, err := NewRetrievalCoordinator(source, embedder, RetrievalProfile{
+		ID:         ProductionRetrievalProfileID,
+		BaseURL:    "https://api.siliconflow.cn/v1",
+		Model:      "BAAI/bge-m3",
+		Dimensions: 1024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeResult, err := coordinator.Retrieve(ctx, RetrievalRequest{
+		OperationID:   "ops-retrieval-before-dump",
+		TenantID:      "ops-retrieval-tenant",
+		ContinuityIDs: []string{resolution.ContinuityID},
+		Query:         "rollback approval",
+		Limit:         5,
+		Mode:          RetrievalVector,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(beforeResult.Memories) != 1 || beforeResult.Memories[0].ID != active.Memory.MemoryID {
+		t.Fatalf("unexpected pre-dump vector result: %#v", beforeResult)
+	}
+	sourceFingerprint := operationsAuthorityFingerprint(t, source.pool)
+	sourceCounts := operationsRetrievalCounts(t, source.pool)
+
+	dumpPath := filepath.Join(t.TempDir(), "vermory-retrieval.dump")
+	pgDump := postgresTestTool(t, "pg_dump")
+	pgRestore := postgresTestTool(t, "pg_restore")
+	dump := exec.Command(pgDump, "--format=custom", "--file", dumpPath, sourceURL)
+	if output, err := dump.CombinedOutput(); err != nil {
+		t.Fatalf("dump schema 14 retrieval database: %v\n%s", err, output)
+	}
+	restore := exec.Command(pgRestore, "--no-owner", "--dbname", targetURL, dumpPath)
+	if output, err := restore.CombinedOutput(); err != nil {
+		t.Fatalf("restore schema 14 retrieval database: %v\n%s", err, output)
+	}
+
+	target, err := OpenStore(ctx, targetURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(target.Close)
+	version, err := target.SchemaVersion(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != 14 {
+		t.Fatalf("restored schema version=%d", version)
+	}
+	if targetCounts := operationsRetrievalCounts(t, target.pool); !reflect.DeepEqual(targetCounts, sourceCounts) {
+		t.Fatalf("restored retrieval counts=%#v want %#v", targetCounts, sourceCounts)
+	}
+	if targetFingerprint := operationsAuthorityFingerprint(t, target.pool); targetFingerprint != sourceFingerprint {
+		t.Fatalf("restore changed authority: source=%s target=%s", sourceFingerprint, targetFingerprint)
+	}
+
+	targetCoordinator, err := NewRetrievalCoordinator(target, embedder, RetrievalProfile{
+		ID:         ProductionRetrievalProfileID,
+		BaseURL:    "https://api.siliconflow.cn/v1",
+		Model:      "BAAI/bge-m3",
+		Dimensions: 1024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	restoredResult, err := targetCoordinator.Retrieve(ctx, RetrievalRequest{
+		OperationID:   "ops-retrieval-after-restore",
+		TenantID:      "ops-retrieval-tenant",
+		ContinuityIDs: []string{resolution.ContinuityID},
+		Query:         "rollback approval",
+		Limit:         5,
+		Mode:          RetrievalVector,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(retrievalMemoryIDs(beforeResult.Memories), retrievalMemoryIDs(restoredResult.Memories)) {
+		t.Fatalf("restore changed retrieval IDs: before=%#v restored=%#v", retrievalMemoryIDs(beforeResult.Memories), retrievalMemoryIDs(restoredResult.Memories))
+	}
+	if err := target.ResetVectorProjection(ctx, "ops-retrieval-tenant", ProductionRetrievalProfileID); err != nil {
+		t.Fatal(err)
+	}
+	if resetFingerprint := operationsAuthorityFingerprint(t, target.pool); resetFingerprint != sourceFingerprint {
+		t.Fatalf("post-restore vector deletion changed authority: source=%s reset=%s", sourceFingerprint, resetFingerprint)
+	}
+	targetWorker := mustProjectionWorker(t, target, embedder, "ops-retrieval-tenant", 16)
+	if _, err := targetWorker.RunOnce(ctx); err != nil {
+		t.Fatal(err)
+	}
+	rebuiltResult, err := targetCoordinator.Retrieve(ctx, RetrievalRequest{
+		OperationID:   "ops-retrieval-after-rebuild",
+		TenantID:      "ops-retrieval-tenant",
+		ContinuityIDs: []string{resolution.ContinuityID},
+		Query:         "rollback approval",
+		Limit:         5,
+		Mode:          RetrievalVector,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(retrievalMemoryIDs(beforeResult.Memories), retrievalMemoryIDs(rebuiltResult.Memories)) {
+		t.Fatalf("post-restore rebuild changed retrieval IDs: before=%#v rebuilt=%#v", retrievalMemoryIDs(beforeResult.Memories), retrievalMemoryIDs(rebuiltResult.Memories))
+	}
+	if rebuiltFingerprint := operationsAuthorityFingerprint(t, target.pool); rebuiltFingerprint != sourceFingerprint {
+		t.Fatalf("post-restore replay changed authority: source=%s rebuilt=%s", sourceFingerprint, rebuiltFingerprint)
+	}
+}
+
+type operationsRetrievalTableCounts struct {
+	Events  int
+	Cursors int
+	Vectors int
+	Audits  int
+}
+
+func operationsRetrievalCounts(t *testing.T, pool *pgxpool.Pool) operationsRetrievalTableCounts {
+	t.Helper()
+	var counts operationsRetrievalTableCounts
+	if err := pool.QueryRow(context.Background(), `
+SELECT
+  (SELECT count(*) FROM memory_projection_events),
+  (SELECT count(*) FROM memory_projection_cursors),
+  (SELECT count(*) FROM memory_vector_documents),
+  (SELECT count(*) FROM memory_retrieval_runs)`).Scan(&counts.Events, &counts.Cursors, &counts.Vectors, &counts.Audits); err != nil {
+		t.Fatal(err)
+	}
+	if counts.Events == 0 || counts.Cursors == 0 || counts.Vectors == 0 || counts.Audits == 0 {
+		t.Fatalf("retrieval dump source is incomplete: %#v", counts)
+	}
+	return counts
+}
+
+func postgresTestTool(t *testing.T, name string) string {
+	t.Helper()
+	if path, err := exec.LookPath(name); err == nil {
+		return path
+	}
+	for _, path := range []string{
+		filepath.Join("/opt/homebrew/opt/postgresql@18/bin", name),
+		filepath.Join("/opt/homebrew/opt/libpq/bin", name),
+	} {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return path
+		}
+	}
+	t.Skipf("%s is not available", name)
+	return ""
 }
 
 func operationsTurnCountEventually(t *testing.T, pool *pgxpool.Pool, operationID string) int {

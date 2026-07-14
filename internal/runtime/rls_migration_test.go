@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"vermory/internal/authn"
 )
 
 func TestIdentityRLSMigrationCreatesRestrictedAuthSchema(t *testing.T) {
@@ -118,6 +120,74 @@ WHERE c.conrelid = 'vermory_auth.api_tokens'::regclass AND c.contype = 'c'`,
 	for _, expected := range []string{"client", "operator", "owner", "active", "revoked"} {
 		if !strings.Contains(checks, expected) {
 			t.Fatalf("auth token checks do not constrain %q: %s", expected, checks)
+		}
+	}
+}
+
+func TestProductionRetrievalRLSFiltersEveryOperationalTable(t *testing.T) {
+	admin, databaseURL := openTenantPoolAdmin(t)
+	ctx := context.Background()
+	graphA := seedTenantGraph(t, admin.pool, "retrieval-rls-a", "retrieval-a")
+	graphB := seedTenantGraph(t, admin.pool, "retrieval-rls-b", "retrieval-b")
+	for tenantID, graph := range map[string]tenantGraph{
+		"retrieval-rls-a": graphA,
+		"retrieval-rls-b": graphB,
+	} {
+		if _, err := admin.pool.Exec(ctx, `
+INSERT INTO memory_projection_cursors (tenant_id, profile_id, last_event_id, status)
+VALUES ($1, $2, 0, 'idle')`, tenantID, ProductionRetrievalProfileID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.pool.Exec(ctx, `
+INSERT INTO memory_vector_documents (
+  profile_id, tenant_id, continuity_id, memory_id, content_sha256, embedding
+) VALUES ($1, $2, $3::uuid, $4::uuid, repeat('a', 64), array_fill(0::real, ARRAY[1024])::vector)`, ProductionRetrievalProfileID, tenantID, graph.continuityID, graph.memoryID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.pool.Exec(ctx, `
+INSERT INTO memory_retrieval_runs (
+  tenant_id, primary_continuity_id, continuity_ids, operation_id,
+  request_fingerprint, requested_mode, effective_mode, profile_id,
+  query_sha256, projection_current, degraded
+) VALUES (
+  $1, $2::uuid, ARRAY[$2::uuid], $3,
+  repeat('b', 64), 'vector', 'vector', $4,
+  repeat('c', 64), true, false
+)`, tenantID, graph.continuityID, "retrieval-rls-run-"+tenantID, ProductionRetrievalProfileID); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	roleName, runtimeURL := createTenantPoolRole(t, admin.pool, databaseURL, "retrieval_rls", "")
+	if err := authn.GrantRuntimeRole(ctx, admin.pool, roleName); err != nil {
+		t.Fatal(err)
+	}
+	runtimeStore, err := OpenStoreWithOptions(ctx, runtimeURL, StoreOptions{EnforceTenantContext: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(runtimeStore.Close)
+	for _, table := range []string{
+		"memory_projection_events",
+		"memory_projection_cursors",
+		"memory_vector_documents",
+		"memory_retrieval_runs",
+	} {
+		if err := runtimeStore.pool.QueryRow(ctx, "SELECT count(*) FROM "+table).Scan(new(int)); err == nil {
+			t.Fatalf("%s did not fail closed without tenant context", table)
+		}
+		for _, tenantID := range []string{"retrieval-rls-a", "retrieval-rls-b"} {
+			tenantCtx, err := withTenantContext(ctx, tenantID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var visible string
+			if err := runtimeStore.pool.QueryRow(tenantCtx, "SELECT string_agg(DISTINCT tenant_id, ',' ORDER BY tenant_id) FROM "+table).Scan(&visible); err != nil {
+				t.Fatalf("query %s as %s: %v", table, tenantID, err)
+			}
+			if visible != tenantID {
+				t.Fatalf("%s tenant %s observed %q", table, tenantID, visible)
+			}
 		}
 	}
 }
