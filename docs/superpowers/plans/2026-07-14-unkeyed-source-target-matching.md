@@ -106,13 +106,13 @@
 - Consumes: dedicated PostgreSQL database, release binary, locally authenticated Grok CLI, existing MCP server, and W06 fixture.
 - Produces: reproducible matched/abstained evidence, accepted current context, model artifact, write-back, hashes, and non-claims.
 
-- [ ] **Step 1: Build an isolated release binary and migrate a dedicated W06 database to schema 11.**
-- [ ] **Step 2: Seed three local keyed facts plus one cross-tenant distractor and verify the pre-match context.**
-- [ ] **Step 3: Run real Grok match, ambiguous abstain, and unrelated abstain operations and preserve exact provider evidence hashes.**
-- [ ] **Step 4: Verify proposal invisibility, inspect the durable match, accept the candidate explicitly, and rebuild projections.**
-- [ ] **Step 5: Run isolated Grok through Vermory MCP to create `release-control-policy.md` and commit its result as proposed.**
-- [ ] **Step 6: Verify positive and negative artifact assertions, stale-query probes, cross-tenant isolation, lifecycle rows, RLS, and projection fingerprint.**
-- [ ] **Step 7: Record exact commands, revisions, versions, hashes, row counts, failures, and non-claims, then commit.**
+- [x] **Step 1: Build an isolated release binary and migrate a dedicated W06 database to schema 11.**
+- [x] **Step 2: Seed three local keyed facts plus one cross-tenant distractor and verify the pre-match context.**
+- [x] **Step 3: Run real Grok match, ambiguous abstain, and unrelated abstain operations and preserve exact provider evidence hashes.**
+- [x] **Step 4: Verify proposal invisibility, inspect the durable match, accept the candidate explicitly, and rebuild projections.**
+- [x] **Step 5: Run isolated Grok through Vermory MCP to create `release-control-policy.md` and commit its result as proposed.**
+- [x] **Step 6: Verify positive and negative artifact assertions, stale-query probes, cross-tenant isolation, lifecycle rows, RLS, and projection fingerprint.**
+- [x] **Step 7: Record exact commands, revisions, versions, hashes, row counts, failures, and non-claims, then commit.**
 
 ### Task 6: Full Verification And Delivery
 

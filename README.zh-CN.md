@@ -55,7 +55,7 @@ Experiment 0 已完成，当前仓库已经具备：
 - 9 个覆盖 workspace、conversation、Global Defaults、删除、source injection、durable bridge、OpenClaw 日常事务连续性、authenticated multi-tenant RLS 与 PostgreSQL 运维恢复的公开冻结案例；
 - JSON 和 Markdown 实验报告。
 
-仓库同时已经包含 workspace、conversation、Global Defaults、durable bridge、显式可信来源修订、按稳定事实 key 治理的 source candidate、OpenClaw external-turn lifecycle、authenticated multi-tenant HTTP profile 和原生 PostgreSQL 恢复的生产形态运行切片。来源变化可以先形成候选而不改变 AI 当前上下文；拒绝候选不会改动当前事实，接受候选则原子替代仍然有效的同 key 目标。真实 Grok MCP 任务已经在投影重建后只消费被接受的新事实，并把结果回写为 proposed。认证 profile 使用服务端发行且只保存 digest 的 token、角色路由、非 owner PostgreSQL runtime identity、tenant-aware foreign keys，以及覆盖当前 continuity graph 的 RLS。恢复证据覆盖迁移重放、原生 dump/restore、投影重建、runtime role 重建和有界数据库中断恢复。Pull Request CI 会在干净 Ubuntu runner 上启动 PostgreSQL 18，并自动执行数据库 Go 测试、关键 runtime race、release build 和 OpenClaw 安装/检查/打包链路。每份证据只对实际执行过的客户端、模型、故障条件和确定性硬门负责，任何单一切片都不被当成“整个平台已经完成”的证明。
+仓库同时已经包含 workspace、conversation、Global Defaults、durable bridge、显式可信来源修订、按稳定事实 key 治理的 source candidate、可信来源无 key 时的 provider 闭集目标匹配、OpenClaw external-turn lifecycle、authenticated multi-tenant HTTP profile 和原生 PostgreSQL 恢复的生产形态运行切片。来源变化可以先形成候选而不改变 AI 当前上下文；拒绝候选不会改动当前事实，接受候选则原子替代仍然有效的同 key 目标。可信来源只有精确内容和 revision、没有内部 key 时，provider 只能从当前 scope 的闭合集合中选一个现有 key 或 abstain；Vermory 会验证并审计结果，仍然要求操作者明确接受。真实 Grok MCP 任务已经在投影重建后只消费被接受的新事实，并把结果回写为 proposed。认证 profile 使用服务端发行且只保存 digest 的 token、角色路由、非 owner PostgreSQL runtime identity、tenant-aware foreign keys，以及覆盖当前 continuity graph 的 RLS。恢复证据覆盖迁移重放、原生 dump/restore、投影重建、runtime role 重建和有界数据库中断恢复。Pull Request CI 会在干净 Ubuntu runner 上启动 PostgreSQL 18，并自动执行数据库 Go 测试、关键 runtime race、release build 和 OpenClaw 安装/检查/打包链路。每份证据只对实际执行过的客户端、模型、故障条件和确定性硬门负责，任何单一切片都不被当成“整个平台已经完成”的证明。
 
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
@@ -102,6 +102,8 @@ go run ./cmd/vermory experiment-0 \
 可信来源发生变化时，`memory revise-source` 会替代一个被明确指定的当前事实；它不会用语义相似度猜测目标，也不会覆盖同工作区中的无关事实。[显式来源修订运行实证](docs/evidence/2026-07-14-source-revision-runtime.md)记录了软件发布命令更新、投影重建、旧事实精确与改写探针、真实 Grok MCP 消费回写，以及本轮 Codex 因模型或账户配额在 MCP 前失败的边界。
 
 当可信 ingestor 能提供稳定事实 key 时，`memory propose-source` 会先生成可审查候选，不改变当前检索；操作者再使用 `memory accept-candidate` 或 `memory reject-candidate` 明确裁决，普通 MCP 客户端看不到 proposed/rejected 内容。[来源冲突候选运行实证](docs/evidence/2026-07-14-source-conflict-candidate-runtime.md)记录了拒绝、接受、跨租户阻断、投影重建、旧事实原文与改写探针，以及真实 Grok MCP 消费回写的完整链路。
+
+当可信来源只有精确事实与 revision、没有 Vermory 内部 key 时，`memory match-source` 会让已配置 provider 只从当前 workspace 的闭集 key 中选择一个目标或 abstain。provider 不能创造 authority、跨 scope 或直接激活 memory；合法匹配只会形成原有的可审查 source candidate。[无 key 来源目标匹配运行实证](docs/evidence/2026-07-14-unkeyed-source-target-matching-runtime.md)记录了真实 Grok matched/abstained、proposal 隔离、显式接受、RLS 审计、投影重建、stale probes 与真实 MCP coder 回写。该能力是闭集匹配，不是任意文档抽取。
 
 ## 发布产物
 

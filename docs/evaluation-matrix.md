@@ -169,6 +169,7 @@ go run ./cmd/vermory benchmark-coverage \
 - LongMemEval original oracle sample with Grok: completed as `dataset_sample`
 - Explicit source revision runtime with Grok MCP: completed
 - Governed source conflict candidate runtime with Grok MCP: completed
+- Provider-assisted unkeyed source target matching with Grok MCP: completed
 
 ## Completed Runs
 
@@ -184,6 +185,8 @@ go run ./cmd/vermory benchmark-coverage \
 - Source revision Grok session: `955B4CA6-68EB-4D0E-9CB4-96BE91AC1776`
 - Source candidate Grok session: `019f5f3c-d836-7d80-a8de-995dcde29ef8`
 - Source candidate stale-probe session: `019f5f3e-4b7f-7510-8cda-a26e0ba89725`
+- Unkeyed source matching coder session: `019f5f83-d177-7192-ae20-f7b96ca2a05a`
+- Unkeyed source matching stale-probe session: `019f5f85-3411-7f00-95ac-87bb12acb66b`
 
 ## Explicit Source Revision Runtime
 
@@ -229,6 +232,32 @@ self-report, established that:
 This is deterministic keyed formation, not arbitrary-document extraction or
 general semantic conflict matching. See
 [the scoped runtime evidence](evidence/2026-07-14-source-conflict-candidate-runtime.md).
+
+## Provider-Assisted Unkeyed Source Target Matching
+
+The frozen `108-workspace-unkeyed-source-target-match` case removes the trusted
+ingestor's knowledge of `memory_key` while retaining exact source content and
+revision identity. A real Grok `grok-4.5` provider received three current
+same-workspace keyed facts and selected `release.signing.mode` for the OIDC
+signing revision. The same candidate snapshot produced abstentions for one
+ambiguous release-flow source and one unrelated maintenance source.
+
+PostgreSQL and real MCP probes established:
+
+- the provider candidate packet excluded the other tenant;
+- all three provider decisions share one durable candidate-set fingerprint;
+- matching created only a proposed candidate and left pre-accept context on the
+  old keychain fact;
+- explicit acceptance activated OIDC and projection rebuild excluded the stale
+  target and proposed write-backs;
+- a real Grok MCP coder created `release-control-policy.md` with OIDC, `800 ms`,
+  and SLSA attestation while excluding keychain and static credentials;
+- exact and paraphrased stale probes returned OIDC only;
+- source-match audit is RLS protected and excluded from model-facing context.
+
+This is closed-set provider matching, not arbitrary-document extraction,
+open-vocabulary conflict discovery, or automatic memory activation. See
+[the scoped runtime evidence](evidence/2026-07-14-unkeyed-source-target-matching-runtime.md).
 
 ## LongMemEval Original Sample
 

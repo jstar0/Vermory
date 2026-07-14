@@ -59,7 +59,7 @@ Experiment 0 is complete. It provides:
 - nine frozen public cases covering workspace continuity, conversation continuity, Global Defaults, deletion, source injection, durable bridges, OpenClaw everyday-use continuity, authenticated multi-tenant RLS, and PostgreSQL operations recovery;
 - JSON and Markdown Experiment 0 reports.
 
-The repository also contains production-shaped runtime slices for workspace and conversation continuity, Global Defaults, durable bridges, explicit source-authoritative revision, governed keyed source candidates, the OpenClaw external-turn lifecycle, an authenticated multi-tenant HTTP profile, native PostgreSQL recovery, and a qualified original LongMemEval oracle sample. A source candidate can be proposed without changing current AI context, rejected without changing the active fact, or accepted to atomically replace the still-current keyed target. A real Grok MCP task consumed only the accepted fact after projection rebuild and wrote its result back as proposed. The authenticated profile uses server-issued digest-only tokens, role-gated routes, a non-owner PostgreSQL runtime identity, tenant-aware foreign keys, and RLS on the served continuity graph. Recovery evidence covers migration replay, native dump/restore, projection rebuild, runtime-role re-provisioning, and bounded database outage recovery. Pull-request CI starts PostgreSQL 18 and automatically runs the database-backed Go suite, runtime race gates, release build, and the OpenClaw install/check/package chain on a clean Ubuntu runner. The LongMemEval evidence runs six official records through no-context, full-history, plain-retrieval, and production Vermory-packet conditions with a real Grok reader; it is reported as `dataset_sample`, not a full benchmark score. Each evidence document is scoped to the exact client, model, failure mode, and deterministic hard gates it executed; no individual slice is treated as proof that the complete platform is finished.
+The repository also contains production-shaped runtime slices for workspace and conversation continuity, Global Defaults, durable bridges, explicit source-authoritative revision, governed keyed source candidates, provider-assisted closed-set matching for unkeyed trusted source facts, the OpenClaw external-turn lifecycle, an authenticated multi-tenant HTTP profile, native PostgreSQL recovery, and a qualified original LongMemEval oracle sample. A source candidate can be proposed without changing current AI context, rejected without changing the active fact, or accepted to atomically replace the still-current keyed target. When a trusted source lacks an internal key, a provider may select exactly one key from the current same-scope closed set or abstain; Vermory validates and audits the decision, and still requires operator acceptance. A real Grok MCP task consumed only the accepted fact after projection rebuild and wrote its result back as proposed. The authenticated profile uses server-issued digest-only tokens, role-gated routes, a non-owner PostgreSQL runtime identity, tenant-aware foreign keys, and RLS on the served continuity graph. Recovery evidence covers migration replay, native dump/restore, projection rebuild, runtime-role re-provisioning, and bounded database outage recovery. Pull-request CI starts PostgreSQL 18 and automatically runs the database-backed Go suite, runtime race gates, release build, and the OpenClaw install/check/package chain on a clean Ubuntu runner. The LongMemEval evidence runs six official records through no-context, full-history, plain-retrieval, and production Vermory-packet conditions with a real Grok reader; it is reported as `dataset_sample`, not a full benchmark score. Each evidence document is scoped to the exact client, model, failure mode, and deterministic hard gates it executed; no individual slice is treated as proof that the complete platform is finished.
 
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
@@ -151,6 +151,29 @@ never receive proposed or rejected content. See
 [Source Conflict Candidate Runtime Evidence](docs/evidence/2026-07-14-source-conflict-candidate-runtime.md)
 for the complete rejection, acceptance, rebuild, cross-tenant, stale-probe, and
 real Grok MCP path.
+
+When a trusted source has exact content and revision identity but no internal
+key, `memory match-source` asks a configured provider to choose exactly one key
+from the current workspace's closed set or abstain. The provider cannot invent
+authority or activate memory; a valid match creates the same reviewable source
+candidate used above.
+
+```bash
+go run ./cmd/vermory memory match-source \
+  --database-url "$VERMORY_DATABASE_URL" \
+  --tenant-id local \
+  --repo-root /absolute/workspace \
+  --operation-id release-signing-unkeyed-v2 \
+  --source-ref repo:deploy/production.yaml@v2 \
+  --content 'Production releases now use GitHub Actions OIDC keyless signing.' \
+  --provider grok-cli \
+  --model grok-4.5
+```
+
+See [Unkeyed Source Target Matching Runtime Evidence](docs/evidence/2026-07-14-unkeyed-source-target-matching-runtime.md)
+for the matched and abstained real-provider paths, proposal isolation, explicit
+acceptance, RLS audit, projection rebuild, stale probes, and real Grok MCP coder
+task. This is closed-set matching, not arbitrary-document extraction.
 
 See [CI Release Gates Evidence](docs/evidence/2026-07-14-ci-release-gates.md)
 for the clean-runner PostgreSQL, race, release-build, and OpenClaw pull-request
