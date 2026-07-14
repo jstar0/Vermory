@@ -165,10 +165,10 @@ git commit -m "docs: record release packaging evidence"
 git push
 ```
 
-- [ ] **Step 3: Verify protected remote gates**
+- [x] **Step 3: Verify protected remote gates**
 
 Require Draft PR 1 to remain `CLEAN` and `MERGEABLE`, the protected `test` check to pass, snapshot artifacts to exist, and no GitHub Release or tag to be created from the PR run.
 
-- [ ] **Step 4: Close this slice without closing the platform goal**
+- [x] **Step 4: Close this slice without closing the platform goal**
 
 Mark this checklist complete only after evidence is on the remote branch and the protected check passes. Keep the overall Vermory goal active for conflict candidate formation, broader original benchmarks, scale, sealed evaluation, signing/notarization, and final release acceptance.

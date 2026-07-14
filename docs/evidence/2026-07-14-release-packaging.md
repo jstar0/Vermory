@@ -185,6 +185,11 @@ runs, while local verification additionally checks semantic package identity.
 
 ## Publication And Claim Boundary
 
+Evidence revision `85445979f6d79683f7304f2f9df47a908add56a9` passed
+the protected `test` job in GitHub Actions run
+[`29303019839`](https://github.com/jstar0/Vermory/actions/runs/29303019839)
+after the document and README links were pushed.
+
 After the pull-request runs:
 
 ```text
