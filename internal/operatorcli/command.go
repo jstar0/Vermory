@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
+	"vermory/internal/provider"
 	"vermory/internal/runtime"
 
 	"github.com/spf13/cobra"
@@ -46,6 +48,26 @@ type sourceCandidateOutput struct {
 	CandidateMemoryID string                             `json:"candidate_memory_id,omitempty"`
 	CandidateStatus   string                             `json:"candidate_status,omitempty"`
 	Replayed          bool                               `json:"replayed"`
+}
+
+type sourceMatchOutput struct {
+	SourceMatchID      string                             `json:"source_match_id"`
+	ContinuityID       string                             `json:"continuity_id"`
+	RepoRoot           string                             `json:"repo_root"`
+	Decision           runtime.SourceMatchStatus          `json:"decision"`
+	SelectedMemoryKey  string                             `json:"selected_memory_key,omitempty"`
+	MatchedMemoryID    string                             `json:"matched_memory_id,omitempty"`
+	ObservationID      string                             `json:"observation_id,omitempty"`
+	CandidateMemoryID  string                             `json:"candidate_memory_id,omitempty"`
+	CandidateStatus    string                             `json:"candidate_status,omitempty"`
+	Disposition        runtime.SourceCandidateDisposition `json:"disposition,omitempty"`
+	Provider           string                             `json:"provider"`
+	Model              string                             `json:"model"`
+	FailureCode        string                             `json:"failure_code,omitempty"`
+	Reason             string                             `json:"reason,omitempty"`
+	CandidateSetSHA256 string                             `json:"candidate_set_sha256"`
+	ProviderSHA256     string                             `json:"provider_artifact_sha256,omitempty"`
+	Replayed           bool                               `json:"replayed"`
 }
 
 func NewWorkspaceCommand() *cobra.Command {
@@ -188,6 +210,66 @@ func NewMemoryCommand() *cobra.Command {
 	proposeSource.Flags().StringVar(&proposeSourceRef, "source-ref", "", "opaque source revision reference")
 	markRequired(proposeSource, "repo-root", "operation-id", "key", "content", "source-ref")
 
+	var matchRoot, matchOperationID, matchContent, matchSourceRef string
+	var matchProvider, matchModel, matchBaseURL, matchAPIKeyEnv, matchGrokCommand string
+	matchSource := &cobra.Command{
+		Use:   "match-source",
+		Short: "Match an unkeyed trusted source fact to the current closed set",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			llm, providerName, model, err := buildSourceMatchProvider(
+				matchProvider,
+				matchModel,
+				matchBaseURL,
+				matchAPIKeyEnv,
+				matchGrokCommand,
+			)
+			if err != nil {
+				return err
+			}
+			return withSourceMatching(cmd.Context(), options, llm, providerName, model, func(store *runtime.Store, service *runtime.SourceMatchingService) error {
+				receipt, err := service.MatchSource(cmd.Context(), matchRoot, runtime.SourceMatchRequest{
+					OperationID:   matchOperationID,
+					SourceRef:     matchSourceRef,
+					SourceContent: matchContent,
+				})
+				if err != nil {
+					return err
+				}
+				return writeSourceMatchJSON(cmd, store, options.tenantID, matchRoot, receipt)
+			})
+		},
+	}
+	matchSource.Flags().StringVar(&matchRoot, "repo-root", "", "absolute workspace root")
+	matchSource.Flags().StringVar(&matchOperationID, "operation-id", "", "idempotency key")
+	matchSource.Flags().StringVar(&matchContent, "content", "", "exact trusted source fact")
+	matchSource.Flags().StringVar(&matchSourceRef, "source-ref", "", "opaque source revision reference")
+	matchSource.Flags().StringVar(&matchProvider, "provider", "grok-cli", "provider: grok-cli, openai-compatible, siliconflow, or duojie")
+	matchSource.Flags().StringVar(&matchModel, "model", "", "provider model name")
+	matchSource.Flags().StringVar(&matchBaseURL, "base-url", "", "direct provider base URL")
+	matchSource.Flags().StringVar(&matchAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
+	matchSource.Flags().StringVar(&matchGrokCommand, "grok-command", "", "authenticated Grok CLI command")
+	markRequired(matchSource, "repo-root", "operation-id", "content", "source-ref")
+
+	var inspectMatchRoot, inspectMatchOperationID string
+	inspectSourceMatch := &cobra.Command{
+		Use:   "inspect-source-match",
+		Short: "Inspect one durable source match decision",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withSourceMatching(cmd.Context(), options, nil, "", "", func(store *runtime.Store, service *runtime.SourceMatchingService) error {
+				receipt, err := service.InspectSourceMatch(cmd.Context(), inspectMatchRoot, inspectMatchOperationID)
+				if err != nil {
+					return err
+				}
+				return writeSourceMatchJSON(cmd, store, options.tenantID, inspectMatchRoot, receipt)
+			})
+		},
+	}
+	inspectSourceMatch.Flags().StringVar(&inspectMatchRoot, "repo-root", "", "absolute workspace root")
+	inspectSourceMatch.Flags().StringVar(&inspectMatchOperationID, "operation-id", "", "source match idempotency key")
+	markRequired(inspectSourceMatch, "repo-root", "operation-id")
+
 	var acceptRoot, acceptOperationID, acceptMemoryID string
 	acceptCandidate := &cobra.Command{
 		Use:   "accept-candidate",
@@ -298,7 +380,7 @@ func NewMemoryCommand() *cobra.Command {
 	forget.Flags().StringVar(&forgetMemoryID, "memory-id", "", "memory to redact")
 	markRequired(forget, "repo-root", "operation-id", "memory-id")
 
-	command.AddCommand(inspect, addSource, proposeSource, acceptCandidate, rejectCandidate, reviseSource, correct, forget)
+	command.AddCommand(inspect, addSource, proposeSource, matchSource, inspectSourceMatch, acceptCandidate, rejectCandidate, reviseSource, correct, forget)
 	return command
 }
 
@@ -622,6 +704,82 @@ func withBridges(ctx context.Context, options connectionOptions, run func(*runti
 	return run(runtime.NewBridgeService(store, options.tenantID))
 }
 
+func withSourceMatching(
+	ctx context.Context,
+	options connectionOptions,
+	llm provider.Provider,
+	providerName string,
+	model string,
+	run func(*runtime.Store, *runtime.SourceMatchingService) error,
+) error {
+	if strings.TrimSpace(options.databaseURL) == "" {
+		return fmt.Errorf("--database-url is required")
+	}
+	if strings.TrimSpace(options.tenantID) == "" {
+		return fmt.Errorf("--tenant-id is required")
+	}
+	store, err := runtime.OpenStore(ctx, options.databaseURL)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx); err != nil {
+		return err
+	}
+	return run(store, runtime.NewSourceMatchingService(store, options.tenantID, llm, providerName, model))
+}
+
+func buildSourceMatchProvider(name, model, baseURL, apiKeyEnv, grokCommand string) (provider.Provider, string, string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "grok-cli"
+	}
+	model = strings.TrimSpace(model)
+	switch name {
+	case "grok-cli":
+		if model == "" {
+			model = "grok-4.5"
+		}
+		return provider.NewGrokCLI(provider.GrokCLIConfig{Command: grokCommand}), name, model, nil
+	case "openai-compatible", "siliconflow", "duojie":
+		baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+		apiKeyEnv = strings.TrimSpace(apiKeyEnv)
+		switch name {
+		case "siliconflow":
+			if baseURL == "" {
+				baseURL = "https://api.siliconflow.cn/v1"
+			}
+			if apiKeyEnv == "" {
+				apiKeyEnv = "SILICONFLOW_API_KEY"
+			}
+		case "duojie":
+			if baseURL == "" {
+				baseURL = "https://api.duojie.games/v1"
+			}
+			if apiKeyEnv == "" {
+				apiKeyEnv = "DUOJIE_API_KEY"
+			}
+		default:
+			if apiKeyEnv == "" {
+				apiKeyEnv = "VERMORY_PROVIDER_API_KEY"
+			}
+		}
+		if model == "" {
+			return nil, "", "", fmt.Errorf("%s provider requires --model", name)
+		}
+		if baseURL == "" {
+			return nil, "", "", fmt.Errorf("%s provider requires --base-url", name)
+		}
+		apiKey := strings.TrimSpace(os.Getenv(apiKeyEnv))
+		if apiKey == "" {
+			return nil, "", "", fmt.Errorf("%s provider requires non-empty env %s", name, apiKeyEnv)
+		}
+		return provider.NewOpenAICompatible(provider.Config{BaseURL: baseURL, APIKey: apiKey}), name, model, nil
+	default:
+		return nil, "", "", fmt.Errorf("unsupported source match provider %q", name)
+	}
+}
+
 func writeJSON(cmd *cobra.Command, value any) error {
 	return json.NewEncoder(cmd.OutOrStdout()).Encode(value)
 }
@@ -655,5 +813,39 @@ func writeSourceCandidateJSON(cmd *cobra.Command, service *runtime.GovernanceSer
 		CandidateMemoryID: receipt.Candidate.MemoryID,
 		CandidateStatus:   receipt.Candidate.Status,
 		Replayed:          receipt.Replayed,
+	})
+}
+
+func writeSourceMatchJSON(cmd *cobra.Command, store *runtime.Store, tenantID, repoRoot string, receipt runtime.SourceMatchReceipt) error {
+	governance := runtime.NewGovernanceService(store, tenantID)
+	resolution, memories, err := governance.ListWorkspaceMemories(cmd.Context(), repoRoot)
+	if err != nil {
+		return err
+	}
+	candidateStatus := ""
+	for _, memory := range memories {
+		if memory.ID == receipt.CandidateMemoryID {
+			candidateStatus = memory.LifecycleStatus
+			break
+		}
+	}
+	return writeJSON(cmd, sourceMatchOutput{
+		SourceMatchID:      receipt.ID,
+		ContinuityID:       resolution.ContinuityID,
+		RepoRoot:           resolution.RepoRoot,
+		Decision:           receipt.Status,
+		SelectedMemoryKey:  receipt.SelectedMemoryKey,
+		MatchedMemoryID:    receipt.TargetMemoryID,
+		ObservationID:      receipt.ObservationID,
+		CandidateMemoryID:  receipt.CandidateMemoryID,
+		CandidateStatus:    candidateStatus,
+		Disposition:        receipt.Disposition,
+		Provider:           receipt.ProviderName,
+		Model:              receipt.ResolvedModel,
+		FailureCode:        receipt.FailureCode,
+		Reason:             receipt.Reason,
+		CandidateSetSHA256: receipt.CandidateSetFingerprint,
+		ProviderSHA256:     receipt.ProviderArtifactSHA256,
+		Replayed:           receipt.Replayed,
 	})
 }

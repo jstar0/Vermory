@@ -211,3 +211,29 @@ func TestOperatorSourceRevisionCommandIsRegistered(t *testing.T) {
 	}
 	t.Fatal("expected memory revise-source command")
 }
+
+func TestOperatorSourceMatchCommandsAreRegistered(t *testing.T) {
+	root := newRootCommand()
+	for _, parent := range root.Commands() {
+		if parent.Name() != "memory" {
+			continue
+		}
+		found := map[string]bool{}
+		for _, child := range parent.Commands() {
+			found[child.Name()] = true
+			if child.Name() != "match-source" {
+				continue
+			}
+			for _, flag := range []string{"repo-root", "operation-id", "source-ref", "content", "provider", "model", "base-url", "api-key-env", "grok-command"} {
+				if child.Flags().Lookup(flag) == nil {
+					t.Fatalf("match-source is missing --%s", flag)
+				}
+			}
+		}
+		if !found["match-source"] || !found["inspect-source-match"] {
+			t.Fatalf("source match commands are missing: %#v", found)
+		}
+		return
+	}
+	t.Fatal("expected memory source match commands")
+}

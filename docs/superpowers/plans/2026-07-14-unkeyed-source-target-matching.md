@@ -88,11 +88,11 @@
 - Consumes: `NewSourceMatchingService`, existing Grok/OpenAI-compatible providers, and governance connection flags.
 - Produces: `memory match-source` and `memory inspect-source-match` JSON commands.
 
-- [ ] **Step 1: Write failing CLI tests for required flags, provider construction, matched/abstained/failed output, replay, inspection, and absence from MCP tools.**
-- [ ] **Step 2: Run focused CLI tests and confirm the commands are missing.**
-- [ ] **Step 3: Add `--provider`, `--model`, `--base-url`, `--api-key-env`, and `--grok-command` only to `match-source`; default to `grok-cli` and `grok-4.5`.**
-- [ ] **Step 4: Implement stable JSON output without exposing raw provider artifacts or adding governance commands to MCP.**
-- [ ] **Step 5: Run focused CLI and command-surface tests serially until green and commit.**
+- [x] **Step 1: Write failing CLI tests for required flags, provider construction, matched/abstained/failed output, replay, inspection, and absence from MCP tools.**
+- [x] **Step 2: Run focused CLI tests and confirm the commands are missing.**
+- [x] **Step 3: Add `--provider`, `--model`, `--base-url`, `--api-key-env`, and `--grok-command` only to `match-source`; default to `grok-cli` and `grok-4.5`.**
+- [x] **Step 4: Implement stable JSON output without exposing raw provider artifacts or adding governance commands to MCP.**
+- [x] **Step 5: Run focused CLI and command-surface tests serially until green and commit.**
 
 ### Task 5: W06 Real Grok And MCP Acceptance
 
