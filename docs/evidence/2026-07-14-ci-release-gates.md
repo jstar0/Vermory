@@ -23,7 +23,7 @@ The single `test` job now uses:
 
 ```text
 Ubuntu GitHub-hosted runner
-PostgreSQL service image: postgres:18
+PostgreSQL service image: pgvector/pgvector:pg18@sha256:12a379b47ad65289572ea0756efc11b7c241a6662833e8af7038cd3b73d647e0
 Database: vermory_test
 Go version: go.mod (1.25.7)
 Node.js: 24
@@ -35,7 +35,7 @@ Job timeout: 30 minutes
 |---|---|
 | PostgreSQL readiness | Container health check with `pg_isready` |
 | Full Go suite with database | `go test -p 1 -count=1 ./...` |
-| Runtime race coverage | `go test -race -p 1 -count=1` across authn, runtime, webchat, identity CLI, operator CLI, MCP server, command, and provider packages |
+| Runtime race coverage | `go test -race -p 1 -count=1` across authn, runtime, webchat, identity CLI, operator CLI, MCP server, command, provider, memory-backend, and retrieval-ablation packages |
 | Reality race coverage | `go test -count=1 -race ./internal/reality` |
 | Static analysis | `go vet ./...` |
 | Dependency drift | `go mod tidy` followed by zero `go.mod` / `go.sum` diff |
@@ -75,6 +75,45 @@ tests, runtime race tests, reality race tests, vet, module verification,
 release build, OpenClaw install/check/package, and clean-diff verification.
 This is stronger evidence than the previous CI result because the database URL
 was present and the PostgreSQL service was healthy before tests began.
+
+## W08 Pgvector Gate Correction
+
+W08 added database-backed native pgvector retrieval and outage tests. The first
+remote run at revision `465f045587ae59f69fb9bf1a2ab97342d42a71db` used the
+plain `postgres:18` service image. GitHub Actions run
+[`29334199266`](https://github.com/jstar0/Vermory/actions/runs/29334199266), job
+`87089262583`, failed because that image did not provide the `vector`
+extension. The two native retrieval tests failed rather than being skipped:
+
+```text
+TestRunUsesNativePostgreSQLVectorBackend: failed
+TestRunNativeVectorOutageDegradesToLexical: failed
+root cause: extension "vector" is not available
+```
+
+Revision `51a484bd2e8fd57ce8f2f1d98cc81f03fb855c10` changed the service
+to the immutable image:
+
+```text
+pgvector/pgvector:pg18@sha256:12a379b47ad65289572ea0756efc11b7c241a6662833e8af7038cd3b73d647e0
+```
+
+It also added `internal/memorybackend` and `internal/retrievalablation` to the
+remote race set. GitHub Actions run
+[`29334651225`](https://github.com/jstar0/Vermory/actions/runs/29334651225), job
+`87090757056`, then completed successfully in `3m54s`. All 19 main steps
+passed, including the full serial PostgreSQL/pgvector suite, expanded runtime
+race tests, reality race, vet, module-drift check, release binary, OpenClaw
+install/check/package, four-platform GoReleaser snapshot, artifact upload, and
+clean-diff verification.
+
+The successful run uploaded artifact `8311523895`, named
+`vermory-pr-snapshot-5dde8dcdd7264888fcd9c4e2b5a9f373927cc56d`, with GitHub
+digest
+`sha256:238a173f91fa775b62f212251cbea0f67b757d4184a8f406c5be8fefe22f40af`.
+This is pre-final delivery evidence; the final checklist head is required to
+pass the same protected workflow and produce an independently verified
+artifact before W08 delivery closes.
 
 ## Main Branch Enforcement
 

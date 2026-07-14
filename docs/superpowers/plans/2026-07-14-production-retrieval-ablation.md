@@ -335,8 +335,8 @@ git diff --check
 
 - [x] **Step 3: Scan all tracked and public evidence files for credential-shaped values and require zero matches. Remove every dedicated database, temporary runtime role, API transcript containing headers, isolated HOME, and downloaded local artifact after normalized evidence is committed.**
 
-- [ ] **Step 4: Mark the plan checklist from fresh evidence, push `agent/grok-cli-runtime`, wait for protected CI, download the final artifact, verify GitHub digest, all four archive checksums/layouts, OpenClaw package, and darwin/arm64 execution.**
+- [x] **Step 4: Mark the plan checklist from fresh evidence, push `agent/grok-cli-runtime`, wait for protected CI, download the final artifact, verify GitHub digest, all four archive checksums/layouts, OpenClaw package, and darwin/arm64 execution.**
 
-- [ ] **Step 5: Update Draft PR 1 with the W08 result, preserved limitations, final run/job/artifact/digest, and confirmation that it remains Draft, `CLEAN`, `MERGEABLE`, and required `test=SUCCESS`.**
+- [x] **Step 5: Update Draft PR 1 with the W08 result, preserved limitations, final run/job/artifact/digest, and confirmation that it remains Draft, `CLEAN`, `MERGEABLE`, and required `test=SUCCESS`.**
 
-- [ ] **Step 6: Keep the overall Vermory goal active. W08 completion does not complete production hybrid integration, source authority ranking, scale/fault qualification, sealed evaluation, signing, or final release acceptance.**
+- [x] **Step 6: Keep the overall Vermory goal active. W08 completion does not complete production hybrid integration, source authority ranking, scale/fault qualification, sealed evaluation, signing, or final release acceptance.**
