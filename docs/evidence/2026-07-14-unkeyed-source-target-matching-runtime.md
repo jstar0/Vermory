@@ -2,7 +2,7 @@
 
 Date: 2026-07-14
 
-Tested implementation revision: `187f47d3fdfa7ab9dfc68181fbde79f56f23c493`
+Tested implementation revision: `270a0cc510de5be9a3ca9d6e221e6270383297b2`
 
 ## Scope
 
@@ -44,15 +44,15 @@ case.json   f4f832690bcf54859083720c825f82cbc9a0219d1562593a58ef9e8baf0f87a8
 
 ```text
 Vermory version: 0.1.0-dev
-Vermory revision: 187f47d3fdfa7ab9dfc68181fbde79f56f23c493
-Vermory build date: 2026-07-14T15:16:31+08:00
-Vermory binary SHA-256: 015448ee4adecd882a3fedef3e4e20009b4bb9c4864fcc9f6640689426dfc305
+Vermory revision: 270a0cc510de5be9a3ca9d6e221e6270383297b2
+Vermory build date: 2026-07-14T16:06:32+08:00
+Vermory binary SHA-256: 88209d0f82f09e76679f822b122a259ca860e745dd6c1d9a214689c15d1293ad
 Go runtime: go1.26.5
 Grok CLI: 0.2.101 (5bc4b5dfadcf)
 Grok model: grok-4.5
 PostgreSQL: 18.4
-Schema version: 11
-Dedicated database: vermory_w06_20260714071952
+Schema version: 12
+Dedicated database: vermory_w06_final_20260714080714
 Target tenant: w06-local
 Distractor tenant: w06-other
 ```
@@ -69,22 +69,23 @@ candidate snapshot:
 
 | Operation | Result | Selected key | Provider artifact SHA-256 |
 |---|---|---|---|
-| `w06-real-match` | matched | `release.signing.mode` | `38cd9b96e66f2b00cb85d3260848cae0908f5f456a1d8a0bcbf60693d6416662` |
-| `w06-real-ambiguous` | abstained | none | `8f7773db6bee5899ab369c643afbd7b03c784fa63d08c9c11d0162979611c1b3` |
-| `w06-real-unrelated` | abstained | none | `641534a8f699e8eb9828b91408a6f627d0e43db69dcca1cff6d9d7d0fcbd6eab` |
+| `w06-real-match` | matched | `release.signing.mode` | `740d2d4730b2d1b2734099959b2f3d7f82728b17e3591b03f09e1e4e5462cdd4` |
+| `w06-real-ambiguous` | abstained | none | `4f909377a0c9024d765a4b86ea195eeed80004c3e2edbe78843e9ead4dcccb71` |
+| `w06-real-unrelated` | abstained | none | `6d8cc77dc447e24ee01aaa57334203a119773f48181f0189e88812be8760c0cd` |
 
 All three audit rows have candidate-set fingerprint
-`ec05d49edb4bb2e92b2bfcd31c04c09a8507e7d00c14b1eb75c7a657407cd18f`.
+`06d78bb7d1cc3f00fe3141eac7922cf46455baa2e68fe2dd0be44258385c50cb`.
 The stored candidate JSON contains zero occurrences of the other tenant's
 static credential fact.
 
 The matched decision returned:
 
 ```text
-source match: d9647442-f76d-4fe5-b185-99b8b0d7221a
+source match: 28f29bfa-6734-432a-a8c1-a3dcdb59a579
 selected key: release.signing.mode
-target memory: 9c24d779-9294-4264-8044-ebc24554e43c
-candidate memory: 52c0d7f6-82b0-48ef-9042-7a3e493b21bf
+target memory: 4666236f-ce22-4e03-997b-480ff901dbe9
+observation: b6d67188-7faa-4ef3-a4a0-3b637ee8c683
+candidate memory: 41d27191-2ff4-419b-9c2d-3887df21e1be
 candidate status before review: proposed
 ```
 
@@ -96,11 +97,11 @@ operation created an observation or governed-memory candidate.
 ## Proposal Isolation And Acceptance
 
 Before operator acceptance, real Grok session
-`019f5f81-7638-7143-bf88-856088156fee` called `prepare_context`. PostgreSQL
+`019f5fac-03c2-7833-b4bf-a807d6439167` called `prepare_context`. PostgreSQL
 measured these positions in the persisted delivery:
 
 ```text
-delivery ID: a0f476bd-1713-44e0-949c-f61a4858a49c
+delivery ID: 23a1c459-9b8f-4099-a908-990cd6049af7
 macOS keychain certificate: 146
 800 ms: 48
 signed SLSA provenance statement: 86
@@ -109,24 +110,25 @@ static cloud credentials: 0
 ```
 
 The operator then accepted candidate
-`52c0d7f6-82b0-48ef-9042-7a3e493b21bf`. PostgreSQL atomically changed the
+`41d27191-2ff4-419b-9c2d-3887df21e1be` with acceptance observation
+`09667e00-a62f-46e3-9e5b-02b7b8d60296`. PostgreSQL atomically changed the
 target to `superseded`, changed the candidate to `active`, preserved the timeout
 and attestation facts as active, and left both abstained match decisions as
 audit-only rows.
 
 Projection rebuild retained four active documents across both tenants with
-fingerprint `61e769d60beaa3ce142d35dd28b902bd` before and after rebuild. Proposed
+fingerprint `bdfe130b1df34408a324841e5e7c7555` before and after rebuild. Proposed
 client write-backs and the superseded keychain fact were excluded.
 
 ## Real MCP Coder Task
 
-Real Grok session `019f5f83-d177-7192-ae20-f7b96ca2a05a` executed:
+Real Grok session `019f5fac-feb7-7cf0-a762-15aab01c705a` executed:
 
 ```text
-prepare_context (w06-grok-final-prepare-2)
+prepare_context (w06-grok-final-prepare)
 -> current OIDC signing + 800 ms timeout + SLSA attestation
 -> create and deterministically verify release-control-policy.md
--> commit_observation (w06-grok-final-observation-2)
+-> commit_observation (w06-grok-final-observation)
 -> agent_result stored as proposed
 ```
 
@@ -134,12 +136,12 @@ The generated artifact is committed as a
 [normalized snapshot](snapshots/2026-07-14-unkeyed-source-target-matching-grok-release-control-policy.md).
 
 ```text
-delivery ID: bc859f6a-6086-416f-9dce-80490eab0533
-observation ID: d750c97e-540c-4807-a37c-525726062118
-write-back memory ID: af9b3858-10f6-4215-8dd2-85bfad20a5ae
+delivery ID: 906273a4-3dae-4292-ba6e-91ed9855c9b3
+observation ID: 4bb0f3b2-a928-45c8-be71-9572a50e3d7e
+write-back memory ID: fcc46503-d727-4d5d-95d1-c12776339914
 write-back lifecycle: proposed
 artifact SHA-256: 37175009a79c26ce1519d4fd1ddc0b60646582782a26105450233e199b6757d9
-transcript SHA-256: 308a7638ae15f48784251922ee67e21e42459f3e199471d07e9903cf03645bac
+transcript SHA-256: 6f9df82341b044ca2399ed144f939ec91194dbe170f3afe8aeffef0ee337afd9
 ```
 
 Persisted delivery positions independently establish the consumed context:
@@ -154,16 +156,16 @@ static cloud credentials: 0
 
 ## Stale Probes
 
-Real Grok session `019f5f85-3411-7f00-95ac-87bb12acb66b` called
+Real Grok session `019f5fae-1a0e-7fb0-b72d-6a726f5e9815` called
 `prepare_context` twice without write-back or file changes.
 
 | Probe | Delivery | OIDC position | Old keychain position | Other-tenant position |
 |---|---|---:|---:|---:|
-| Exact stale statement | `b023114b-92ff-4dc7-92f3-4a465167292d` | 46 | 0 | 0 |
-| Certificate-backed paraphrase | `a8394336-c22e-4e36-bca0-11bb0ca7af41` | 46 | 0 | 0 |
+| Exact stale statement | `a7ccfebf-714f-45c9-89be-978ff5c4a934` | 46 | 0 | 0 |
+| Certificate-backed paraphrase | `be6875f4-9a40-4b67-a275-cfbc0d3525fe` | 46 | 0 | 0 |
 
 The preserved stale transcript SHA-256 is
-`ceacb1136cbfe02e7948f2be13a2969b77b42b4b0686ba931fcca8b0422bccfc`.
+`25a087bdf2a7509586978468b155fb190c54d523cb068044cb4d89e789b88ea6`.
 
 ## Database And Isolation Evidence
 
@@ -178,25 +180,12 @@ Final target-tenant governed-memory counts were:
 ```text
 active: 3
 superseded: 1
-proposed: 2
+proposed: 1
 ```
 
-Both proposed rows are real Grok task write-backs. The first coder process
-continued after the command wrapper returned early; the official artifact and
-ledger values above use the second independently verified operation.
-
-## Preserved Execution Corrections
-
-1. Two pre-accept probes using `dontAsk` were cancelled at MCP authorization
-   before a delivery existed. Re-running with an isolated one-server config and
-   `--always-approve` produced the recorded read-only delivery.
-2. The first final coder wrapper surfaced a telemetry export error and returned
-   before the still-running Grok process completed. It later produced a valid
-   delivery and proposed write-back. A second operation was run with OTEL export
-   disabled and independently verified; both audit rows remain preserved.
-3. The stale-probe shell wrapper assigned to zsh's read-only `status` variable
-   after Grok had completed. The transcript and both PostgreSQL deliveries were
-   already complete; the evidence was recovered without another model call.
+The proposed row is the real Grok task write-back recorded above. There are no
+extra proposed rows from abandoned or duplicate coder runs in this final W06
+database.
 
 ## Deterministic Hard Gates
 
@@ -216,22 +205,33 @@ ledger values above use the second independently verified operation.
 | Exact and paraphrased stale probes return OIDC only | PASS |
 | Match audit table is RLS protected and authoritative | PASS |
 
-## Post-Runtime Hardening
+## Runtime Safety And Audit Hardening
 
-The real W06 model run used revision
-`187f47d3fdfa7ab9dfc68181fbde79f56f23c493`. A subsequent review found and
-fixed three lifecycle gaps before full release qualification. Revision
-`04ba8330b16b` adds regression tests and production fixes for:
+The final W06 run used revision `270a0cc510de5be9a3ca9d6e221e6270383297b2`,
+after the provider and audit lifecycle review fixes were applied. The same
+revision includes deterministic regression coverage for:
 
-- persisting a terminal `provider_timeout` or `provider_canceled` decision in a
-  bounded detached database context after the request context expires;
-- requiring `source_match_decisions` privileges during runtime-role startup
-  validation, not only during role provisioning;
-- redacting forgotten source content, matching candidate entries, provider
-  output, and reason text while preserving structural audit IDs and hashes.
+- writing Grok source and candidate content to a mode-`0600` temporary prompt
+  file, keeping that content out of process arguments, and deleting the file
+  after the call;
+- enforcing a two-minute provider deadline, killing the entire spawned process
+  group on cancellation, and bounding process wait cleanup;
+- persisting terminal provider timeout or cancellation failures after the
+  caller context expires;
+- expiring orphaned pending operations and rejecting replay when the active
+  candidate snapshot changed;
+- making `forget` win over an in-flight provider completion so a late result
+  cannot restore deleted text;
+- redacting forgotten source, candidate, provider-output, and reason text while
+  preserving structural audit IDs and recomputing the canonical fingerprint;
+- validating `source_match_decisions` privileges during restricted runtime-role
+  startup;
+- enforcing tenant-and-continuity foreign keys for target memory, observation,
+  and candidate memory references, including migration handling for historical
+  invalid rows.
 
-These fixes do not change the successful matched/abstained provider contract or
-the explicit candidate acceptance path exercised by W06.
+These controls preserve the successful matched/abstained contract while keeping
+provider output governance-only and deletion authoritative.
 
 ## Native Backup And Restore
 
@@ -240,10 +240,10 @@ dumped with PostgreSQL 18.4 `pg_dump --format=custom --no-owner --no-acl` and
 restored into a fresh database with `pg_restore --exit-on-error`.
 
 ```text
-source authority fingerprint: 69b684d76633d499e71ae942b964ec0f
-target authority fingerprint: 69b684d76633d499e71ae942b964ec0f
-dump SHA-256: ae7f305edc2ff588964034af2d664f8f5d3d66bdc26fdc558625bf678a7236a7
-restored schema version: 11
+source authority fingerprint: 3353564dcddeb2f526f6362ee5710671
+target authority fingerprint: 3353564dcddeb2f526f6362ee5710671
+dump SHA-256: 86c74b2d1c35587947730c9d7a9f62e50fb8f91d803c96af0bfe12d092e7677e
+restored schema version: 12
 restored source-match rows: 3
 restored matched rows: 1
 restored abstained rows: 2
@@ -252,7 +252,7 @@ restored RLS: enabled, one policy
 
 The restored projection was deleted and rebuilt through the current release
 binary. It returned four active documents and the same projection fingerprint
-`61e769d60beaa3ce142d35dd28b902bd`; the authority fingerprint remained
+`bdfe130b1df34408a324841e5e7c7555`; the authority fingerprint remained
 unchanged. A newly created restricted runtime role was provisioned with
 `database grant-runtime`. Direct filter-omission probes against the restored
 audit table returned `0` rows with no tenant setting, `3` for `w06-local`, and
@@ -260,23 +260,10 @@ audit table returned `0` rows with no tenant setting, `3` for `w06-local`, and
 
 ## Local Release Gates
 
-The final local verification on revision `04ba8330b16b` completed:
-
-```text
-go test -p 1 -count=1 ./...                                      PASS
-go test -race -p 1 (9 runtime/client packages)                   PASS
-go test -race -count=1 ./internal/reality                        PASS
-go vet ./...                                                     PASS
-go mod tidy with zero go.mod/go.sum diff                         PASS
-actionlint v1.7.7, CI and Release workflows                      PASS
-GoReleaser v2.17.0 configuration check                           PASS
-GoReleaser snapshot, four target archives                        PASS
-snapshot SHA-256 verification, four archives                     PASS
-OpenClaw: 5 files, 43 tests, typecheck, build                     PASS
-OpenClaw package dry-run                                         PASS
-git diff --check                                                 PASS
-W06 evidence credential-shaped scan                              0 matches
-```
+The previous schema-11 gate record is not reused for this schema-12 evidence.
+Fresh full-repository, race, migration, recovery, packaging, OpenClaw, and
+checksum gates are recorded only after this final runtime evidence is committed
+and the resulting head is tested.
 
 ## Claim Boundary
 

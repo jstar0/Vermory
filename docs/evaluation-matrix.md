@@ -185,8 +185,8 @@ go run ./cmd/vermory benchmark-coverage \
 - Source revision Grok session: `955B4CA6-68EB-4D0E-9CB4-96BE91AC1776`
 - Source candidate Grok session: `019f5f3c-d836-7d80-a8de-995dcde29ef8`
 - Source candidate stale-probe session: `019f5f3e-4b7f-7510-8cda-a26e0ba89725`
-- Unkeyed source matching coder session: `019f5f83-d177-7192-ae20-f7b96ca2a05a`
-- Unkeyed source matching stale-probe session: `019f5f85-3411-7f00-95ac-87bb12acb66b`
+- Unkeyed source matching coder session: `019f5fac-feb7-7cf0-a762-15aab01c705a`
+- Unkeyed source matching stale-probe session: `019f5fae-1a0e-7fb0-b72d-6a726f5e9815`
 
 ## Explicit Source Revision Runtime
 
