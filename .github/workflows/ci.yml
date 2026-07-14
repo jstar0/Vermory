@@ -29,15 +29,15 @@ jobs:
     env:
       VERMORY_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/vermory_test?sslmode=disable
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: true
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
         with:
           version: 11.12.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: pnpm
@@ -71,5 +71,24 @@ jobs:
         run: pnpm -C integrations/openclaw check
       - name: Verify OpenClaw package
         run: pnpm -C integrations/openclaw pack --dry-run
+      - name: Build release snapshot
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: v2.17.0
+          args: release --snapshot --clean --skip=publish --config .goreleaser.yaml
+      - name: Pack OpenClaw release artifact
+        run: pnpm -C integrations/openclaw pack --pack-destination ../../dist
+      - name: Upload release snapshot
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vermory-pr-snapshot-${{ github.sha }}
+          path: |
+            dist/*.tar.gz
+            dist/checksums.txt
+            dist/*.tgz
+            dist/metadata.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Verify clean diff
         run: git diff --check
