@@ -43,6 +43,7 @@
     "effective_vector": 138,
     "controlled_vector_to_lexical_fallback": 412,
     "degraded_total": 412,
+    "failure_code_breakdown_recorded_in_original_run": false,
     "correct_target_results": 1000,
     "cross_tenant_leaks": 0,
     "cross_continuity_leaks": 0,
@@ -67,6 +68,18 @@
   },
   "database_size_bytes": 2710910655,
   "real_provider_requests": 2,
+  "degradation_attribution": {
+    "implementation_revision": "29a3429",
+    "raw_log_sha256": "88b876f933876d650522ba7f50cb1d3cbff20a0f16e6b4f41fba1cab1795e413",
+    "requested_vector_queries": 550,
+    "effective_vector_queries": 145,
+    "projection_lag_fallbacks": 405,
+    "other_degraded_queries": 0,
+    "projection_current_control_effective_vector_queries": 550,
+    "projection_current_control_degraded_queries": 0,
+    "control_implementation_revision": "b1ca093",
+    "control_raw_log_sha256": "7407b497ebfba629971bb21ff08705d9b6b45fb3796cf3c7b729f062a5f46810"
+  },
   "hard_gates": {
     "pass": true,
     "tenant_lag_exact_across_global_id_gaps": true,
@@ -75,6 +88,7 @@
     "deleted_authority_lexical_and_vector_residue": 0,
     "scope_leakage": 0,
     "competing_workers_preserved_single_processing": true,
+    "degradation_attributed_to_projection_lag": true,
     "latency_within_profile": true,
     "database_size_within_profile": true,
     "direct_provider_projection_and_retrieval": true
@@ -90,8 +104,9 @@
     }
   ],
   "measured_limitations": [
-    "412 of 550 requested vector queries used the exact lexical fallback under the highly selective tenant and continuity scopes",
-    "the run qualifies correct fallback and isolation, not server-scale semantic recall or ANN tuning",
+    "the original run recorded aggregate degradation but not failure-code counts",
+    "an instrumented replay classified every degraded vector request as projection_lag and recorded zero other degraded requests",
+    "a 100000-vector projection-current control completed 550 of 550 vector requests without degradation",
     "scale vectors are deterministic operational fixtures; only the two-request post-scale probe used the real embedding provider"
   ],
   "non_claims": [

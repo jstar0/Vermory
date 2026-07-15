@@ -115,13 +115,20 @@ All 1,000 requests returned the exact expected active memory while deletion and
 tail processing were concurrent. The p95 and p99 values remained below the
 frozen `2,000 ms` and `5,000 ms` limits.
 
-This result must not be rewritten as 550 successful ANN deliveries. Under the
-case's highly selective tenant and single-continuity scopes, only 138 requested
-vector calls remained effective vector results; 412 used Vermory's audited
-exact lexical fallback. The fallback preserved task success and isolation, but
-the measured vector effectiveness is a separate server-scale ANN recall/tuning
-finding. W12 therefore qualifies correct delivery, degradation, and operational
-scale, not semantic recall quality at 100,000 vectors.
+The original payload recorded aggregate degradation but did not store its
+failure-code distribution. A later attribution replay at implementation
+`29a3429` added an audit hard gate and measured 550 requested vector calls, 145
+effective vector results, 405 `projection_lag` fallbacks, and zero other
+degraded results. The exact `effective/lag` split varies with scheduling, but
+the invariant held: every requested vector query was either current and served
+by vector retrieval or intentionally rejected while delete events made that
+tenant's projection non-current.
+
+A separate 100,000-vector control with no concurrent authority changes served
+all 550 requests as effective vector results with zero degradation. W12's
+fallbacks are therefore expected projection-lag safety behavior, not evidence
+of a server-scale ANN recall defect. See
+[the attribution evidence](2026-07-15-vector-degradation-attribution.md).
 
 ## Phase Durations And Size
 
@@ -167,9 +174,10 @@ snapshot bootstrap makes one million retained events compatible with 100,000
 current vectors without embedding obsolete history, and ordinary tail workers
 preserve deletion and cursor semantics under competition.
 
-The decision does not promote semantic retrieval to the default. The 412
-controlled vector fallbacks require a separate scoped HNSW recall/tuning
-qualification before Vermory claims server-scale semantic effectiveness.
+The decision does not promote semantic retrieval to the default. W12 qualifies
+the projection-current gate and exact lexical fallback during concurrent
+authority change; semantic quality remains covered by the separate W08 and W10
+retrieval cases rather than this operational scale fixture.
 
 ## Protected Delivery
 

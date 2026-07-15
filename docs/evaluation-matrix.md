@@ -438,13 +438,17 @@ deletion events.
 | Direct provider requests | `2` |
 
 The 1,000 queries all returned the expected current memory during concurrent
-deletion, but the result is not 550 successful ANN deliveries. Of 550 requested
-vector queries, 138 remained effective vector results and 412 used the audited
-exact lexical fallback under highly selective tenant and continuity scopes.
-W12 therefore supports the named operational profile and its degradation
-contract; scoped server-scale HNSW recall remains a separate qualification.
-Lexical remains the default. See
+deletion. The original run recorded 138 effective vector results and 412 exact
+lexical fallbacks among 550 requested vector queries. An instrumented replay
+recorded 145 effective vector results, 405 `projection_lag` fallbacks, and zero
+other degraded results; a separate projection-current 100,000-vector control
+served all 550 vector requests without degradation. The split is
+scheduler-dependent, but every degraded request was caused by intentional lag
+gating while delete events were pending, not by a scoped HNSW recall failure.
+W12 therefore supports the named operational and degradation contract. Lexical
+remains the default. See
 [the W12 evidence](evidence/2026-07-15-server-qualification-scale-profile.md).
+See also [the W13 attribution](evidence/2026-07-15-vector-degradation-attribution.md).
 
 ## LongMemEval Original Sample
 

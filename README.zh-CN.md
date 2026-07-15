@@ -57,6 +57,12 @@ Experiment 0 已完成，当前仓库已经具备：
 
 仓库同时已经包含 workspace、conversation、Global Defaults、durable bridge、显式可信来源修订、按稳定事实 key 治理的 source candidate、可信来源无 key 时的 provider 闭集目标匹配、OpenClaw external-turn lifecycle、authenticated multi-tenant HTTP profile、原生 PostgreSQL 恢复、可选 active-only pgvector runtime、可并行构建和测量切换的版本化语义投影，以及 PostgreSQL transactional outbox 故障资格。来源变化可以先形成候选而不改变 AI 当前上下文；拒绝候选不会改动当前事实，接受候选则原子替代仍然有效的同 key 目标。可信来源只有精确内容和 revision、没有内部 key 时，provider 只能从当前 scope 的闭合集合中选一个现有 key 或 abstain；Vermory 会验证并审计结果，仍然要求操作者明确接受。真实 Grok MCP 任务已经在投影重建后只消费被接受的新事实，并把结果回写为 proposed。语义检索 profile 共享 PostgreSQL 权威事实，但拥有独立 cursor、vector、audit、reset/rebuild 与 promotion decision；当前实测 v2 仍保留为 candidate，lexical 和 v1 默认均未被擅自切换。W11 disposable-cluster 运行进一步证明 1000 条 backlog 的有界消费、provider 重试、at-least-once replay、embedding 进行中的 PostgreSQL immediate restart、同一 pool 恢复、删除压过晚到结果，以及重启后的直接 provider 恢复，因此当前 self-hosted profile 不要求 Redis。W12 又在 `server-qualification-v1` 下完成 55 万条 governed memory、10 万条当前 lexical/vector、100 万条历史 projection event、1000 条并发删除、租户内竞争 worker、最终 lag 与 scope leakage 均为 0，以及真实 provider 的 post-scale projection/query probe；current-authority bootstrap 只嵌入当前事实，不重放过时历史。1000 次 scoped query 全部返回正确当前事实，但 550 次 vector 请求中有 412 次受控回退 lexical，因此这是规模运行与降级合同资格，不是 10 万向量下的语义召回质量宣称。认证 profile 使用服务端发行且只保存 digest 的 token、角色路由、非 owner PostgreSQL runtime identity、tenant-aware foreign keys，以及覆盖当前 continuity graph 的 RLS。恢复证据覆盖迁移重放、原生 dump/restore、投影重建、runtime role 重建和有界数据库中断恢复。Pull Request CI 会在干净 Ubuntu runner 上启动 PostgreSQL 18，并自动执行数据库 Go 测试、关键 runtime race、release build 和 OpenClaw 安装/检查/打包链路。每份证据只对实际执行过的客户端、模型、故障条件和确定性硬门负责，任何单一切片都不被当成“整个平台已经完成”的证明。
 
+后续 audit 归因确认：W12 的所有 vector 降级都发生在并发删除事件使
+projection 暂时存在 lag 的窗口，failure code 均为 `projection_lag`；另一个
+projection 始终 current 的 10 万向量控制组完成了 `550/550` 次有效 vector
+请求且零降级，因此没有引入 scoped HNSW 生产改动。详见
+[Vector 降级归因实证](docs/evidence/2026-07-15-vector-degradation-attribution.md)。
+
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
 ## 快速开始
