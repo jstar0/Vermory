@@ -528,7 +528,7 @@ git commit -m "feat: report full LongMemEval reader QA"
 - Produces: `vermory benchmark-longmemeval-qa`.
 - Supports phases: `reader`, `judge`, `all`, `finalize`.
 
-- [ ] **Step 1: Write failing CLI tests**
+- [x] **Step 1: Write failing CLI tests**
 
 Require flags:
 
@@ -553,13 +553,13 @@ Require flags:
 Reject unknown phases and positional arguments. Provider/model/worker/timeout/K
 come from the execution manifest and are not mutable CLI flags.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 go test ./cmd/vermory -run 'TestBenchmarkLongMemEvalQA|TestRootCommand' -count=1
 ```
 
-- [ ] **Step 3: Implement CLI and a two-record all-phase integration test**
+- [x] **Step 3: Implement CLI and a two-record all-phase integration test**
 
 The command loads the manifest, builds reader and judge providers from its
 provider names plus runtime endpoint/command flags, executes requested phases,
@@ -569,7 +569,7 @@ The integration test uses two provider overrides, two conditions, concurrency,
 reader failure, judge invalid output, resume, and finalization. It proves the
 second run makes zero provider calls and final hashes do not change.
 
-- [ ] **Step 4: Run focused and full tests, then commit**
+- [x] **Step 4: Run focused and full tests, then commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./cmd/vermory ./internal/app ./internal/benchmark ./internal/provider

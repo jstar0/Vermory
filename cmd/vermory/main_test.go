@@ -148,6 +148,37 @@ func TestBenchmarkLongMemEvalRetrievalCommandIsRegistered(t *testing.T) {
 	t.Fatal("expected benchmark-longmemeval-retrieval command")
 }
 
+func TestBenchmarkLongMemEvalQACommandIsRegistered(t *testing.T) {
+	for _, command := range newRootCommand().Commands() {
+		if command.Name() != "benchmark-longmemeval-qa" {
+			continue
+		}
+		for _, flagName := range []string{
+			"source-dataset",
+			"retrieval-results",
+			"qualification",
+			"execution",
+			"artifact-root",
+			"run-id",
+			"implementation-revision",
+			"phase",
+			"reader-command",
+			"reader-base-url",
+			"reader-api-key-env",
+			"judge-command",
+			"judge-base-url",
+			"judge-api-key-env",
+			"resume",
+		} {
+			if command.Flags().Lookup(flagName) == nil {
+				t.Fatalf("benchmark-longmemeval-qa must expose --%s", flagName)
+			}
+		}
+		return
+	}
+	t.Fatal("expected benchmark-longmemeval-qa command")
+}
+
 func TestMCPStdioCommandIsRegistered(t *testing.T) {
 	for _, command := range newRootCommand().Commands() {
 		if command.Name() != "mcp-stdio" {
