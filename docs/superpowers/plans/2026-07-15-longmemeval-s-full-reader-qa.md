@@ -704,13 +704,13 @@ git diff --check
 Verify four archive checksums/layouts/build metadata, OpenClaw 12-entry package,
 Darwin arm64 `version`, and `benchmark-longmemeval-qa --help`.
 
-- [ ] **Step 2: Push the evidence head and update Draft PR**
+- [x] **Step 2: Push the evidence head and update Draft PR**
 
 Mark the local-gate item from fresh output, commit that state, push
 `agent/grok-cli-runtime`, and append the full QA result and non-claims to Draft
 PR 1 without changing it from Draft. Leave remote acceptance unchecked.
 
-- [ ] **Step 3: Verify the evidence-head CI and artifact independently**
+- [x] **Step 3: Verify the evidence-head CI and artifact independently**
 
 Download the new transport ZIP through GitHub's artifact API, match its digest
 and byte count, verify all four archives and metadata, execute Darwin arm64
@@ -718,7 +718,7 @@ and byte count, verify all four archives and metadata, execute Darwin arm64
 merge second parent, and require `OPEN / Draft / CLEAN / MERGEABLE /
 test=SUCCESS`, zero tags, and zero Releases.
 
-- [ ] **Step 4: Close the checklist on a final protected head**
+- [x] **Step 4: Close the checklist on a final protected head**
 
 Mark the remaining W15 items, commit `docs: close full LongMemEval reader QA`,
 push again, and require that final checklist head to pass a second protected CI
@@ -726,7 +726,7 @@ and independent artifact verification. Append only final immutable run, job,
 artifact, digest, merge, and PR-state identifiers to the PR body so no third
 documentation commit is created.
 
-- [ ] **Step 5: Keep the platform goal active**
+- [x] **Step 5: Keep the platform goal active**
 
 W15 completion advances public full reader QA only. The overall goal remains
 active for a genuinely external sealed evaluator, withheld cases, long-duration
