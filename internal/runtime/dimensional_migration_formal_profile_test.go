@@ -176,9 +176,7 @@ func TestActiveBacklogDimensionalMigrationProfile(t *testing.T) {
 	if querySummary.Successful != manifest.QueryClientCount*manifest.QueriesPerClient || querySummary.CrossScope != 0 {
 		t.Fatalf("W17 incumbent query summary=%#v", querySummary)
 	}
-	queryP50 := percentileDuration(querySummary.Latencies, 50)
-	queryP95 := percentileDuration(querySummary.Latencies, 95)
-	queryP99 := percentileDuration(querySummary.Latencies, 99)
+	queryP50, queryP95, queryP99 := dimensionalLatencyPercentiles(querySummary.Latencies)
 	if queryP95 > time.Duration(manifest.CalibratedLimits.QueryP95MS)*time.Millisecond ||
 		queryP99 > time.Duration(manifest.CalibratedLimits.QueryP99MS)*time.Millisecond {
 		t.Fatalf("W17 query latency exceeded profile: p95=%s p99=%s", queryP95, queryP99)
@@ -421,6 +419,24 @@ type dimensionalQueryLoadSummary struct {
 	Successful int
 	CrossScope int
 	Latencies  []time.Duration
+}
+
+func TestDimensionalLatencyPercentilesSortSamples(t *testing.T) {
+	p50, p95, p99 := dimensionalLatencyPercentiles([]time.Duration{
+		10 * time.Millisecond,
+		1 * time.Millisecond,
+		7 * time.Millisecond,
+		5 * time.Millisecond,
+	})
+	if p50 != 5*time.Millisecond || p95 != 7*time.Millisecond || p99 != 7*time.Millisecond {
+		t.Fatalf("unexpected dimensional percentiles: p50=%s p95=%s p99=%s", p50, p95, p99)
+	}
+}
+
+func dimensionalLatencyPercentiles(samples []time.Duration) (time.Duration, time.Duration, time.Duration) {
+	sorted := append([]time.Duration(nil), samples...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	return percentileDuration(sorted, 50), percentileDuration(sorted, 95), percentileDuration(sorted, 99)
 }
 
 func runDimensionalIncumbentQueryLoad(

@@ -95,6 +95,14 @@ func TestDimensionalMigrationReportRejectsConflictFailedGateAndSecret(t *testing
 	if err := ValidateDimensionalMigrationReport(secret); err == nil || !strings.Contains(err.Error(), "secret-shaped") {
 		t.Fatalf("expected secret rejection, got %v", err)
 	}
+
+	nonMonotonic := report
+	nonMonotonic.Queries.P50MS = 10
+	nonMonotonic.Queries.P95MS = 7
+	nonMonotonic.Queries.P99MS = 5
+	if err := ValidateDimensionalMigrationReport(nonMonotonic); err == nil || !strings.Contains(err.Error(), "latency percentiles") {
+		t.Fatalf("expected non-monotonic latency rejection, got %v", err)
+	}
 }
 
 func validDimensionalMigrationReportFixture() DimensionalMigrationReport {

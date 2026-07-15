@@ -222,6 +222,9 @@ func ValidateDimensionalMigrationReport(report DimensionalMigrationReport) error
 		report.Profiles.CandidateLifecycle != "candidate" {
 		return errors.New("dimensional migration profile contract is invalid")
 	}
+	if report.Queries.P50MS < 0 || report.Queries.P50MS > report.Queries.P95MS || report.Queries.P95MS > report.Queries.P99MS {
+		return errors.New("dimensional migration latency percentiles are invalid")
+	}
 	if len(report.HardGates) != 12 {
 		return fmt.Errorf("dimensional migration hard gate count=%d want 12", len(report.HardGates))
 	}
