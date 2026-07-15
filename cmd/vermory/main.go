@@ -100,6 +100,7 @@ func newRootCommand() *cobra.Command {
 	rootCmd.AddCommand(newServeCommand())
 	rootCmd.AddCommand(newBenchmarkLongMemEvalCommand())
 	rootCmd.AddCommand(newRetrievalAblationCommand())
+	rootCmd.AddCommand(newRetrievalProfileComparisonCommand())
 	rootCmd.AddCommand(newRetrievalWorkerCommand())
 	rootCmd.AddCommand(newRetrievalStatusCommand())
 	rootCmd.AddCommand(newRetrievalRebuildCommand())

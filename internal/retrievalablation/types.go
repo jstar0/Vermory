@@ -63,6 +63,7 @@ type HardGateReport struct {
 	Pass            bool `json:"pass"`
 	ForbiddenCount  int  `json:"forbidden_count"`
 	IneligibleCount int  `json:"ineligible_count"`
+	DegradedCount   int  `json:"degraded_count"`
 }
 
 type RunFailure struct {
