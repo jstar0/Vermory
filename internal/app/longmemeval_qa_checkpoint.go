@@ -27,6 +27,7 @@ type LongMemEvalQAAttempt struct {
 	StartedAt         string               `json:"started_at,omitempty"`
 	DurationMillis    int64                `json:"duration_ms"`
 	Status            string               `json:"status"`
+	Output            string               `json:"output,omitempty"`
 	Error             string               `json:"error,omitempty"`
 	ProviderModel     string               `json:"provider_model,omitempty"`
 	Usage             *provider.TokenUsage `json:"usage,omitempty"`
@@ -36,11 +37,13 @@ type LongMemEvalQAAttempt struct {
 }
 
 type LongMemEvalQAJudgeState struct {
-	Status        string                 `json:"status"`
-	Correct       *bool                  `json:"correct,omitempty"`
-	Output        string                 `json:"output,omitempty"`
-	ProviderModel string                 `json:"provider_model,omitempty"`
-	Attempts      []LongMemEvalQAAttempt `json:"attempts,omitempty"`
+	Config        benchmark.ExecutionModelConfig `json:"config"`
+	PromptSHA256  string                         `json:"prompt_sha256,omitempty"`
+	Status        string                         `json:"status"`
+	Correct       *bool                          `json:"correct,omitempty"`
+	Output        string                         `json:"output,omitempty"`
+	ProviderModel string                         `json:"provider_model,omitempty"`
+	Attempts      []LongMemEvalQAAttempt         `json:"attempts,omitempty"`
 }
 
 type LongMemEvalQACheckpoint struct {

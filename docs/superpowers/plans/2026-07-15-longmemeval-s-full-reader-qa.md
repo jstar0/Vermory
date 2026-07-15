@@ -401,7 +401,7 @@ git commit -m "feat: run resumable LongMemEval readers"
 - Produces: `benchmark.ParseLongMemEvalJudgeLabel(output string) (bool, error)`.
 - Produces: `app.RunLongMemEvalQAJudge(ctx context.Context, opts LongMemEvalQAOptions) (LongMemEvalQAJudgeSummary, error)`.
 
-- [ ] **Step 1: Freeze exact upstream prompt branches in tests**
+- [x] **Step 1: Freeze exact upstream prompt branches in tests**
 
 Add golden expected strings for:
 
@@ -420,20 +420,20 @@ The wording must match pinned `evaluate_qa.py` SHA-256
 Test strict parsing of `yes`, `Yes.`, `NO`, invalid explanations, both labels,
 empty output, and neither label.
 
-- [ ] **Step 2: Verify judge RED**
+- [x] **Step 2: Verify judge RED**
 
 ```bash
 go test ./internal/benchmark -run 'TestLongMemEvalJudgePrompt|TestParseLongMemEvalJudgeLabel' -count=1
 go test ./internal/app -run TestRunLongMemEvalQAJudge -count=1
 ```
 
-- [ ] **Step 3: Implement prompt and strict label parsing**
+- [x] **Step 3: Implement prompt and strict label parsing**
 
 Port only the prompt templates and task dispatch from the pinned Python source.
 Do not port its OpenAI client or substring-`yes` parser. Normalize terminal
 punctuation and require one unambiguous label.
 
-- [ ] **Step 4: Implement resumable judge workers**
+- [x] **Step 4: Implement resumable judge workers**
 
 Load every reader checkpoint, skip terminal reader failures with explicit judge
 state `not_run_reader_failed`, and queue completed responses. The judge request
@@ -445,7 +445,7 @@ terminal. Exhausted or invalid output becomes `judge_failed` or
 `judge_invalid` and remains in evidence. Resume makes zero judge calls for
 terminal judge states.
 
-- [ ] **Step 5: Verify judge GREEN and commit**
+- [x] **Step 5: Verify judge GREEN and commit**
 
 ```bash
 go test ./internal/benchmark -run 'TestLongMemEvalJudgePrompt|TestParseLongMemEvalJudgeLabel' -count=1

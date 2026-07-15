@@ -53,6 +53,7 @@ func RunLongMemEvalQAReader(ctx context.Context, opts LongMemEvalQAOptions) (Lon
 	if err != nil {
 		return LongMemEvalQAReaderSummary{}, err
 	}
+	opts = runtime.opts
 	summary, err := benchmark.ScanLongMemEval(sourcePath, nil)
 	if err != nil {
 		return LongMemEvalQAReaderSummary{}, err
@@ -141,14 +142,32 @@ func RunLongMemEvalQAReader(ctx context.Context, opts LongMemEvalQAOptions) (Lon
 }
 
 func prepareLongMemEvalQAReader(opts LongMemEvalQAOptions) (*longMemEvalQAReaderRuntime, map[string]LongMemEvalRetrievalRecordResult, string, error) {
-	if err := benchmark.ValidateLongMemEvalQAExecution(opts.Qualification, opts.Execution); err != nil {
-		return nil, nil, "", err
-	}
 	if opts.ReaderProvider == nil {
 		return nil, nil, "", fmt.Errorf("LongMemEval QA reader provider is required")
 	}
+	opts, contract, retrieval, sourcePath, err := prepareLongMemEvalQAInputs(opts)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	sleeper := opts.RetrySleeper
+	if sleeper == nil {
+		sleeper = sleepLongMemEvalQARetry
+	}
+	return &longMemEvalQAReaderRuntime{
+		opts:     opts,
+		contract: contract,
+		store:    artifact.NewLocalStore(opts.ArtifactRoot),
+		sleep:    sleeper,
+		summary:  LongMemEvalQAReaderSummary{RunID: contract.RunID},
+	}, retrieval, sourcePath, nil
+}
+
+func prepareLongMemEvalQAInputs(opts LongMemEvalQAOptions) (LongMemEvalQAOptions, longMemEvalQACheckpointContract, map[string]LongMemEvalRetrievalRecordResult, string, error) {
+	if err := benchmark.ValidateLongMemEvalQAExecution(opts.Qualification, opts.Execution); err != nil {
+		return LongMemEvalQAOptions{}, longMemEvalQACheckpointContract{}, nil, "", err
+	}
 	if strings.TrimSpace(opts.SourceDatasetPath) == "" || strings.TrimSpace(opts.RetrievalResultsPath) == "" {
-		return nil, nil, "", fmt.Errorf("LongMemEval QA source dataset and retrieval results are required")
+		return LongMemEvalQAOptions{}, longMemEvalQACheckpointContract{}, nil, "", fmt.Errorf("LongMemEval QA source dataset and retrieval results are required")
 	}
 	if strings.TrimSpace(opts.ArtifactRoot) == "" {
 		opts.ArtifactRoot = "./artifacts"
@@ -158,10 +177,10 @@ func prepareLongMemEvalQAReader(opts LongMemEvalQAOptions) (*longMemEvalQAReader
 		runID = strings.TrimSpace(opts.Execution.RunID)
 	}
 	if runID != strings.TrimSpace(opts.Execution.RunID) {
-		return nil, nil, "", fmt.Errorf("LongMemEval QA run ID %q differs from execution %q", runID, opts.Execution.RunID)
+		return LongMemEvalQAOptions{}, longMemEvalQACheckpointContract{}, nil, "", fmt.Errorf("LongMemEval QA run ID %q differs from execution %q", runID, opts.Execution.RunID)
 	}
 	if err := validateLongMemEvalRetrievalSegment(runID, "run ID"); err != nil {
-		return nil, nil, "", err
+		return LongMemEvalQAOptions{}, longMemEvalQACheckpointContract{}, nil, "", err
 	}
 	implementationRevision := strings.TrimSpace(opts.ImplementationRevision)
 	if implementationRevision == "" {
@@ -171,29 +190,25 @@ func prepareLongMemEvalQAReader(opts LongMemEvalQAOptions) (*longMemEvalQAReader
 		implementationRevision = buildVCSRevision()
 	}
 	if opts.Execution.ImplementationRev != "" && implementationRevision != opts.Execution.ImplementationRev {
-		return nil, nil, "", fmt.Errorf("LongMemEval QA implementation revision %q differs from execution %q", implementationRevision, opts.Execution.ImplementationRev)
+		return LongMemEvalQAOptions{}, longMemEvalQACheckpointContract{}, nil, "", fmt.Errorf("LongMemEval QA implementation revision %q differs from execution %q", implementationRevision, opts.Execution.ImplementationRev)
 	}
 	sourcePath, err := filepath.Abs(opts.SourceDatasetPath)
 	if err != nil {
-		return nil, nil, "", err
+		return LongMemEvalQAOptions{}, longMemEvalQACheckpointContract{}, nil, "", err
 	}
 	if err := benchmark.VerifyFileSHA256(sourcePath, opts.Qualification.Dataset.SHA256); err != nil {
-		return nil, nil, "", fmt.Errorf("verify LongMemEval-S source: %w", err)
+		return LongMemEvalQAOptions{}, longMemEvalQACheckpointContract{}, nil, "", fmt.Errorf("verify LongMemEval-S source: %w", err)
 	}
 	info, err := os.Stat(sourcePath)
 	if err != nil {
-		return nil, nil, "", err
+		return LongMemEvalQAOptions{}, longMemEvalQACheckpointContract{}, nil, "", err
 	}
 	if info.Size() != opts.Qualification.Dataset.SizeBytes {
-		return nil, nil, "", fmt.Errorf("LongMemEval-S source size is %d, want %d", info.Size(), opts.Qualification.Dataset.SizeBytes)
+		return LongMemEvalQAOptions{}, longMemEvalQACheckpointContract{}, nil, "", fmt.Errorf("LongMemEval-S source size is %d, want %d", info.Size(), opts.Qualification.Dataset.SizeBytes)
 	}
 	retrieval, err := LoadLongMemEvalQARetrieval(opts.RetrievalResultsPath, opts.Execution)
 	if err != nil {
-		return nil, nil, "", err
-	}
-	sleeper := opts.RetrySleeper
-	if sleeper == nil {
-		sleeper = sleepLongMemEvalQARetry
+		return LongMemEvalQAOptions{}, longMemEvalQACheckpointContract{}, nil, "", err
 	}
 	contract := longMemEvalQACheckpointContract{
 		RunID:                  runID,
@@ -206,13 +221,9 @@ func prepareLongMemEvalQAReader(opts LongMemEvalQAOptions) (*longMemEvalQAReader
 		K:                      opts.Execution.RetrievalInput.K,
 		Reader:                 *opts.Execution.Reader,
 	}
-	return &longMemEvalQAReaderRuntime{
-		opts:     opts,
-		contract: contract,
-		store:    artifact.NewLocalStore(opts.ArtifactRoot),
-		sleep:    sleeper,
-		summary:  LongMemEvalQAReaderSummary{RunID: runID},
-	}, retrieval, sourcePath, nil
+	opts.RunID = runID
+	opts.ImplementationRevision = implementationRevision
+	return opts, contract, retrieval, sourcePath, nil
 }
 
 func (runtime *longMemEvalQAReaderRuntime) processTask(ctx context.Context, task LongMemEvalQATask) error {
