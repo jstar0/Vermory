@@ -245,7 +245,7 @@ git commit -m "feat: add HA and PITR evidence reports"
 - Produces test-only `clusterHarness`, `postgresCluster`, and `profileConfig` helpers.
 - Consumes `VERMORY_HA_PITR_PROFILE`, `VERMORY_POSTGRES_BIN_DIR`, and `VERMORY_HA_PITR_ROOT`.
 
-- [ ] **Step 1: Write failing harness boundary tests**
+- [x] **Step 1: Write failing harness boundary tests**
 
 ```go
 func TestLoadProfileConfigRequiresExplicitOptIn(t *testing.T)
@@ -260,13 +260,13 @@ exactly `1`. It rejects `/`, an existing PostgreSQL service data directory, a
 root containing symlink escapes, or a bin directory whose `postgres --version`
 or `pg_basebackup --version` is not 18.x.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 go test -count=1 ./internal/operationsprofile -run 'TestLoadProfileConfig|TestClusterPaths|TestRender' -v
 ```
 
-- [ ] **Step 3: Implement minimal cluster lifecycle helpers**
+- [x] **Step 3: Implement minimal cluster lifecycle helpers**
 
 Define:
 
@@ -281,7 +281,6 @@ type profileConfig struct {
 type postgresCluster struct {
     Name       string
     DataDir    string
-    SocketDir  string
     LogPath    string
     Port       int
     ProcessUp  bool
@@ -302,24 +301,26 @@ Implement wrappers for `initdb`, `pg_ctl start/stop/promote`,
 polling, path containment, and cleanup. Every `exec.CommandContext` error must
 return command name, exit code, and a redacted tail of output without DSNs.
 
-Primary configuration must include loopback-only listening, `wal_level`,
+Every cluster must use loopback TCP only with `unix_socket_directories=''` so
+the profile does not depend on platform Unix socket path limits. Primary
+configuration must also include `wal_level`,
 `max_wal_senders`, `max_replication_slots`, `hot_standby`, `archive_mode`, and
 an archive command targeting the dedicated archive directory. The helper must
 use `pg_ctl stop -m immediate` only for the dedicated primary.
 
-- [ ] **Step 4: Run a cluster-only smoke profile**
+- [x] **Step 4: Run a cluster-only smoke profile**
 
 ```bash
 VERMORY_HA_PITR_PROFILE=1 \
 VERMORY_POSTGRES_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin \
-VERMORY_HA_PITR_ROOT=/Volumes/JSData/.vermory-ha-pitr/w16-harness-smoke \
+VERMORY_HA_PITR_ROOT=/Volumes/JSData/ComputerScience/Mac/.vermory-ha-pitr/w16-harness-smoke \
 go test -count=1 ./internal/operationsprofile -run 'TestPostgreSQLClusterHarnessSmoke' -v
 ```
 
 Expected: primary starts, a streamed standby catches up, both system
 identifiers match, and cleanup leaves no listener on the allocated ports.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 go test -count=1 ./internal/operationsprofile
@@ -374,7 +375,7 @@ the same before and after promotion.
 ```bash
 VERMORY_HA_PITR_PROFILE=1 \
 VERMORY_POSTGRES_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin \
-VERMORY_HA_PITR_ROOT=/Volumes/JSData/.vermory-ha-pitr/w16-ha-red \
+VERMORY_HA_PITR_ROOT=/Volumes/JSData/ComputerScience/Mac/.vermory-ha-pitr/w16-ha-red \
 go test -count=1 ./internal/operationsprofile -run 'TestPostgreSQLHAFailoverProfile' -v
 ```
 
@@ -418,7 +419,7 @@ ID/raw value held only in process memory, and the completed PITR base path.
 ```bash
 VERMORY_HA_PITR_PROFILE=1 \
 VERMORY_POSTGRES_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin \
-VERMORY_HA_PITR_ROOT=/Volumes/JSData/.vermory-ha-pitr/w16-ha-green \
+VERMORY_HA_PITR_ROOT=/Volumes/JSData/ComputerScience/Mac/.vermory-ha-pitr/w16-ha-green \
 go test -count=1 ./internal/operationsprofile -run 'TestPostgreSQLHAFailoverProfile' -v
 git diff --check
 git add internal/operationsprofile
@@ -468,7 +469,7 @@ quarantine exit: token A revoked again, new token works, old token returns 401
 ```bash
 VERMORY_HA_PITR_PROFILE=1 \
 VERMORY_POSTGRES_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin \
-VERMORY_HA_PITR_ROOT=/Volumes/JSData/.vermory-ha-pitr/w16-pitr-red \
+VERMORY_HA_PITR_ROOT=/Volumes/JSData/ComputerScience/Mac/.vermory-ha-pitr/w16-pitr-red \
 go test -count=1 ./internal/operationsprofile -run 'TestPostgreSQLPITRProfile' -v
 ```
 
@@ -525,7 +526,7 @@ development, but the formal evidence command uses the combined test above.
 ```bash
 VERMORY_HA_PITR_PROFILE=1 \
 VERMORY_POSTGRES_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin \
-VERMORY_HA_PITR_ROOT=/Volumes/JSData/.vermory-ha-pitr/w16-pitr-green \
+VERMORY_HA_PITR_ROOT=/Volumes/JSData/ComputerScience/Mac/.vermory-ha-pitr/w16-pitr-green \
 go test -count=1 ./internal/operationsprofile -run 'TestPostgreSQLPITRProfile' -v
 git diff --check
 git add internal/operationsprofile
@@ -555,7 +556,7 @@ Use a dedicated root and stable run ID:
 ```bash
 VERMORY_HA_PITR_PROFILE=1 \
 VERMORY_POSTGRES_BIN_DIR=/opt/homebrew/opt/postgresql@18/bin \
-VERMORY_HA_PITR_ROOT=/Volumes/JSData/.vermory-ha-pitr/postgresql-ha-pitr-20260716-v1 \
+VERMORY_HA_PITR_ROOT=/Volumes/JSData/ComputerScience/Mac/.vermory-ha-pitr/postgresql-ha-pitr-20260716-v1 \
 VERMORY_HA_PITR_RUN_ID=postgresql-ha-pitr-20260716-v1 \
 VERMORY_HA_PITR_IMPLEMENTATION_REVISION="$(git rev-parse HEAD)" \
 go test -count=1 ./internal/operationsprofile -run 'TestPostgreSQLHAPITRProfile' -v

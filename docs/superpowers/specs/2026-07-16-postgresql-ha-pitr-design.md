@@ -80,7 +80,6 @@ profile-root/
   pitr-base/
   pitr-restored/
   wal-archive/
-  sockets/
   logs/
   artifacts/
 ```
@@ -89,10 +88,12 @@ The real evidence run places this root on `/Volumes/JSData` rather than the
 nearly full system volume. Automated tests may use `t.TempDir()` when space is
 sufficient.
 
-Each cluster listens only on `127.0.0.1` and its private Unix socket directory.
-Ports are allocated dynamically. The generated `pg_hba.conf` trusts only local
-loopback connections inside these dedicated disposable clusters. No existing
-Homebrew service is stopped or reconfigured.
+Each cluster listens only on `127.0.0.1` with a dynamically allocated port and
+sets `unix_socket_directories=''`. TCP-only loopback avoids platform Unix socket
+path-length limits while keeping the disposable profile unreachable from
+non-loopback interfaces. The generated `pg_hba.conf` trusts only local loopback
+connections inside these dedicated disposable clusters. No existing Homebrew
+service is stopped or reconfigured.
 
 The harness requires PostgreSQL 18 tools through
 `VERMORY_POSTGRES_BIN_DIR`. It invokes `initdb`, `pg_ctl`, `pg_basebackup`,
@@ -157,7 +158,7 @@ T4  a later fact C is committed
 The restore copies the physical base backup into a new dedicated data
 directory, configures `restore_command`, creates `recovery.signal`, and sets
 `recovery_target_lsn` to the exact LSN captured after T2. It uses
-`recovery_target_action=promote` and a separate port/socket.
+`recovery_target_action=promote` and a separate loopback port.
 
 The restored cluster is accepted only when:
 
