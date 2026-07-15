@@ -299,6 +299,37 @@ type dimensionalPostgres18 struct {
 	running     bool
 }
 
+func TestDimensionalPostgresVersionParsesVendorSuffix(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		output string
+		want   string
+	}{
+		{name: "upstream", output: "postgres (PostgreSQL) 18.4", want: "18.4"},
+		{name: "homebrew", output: "postgres (PostgreSQL) 18.4 (Homebrew)", want: "18.4"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := dimensionalPostgresVersion(test.output)
+			if err != nil || got != test.want {
+				t.Fatalf("dimensionalPostgresVersion(%q)=%q, %v; want %q", test.output, got, err, test.want)
+			}
+		})
+	}
+	if _, err := dimensionalPostgresVersion("postgres version unavailable"); err == nil {
+		t.Fatal("version output without a numeric version was accepted")
+	}
+}
+
+func dimensionalPostgresVersion(output string) (string, error) {
+	for _, field := range strings.Fields(strings.TrimSpace(output)) {
+		field = strings.Trim(field, "()")
+		if len(field) > 0 && field[0] >= '0' && field[0] <= '9' && strings.Contains(field, ".") {
+			return field, nil
+		}
+	}
+	return "", fmt.Errorf("PostgreSQL version output has no numeric version")
+}
+
 func startDimensionalPostgres18(t *testing.T, root, binDir string) *dimensionalPostgres18 {
 	t.Helper()
 	root = filepath.Clean(strings.TrimSpace(root))
@@ -324,11 +355,10 @@ func startDimensionalPostgres18(t *testing.T, root, binDir string) *dimensionalP
 	if err != nil {
 		t.Fatal(err)
 	}
-	versionFields := strings.Fields(strings.TrimSpace(string(versionOutput)))
-	if len(versionFields) == 0 {
-		t.Fatal("PostgreSQL version output is empty")
+	version, err := dimensionalPostgresVersion(string(versionOutput))
+	if err != nil {
+		t.Fatal(err)
 	}
-	version := versionFields[len(versionFields)-1]
 	if !strings.HasPrefix(version, "18.") {
 		t.Fatalf("PostgreSQL 18 is required, got %s", version)
 	}
