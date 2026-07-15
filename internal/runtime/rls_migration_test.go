@@ -145,6 +145,12 @@ INSERT INTO memory_vector_documents (
 			t.Fatal(err)
 		}
 		if _, err := admin.pool.Exec(ctx, `
+INSERT INTO memory_vector_documents_512 (
+  profile_id, tenant_id, continuity_id, memory_id, content_sha256, embedding
+) VALUES ($1, $2, $3::uuid, $4::uuid, repeat('d', 64), array_fill(0::real, ARRAY[512])::vector)`, DimensionalMigrationRetrievalProfileID, tenantID, graph.continuityID, graph.memoryID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.pool.Exec(ctx, `
 INSERT INTO memory_retrieval_runs (
   tenant_id, primary_continuity_id, continuity_ids, operation_id,
   request_fingerprint, requested_mode, effective_mode, profile_id,
@@ -171,6 +177,7 @@ INSERT INTO memory_retrieval_runs (
 		"memory_projection_events",
 		"memory_projection_cursors",
 		"memory_vector_documents",
+		"memory_vector_documents_512",
 		"memory_retrieval_runs",
 	} {
 		if err := runtimeStore.pool.QueryRow(ctx, "SELECT count(*) FROM "+table).Scan(new(int)); err == nil {
@@ -214,6 +221,7 @@ func TestIdentityRLSMigrationEnablesEveryServedTenantTable(t *testing.T) {
 		"memory_projection_events",
 		"memory_projection_cursors",
 		"memory_vector_documents",
+		"memory_vector_documents_512",
 		"memory_retrieval_runs",
 	}
 	for _, table := range tables {
@@ -303,6 +311,8 @@ func TestIdentityRLSMigrationAddsTenantAwareForeignKeys(t *testing.T) {
 		"memory_projection_events_tenant_memory_fk",
 		"memory_vector_documents_tenant_continuity_fk",
 		"memory_vector_documents_tenant_memory_fk",
+		"memory_vector_documents_512_tenant_continuity_fk",
+		"memory_vector_documents_512_tenant_memory_fk",
 		"memory_retrieval_runs_tenant_primary_continuity_fk",
 	}
 	for _, name := range constraints {

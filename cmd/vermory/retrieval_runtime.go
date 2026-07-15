@@ -27,26 +27,35 @@ type retrievalRuntimeOptions struct {
 
 func defaultRetrievalRuntimeOptions() retrievalRuntimeOptions {
 	return retrievalRuntimeOptions{
-		Mode:                runtime.RetrievalLexical,
-		ProfileID:           runtime.ProductionRetrievalProfileID,
-		EmbeddingBaseURL:    "https://api.siliconflow.cn/v1",
-		EmbeddingAPIKeyEnv:  "SILICONFLOW_API_KEY",
-		EmbeddingModel:      "BAAI/bge-m3",
-		EmbeddingDimensions: 1024,
+		Mode:               runtime.RetrievalLexical,
+		ProfileID:          runtime.ProductionRetrievalProfileID,
+		EmbeddingAPIKeyEnv: "SILICONFLOW_API_KEY",
 	}
 }
 
 func (options retrievalRuntimeOptions) profile() runtime.RetrievalProfile {
 	profileID := strings.TrimSpace(options.ProfileID)
+	baseURL := strings.TrimSpace(options.EmbeddingBaseURL)
+	model := strings.TrimSpace(options.EmbeddingModel)
+	dimensions := options.EmbeddingDimensions
 	var projectionClass runtime.ProjectionClass
 	if spec, ok := runtime.SupportedRetrievalProfile(profileID); ok {
 		projectionClass = spec.ProjectionClass
+		if baseURL == "" {
+			baseURL = spec.BaseURL
+		}
+		if model == "" {
+			model = spec.Model
+		}
+		if dimensions == 0 {
+			dimensions = spec.Dimensions
+		}
 	}
 	return runtime.RetrievalProfile{
 		ID:              profileID,
-		BaseURL:         strings.TrimSpace(options.EmbeddingBaseURL),
-		Model:           strings.TrimSpace(options.EmbeddingModel),
-		Dimensions:      options.EmbeddingDimensions,
+		BaseURL:         baseURL,
+		Model:           model,
+		Dimensions:      dimensions,
 		ProjectionClass: projectionClass,
 	}
 }

@@ -141,7 +141,11 @@ func runPITRPhase(t *testing.T, harness *clusterHarness, target targetState, rep
 	})
 
 	for _, tenantID := range []string{profileTenantA, profileTenantB} {
-		for _, profileID := range []string{vermoryruntime.ProductionRetrievalProfileID, vermoryruntime.MigrationRetrievalProfileID} {
+		for _, profileID := range []string{
+			vermoryruntime.ProductionRetrievalProfileID,
+			vermoryruntime.MigrationRetrievalProfileID,
+			vermoryruntime.DimensionalMigrationRetrievalProfileID,
+		} {
 			if err := restoredStore.ResetVectorProjection(ctx, tenantID, profileID); err != nil {
 				t.Fatal(err)
 			}

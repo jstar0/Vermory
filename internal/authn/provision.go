@@ -32,6 +32,7 @@ var servedTables = []string{
 	"memory_projection_events",
 	"memory_projection_cursors",
 	"memory_vector_documents",
+	"memory_vector_documents_512",
 	"memory_retrieval_runs",
 }
 

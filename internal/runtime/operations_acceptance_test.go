@@ -250,6 +250,18 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 	if _, err := worker.RunOnce(ctx); err != nil {
 		t.Fatal(err)
 	}
+	candidateEmbedder := &projectionTestEmbedder{vector: testVector512(0.25)}
+	candidateWorker, err := NewProjectionWorker(source, candidateEmbedder, ProjectionWorkerOptions{
+		TenantID:  "ops-retrieval-tenant",
+		Profile:   dimensionalMigrationProfile(t),
+		BatchSize: 16,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := candidateWorker.RunOnce(ctx); err != nil {
+		t.Fatal(err)
+	}
 	coordinator, err := NewRetrievalCoordinator(source, embedder, RetrievalProfile{
 		ID:              ProductionRetrievalProfileID,
 		BaseURL:         "https://api.siliconflow.cn/v1",
@@ -273,6 +285,24 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 	}
 	if len(beforeResult.Memories) != 1 || beforeResult.Memories[0].ID != active.Memory.MemoryID {
 		t.Fatalf("unexpected pre-dump vector result: %#v", beforeResult)
+	}
+	candidateCoordinator, err := NewRetrievalCoordinator(source, candidateEmbedder, dimensionalMigrationProfile(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidateBefore, err := candidateCoordinator.Retrieve(ctx, RetrievalRequest{
+		OperationID:   "ops-retrieval-candidate-before-dump",
+		TenantID:      "ops-retrieval-tenant",
+		ContinuityIDs: []string{resolution.ContinuityID},
+		Query:         "rollback approval",
+		Limit:         5,
+		Mode:          RetrievalVector,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candidateBefore.Memories) != 1 || candidateBefore.Memories[0].ID != active.Memory.MemoryID {
+		t.Fatalf("unexpected candidate pre-dump vector result: %#v", candidateBefore)
 	}
 	sourceFingerprint := operationsAuthorityFingerprint(t, source.pool)
 	sourceCounts := operationsRetrievalCounts(t, source.pool)
@@ -332,6 +362,24 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 	if !reflect.DeepEqual(retrievalMemoryIDs(beforeResult.Memories), retrievalMemoryIDs(restoredResult.Memories)) {
 		t.Fatalf("restore changed retrieval IDs: before=%#v restored=%#v", retrievalMemoryIDs(beforeResult.Memories), retrievalMemoryIDs(restoredResult.Memories))
 	}
+	targetCandidateCoordinator, err := NewRetrievalCoordinator(target, candidateEmbedder, dimensionalMigrationProfile(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidateRestored, err := targetCandidateCoordinator.Retrieve(ctx, RetrievalRequest{
+		OperationID:   "ops-retrieval-candidate-after-restore",
+		TenantID:      "ops-retrieval-tenant",
+		ContinuityIDs: []string{resolution.ContinuityID},
+		Query:         "rollback approval",
+		Limit:         5,
+		Mode:          RetrievalVector,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(retrievalMemoryIDs(candidateBefore.Memories), retrievalMemoryIDs(candidateRestored.Memories)) {
+		t.Fatalf("restore changed candidate retrieval IDs: before=%#v restored=%#v", retrievalMemoryIDs(candidateBefore.Memories), retrievalMemoryIDs(candidateRestored.Memories))
+	}
 	if err := target.ResetVectorProjection(ctx, "ops-retrieval-tenant", ProductionRetrievalProfileID); err != nil {
 		t.Fatal(err)
 	}
@@ -359,13 +407,45 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 	if rebuiltFingerprint := operationsAuthorityFingerprint(t, target.pool); rebuiltFingerprint != sourceFingerprint {
 		t.Fatalf("post-restore replay changed authority: source=%s rebuilt=%s", sourceFingerprint, rebuiltFingerprint)
 	}
+	if err := target.ResetVectorProjection(ctx, "ops-retrieval-tenant", DimensionalMigrationRetrievalProfileID); err != nil {
+		t.Fatal(err)
+	}
+	incumbentAfterCandidateReset, err := targetCoordinator.Retrieve(ctx, RetrievalRequest{
+		OperationID:   "ops-retrieval-incumbent-after-candidate-reset",
+		TenantID:      "ops-retrieval-tenant",
+		ContinuityIDs: []string{resolution.ContinuityID},
+		Query:         "rollback approval",
+		Limit:         5,
+		Mode:          RetrievalVector,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(retrievalMemoryIDs(beforeResult.Memories), retrievalMemoryIDs(incumbentAfterCandidateReset.Memories)) {
+		t.Fatalf("candidate reset changed incumbent retrieval: before=%#v after=%#v", retrievalMemoryIDs(beforeResult.Memories), retrievalMemoryIDs(incumbentAfterCandidateReset.Memories))
+	}
+	targetCandidateWorker, err := NewProjectionWorker(target, candidateEmbedder, ProjectionWorkerOptions{
+		TenantID:         "ops-retrieval-tenant",
+		Profile:          dimensionalMigrationProfile(t),
+		SnapshotPageSize: 16,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rebuild, err := targetCandidateWorker.RebuildCurrent(ctx); err != nil || rebuild.Projected != 1 || rebuild.Lag != 0 {
+		t.Fatalf("candidate rebuild after restore=%#v err=%v", rebuild, err)
+	}
+	if rebuiltFingerprint := operationsAuthorityFingerprint(t, target.pool); rebuiltFingerprint != sourceFingerprint {
+		t.Fatalf("candidate rebuild changed authority: source=%s rebuilt=%s", sourceFingerprint, rebuiltFingerprint)
+	}
 }
 
 type operationsRetrievalTableCounts struct {
-	Events  int
-	Cursors int
-	Vectors int
-	Audits  int
+	Events     int
+	Cursors    int
+	Vectors    int
+	Vectors512 int
+	Audits     int
 }
 
 func operationsRetrievalCounts(t *testing.T, pool *pgxpool.Pool) operationsRetrievalTableCounts {
@@ -376,10 +456,13 @@ SELECT
   (SELECT count(*) FROM memory_projection_events),
   (SELECT count(*) FROM memory_projection_cursors),
   (SELECT count(*) FROM memory_vector_documents),
-  (SELECT count(*) FROM memory_retrieval_runs)`).Scan(&counts.Events, &counts.Cursors, &counts.Vectors, &counts.Audits); err != nil {
+	  (SELECT count(*) FROM memory_vector_documents_512),
+  (SELECT count(*) FROM memory_retrieval_runs)`).Scan(
+		&counts.Events, &counts.Cursors, &counts.Vectors, &counts.Vectors512, &counts.Audits,
+	); err != nil {
 		t.Fatal(err)
 	}
-	if counts.Events == 0 || counts.Cursors == 0 || counts.Vectors == 0 || counts.Audits == 0 {
+	if counts.Events == 0 || counts.Cursors == 0 || counts.Vectors == 0 || counts.Vectors512 == 0 || counts.Audits == 0 {
 		t.Fatalf("retrieval dump source is incomplete: %#v", counts)
 	}
 	return counts

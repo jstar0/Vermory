@@ -26,7 +26,11 @@ func TestProductionRetrievalMigrationCreatesProjectionTables(t *testing.T) {
 			"last_error_code", "last_attempt_at", "updated_at",
 		},
 		"memory_vector_documents": {
-			"profile_id", "tenant_id", "continuity_id", "memory_id", "content_sha256",
+			"profile_id", "projection_class", "tenant_id", "continuity_id", "memory_id", "content_sha256",
+			"embedding", "updated_at",
+		},
+		"memory_vector_documents_512": {
+			"profile_id", "projection_class", "tenant_id", "continuity_id", "memory_id", "content_sha256",
 			"embedding", "updated_at",
 		},
 		"memory_retrieval_runs": {
@@ -107,6 +111,7 @@ WHERE conrelid IN (
   'public.memory_projection_events'::regclass,
   'public.memory_projection_cursors'::regclass,
   'public.memory_vector_documents'::regclass,
+	  'public.memory_vector_documents_512'::regclass,
   'public.memory_retrieval_runs'::regclass
 ) AND contype = 'c'`).Scan(&checks); err != nil {
 		t.Fatal(err)

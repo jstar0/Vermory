@@ -399,7 +399,7 @@ git commit -m "feat: route dimensional vector projections"
 - Produces: restricted runtime access to the 512 table, schema-16 reset and
   recovery inventories, and explicit candidate CLI validation.
 
-- [ ] **Step 1: Add failing role, reset, recovery, and CLI tests.**
+- [x] **Step 1: Add failing role, reset, recovery, and CLI tests.**
 
 Require:
 
@@ -416,7 +416,7 @@ Require:
 - W16's opt-in harness expects current schema 16 when rerun, without rewriting
   its immutable schema-15 evidence snapshot.
 
-- [ ] **Step 2: Run focused tests and observe RED.**
+- [x] **Step 2: Run focused tests and observe RED.**
 
 Run:
 
@@ -429,21 +429,21 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 Expected: failures for missing 512 privileges, reset inventory, schema version,
 recovery inventory, and candidate CLI tuple.
 
-- [ ] **Step 3: Extend served-table and reset inventories.**
+- [x] **Step 3: Extend served-table and reset inventories.**
 
 Add `memory_vector_documents_512` to `authn.servedTables`, runtime validation,
 test reset, backup authority inventory, restore assertions, and RLS inventory.
 Do not grant runtime access to `memory_retrieval_profiles` or any legacy
 ungoverned table.
 
-- [ ] **Step 4: Make CLI profile resolution explicit.**
+- [x] **Step 4: Make CLI profile resolution explicit.**
 
 Add a helper that resolves a supported profile ID to its frozen tuple. For
 worker, snapshot, status, reset, and semantic retrieval commands, a candidate
 profile must not inherit the incumbent model or dimension silently. Explicit
 flags may confirm the tuple but cannot mutate it.
 
-- [ ] **Step 5: Run database, RLS, role, CLI, recovery, and full serial tests.**
+- [x] **Step 5: Run database, RLS, role, CLI, recovery, and full serial tests.**
 
 Run:
 
@@ -458,7 +458,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 Expected: PASS with profile tests skipped only when their explicit opt-in
 environment is absent.
 
-- [ ] **Step 6: Commit the deployment boundary.**
+- [x] **Step 6: Commit the deployment boundary.**
 
 ```bash
 git add internal/authn/provision.go internal/authn/postgres_test.go \

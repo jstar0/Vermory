@@ -236,3 +236,34 @@ func TestSemanticRetrievalRequiresFrozenProfileAndNamedCredential(t *testing.T) 
 		t.Fatalf("missing credential error was absent or leaked a secret: %v", err)
 	}
 }
+
+func TestRetrievalRuntimeProfileIDResolvesFrozenTuple(t *testing.T) {
+	t.Setenv("W17_PRESENT_KEY", "secret-value-that-must-not-leak")
+	options := defaultRetrievalRuntimeOptions()
+	options.Mode = runtime.RetrievalVector
+	options.ProfileID = runtime.DimensionalMigrationRetrievalProfileID
+	options.EmbeddingAPIKeyEnv = "W17_PRESENT_KEY"
+	profile := options.profile()
+	if profile.ID != runtime.DimensionalMigrationRetrievalProfileID ||
+		profile.BaseURL != "https://api.siliconflow.cn/v1" ||
+		profile.Model != "BAAI/bge-small-zh-v1.5" ||
+		profile.Dimensions != 512 || profile.ProjectionClass != runtime.ProjectionClass512 {
+		t.Fatalf("candidate profile ID inherited the incumbent tuple: %#v", profile)
+	}
+	if _, err := options.validateSemantic(); err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(*retrievalRuntimeOptions){
+		"base URL":   func(options *retrievalRuntimeOptions) { options.EmbeddingBaseURL = "https://example.com/v1" },
+		"model":      func(options *retrievalRuntimeOptions) { options.EmbeddingModel = "other" },
+		"dimensions": func(options *retrievalRuntimeOptions) { options.EmbeddingDimensions = 1024 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			invalid := options
+			mutate(&invalid)
+			if _, err := invalid.validateSemantic(); err == nil || strings.Contains(err.Error(), "secret-value-that-must-not-leak") {
+				t.Fatalf("invalid candidate tuple was accepted or leaked the key: %v", err)
+			}
+		})
+	}
+}
