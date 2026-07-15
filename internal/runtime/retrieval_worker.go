@@ -103,6 +103,9 @@ func projectionAdvisoryLockKeys(profileID, tenantID string) (int32, int32) {
 func (w *ProjectionWorker) Run(ctx context.Context) error {
 	for {
 		if _, err := w.RunOnce(ctx); err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr
+			}
 			return err
 		}
 		timer := time.NewTimer(w.options.PollInterval)
