@@ -147,12 +147,15 @@ No ranking algorithm or weight is accepted before ablation.
 
 ### H-012: PostgreSQL transactional outbox
 
-- Status: `proposed`
+- Status: `supported` for the current self-hosted profile
 - Candidate: authoritative transactions enqueue projection and provider work through PostgreSQL, with idempotent workers and no default Redis dependency.
 - Reason: aligns memory state and projection jobs without introducing a second required service.
-- Evidence needed: duplicate delivery, crash, retry, PostgreSQL restart, queue backlog, and concurrent deletion tests.
+- Existing evidence: W11 created 1,000 governed facts and projection events in a disposable PostgreSQL 18 cluster, processed a bounded 128-event batch, retained cursor position across provider failure, replayed the full event stream from cursor zero without duplicate vectors, stopped PostgreSQL with `immediate` while embedding was in flight, recovered through the same runtime pool, and proved concurrent deletion wins over late embedding. A separate tenant completed direct SiliconFlow projection and vector retrieval after restart with two real `BAAI/bge-m3` requests.
+- Evidence artifact: `docs/evidence/2026-07-15-projection-outbox-fault-profile.md`.
+- Current decision: PostgreSQL remains the default authority and transactional outbox; Redis is not a required deployment dependency for the measured developer-local and self-hosted profiles.
+- Evidence needed: sustained server-scale backlog, multiple competing workers, retention pressure, and restart during a dimensionality migration.
 - Falsifier: queue contention or operational requirements exceed calibrated profiles and an external queue produces a clearly safer design.
-- Decision gate: after first failure and self-hosted-team profiles.
+- Decision gate: passed for the current self-hosted profile; reopen for server-qualification or cross-region profiles.
 
 ### H-013: Row-level security defense in depth
 

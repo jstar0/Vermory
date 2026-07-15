@@ -391,6 +391,29 @@ decision is `keep_candidate`; v1 remains active/default. This supports the
 versioned-generation mechanism, not a general embedding-model ranking. See
 [the decision evidence](evidence/2026-07-15-retrieval-profile-promotion-decision.md).
 
+## Projection Outbox Fault Profile W11
+
+W11 starts a disposable PostgreSQL 18 cluster and exercises the production
+projection event worker under backlog, retry, duplicate replay, immediate
+database restart, pool recovery, and concurrent deletion. A separate tenant
+then performs direct SiliconFlow projection and vector retrieval after restart.
+
+| Gate | Result |
+|---|---:|
+| Initial authority/event backlog | 1,000 |
+| First bounded pass | 128 processed / 872 lag |
+| Provider failure cursor movement | 0 |
+| Vectors after full cursor rewind/replay | 1,000 |
+| Partial vector during PostgreSQL stop | 0 |
+| Same pgx pool recovery | PASS |
+| Deleted in-flight vector after retry | 0 |
+| Final lag | 0 |
+| Direct provider requests | 2 |
+
+The case supports H-012 for the current self-hosted profile and keeps Redis
+optional. It does not qualify 100k/1M scale, sustained multi-worker throughput,
+HA, or PITR. See [the W11 evidence](evidence/2026-07-15-projection-outbox-fault-profile.md).
+
 ## LongMemEval Original Sample
 
 The committed original-data evidence uses six frozen records from the official
