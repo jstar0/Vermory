@@ -1,6 +1,6 @@
 {
   "schema_version": "benchmark-qualification/v1",
-  "benchmark": "LongMemEval-S",
+  "benchmark": "LongMemEval",
   "source_class": "official_dataset",
   "repository": {
     "url": "https://github.com/xiaowu0162/LongMemEval",

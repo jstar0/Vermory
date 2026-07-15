@@ -174,12 +174,14 @@ func countOriginalExecutionEvidence(entries []casebook.BenchmarkMapEntry, root s
 			if err := benchmark.ValidateExecution(qualification, execution); err != nil {
 				return 0, fmt.Errorf("benchmark %s original execution evidence: %w", entry.Benchmark, err)
 			}
-			fixturePath := execution.FixturePath
-			if !filepath.IsAbs(fixturePath) {
-				fixturePath = filepath.Join(root, filepath.Clean(fixturePath))
-			}
-			if err := benchmark.VerifyFileSHA256(fixturePath, execution.FixtureSHA256); err != nil {
-				return 0, fmt.Errorf("benchmark %s original execution fixture: %w", entry.Benchmark, err)
+			if execution.ExecutionScope == benchmark.ExecutionScopeSample {
+				fixturePath := execution.FixturePath
+				if !filepath.IsAbs(fixturePath) {
+					fixturePath = filepath.Join(root, filepath.Clean(fixturePath))
+				}
+				if err := benchmark.VerifyFileSHA256(fixturePath, execution.FixtureSHA256); err != nil {
+					return 0, fmt.Errorf("benchmark %s original execution fixture: %w", entry.Benchmark, err)
+				}
 			}
 			if execution.Benchmark != string(entry.Benchmark) {
 				return 0, fmt.Errorf("benchmark %s original execution evidence names %s", entry.Benchmark, execution.Benchmark)

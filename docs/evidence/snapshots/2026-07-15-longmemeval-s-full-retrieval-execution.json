@@ -13,28 +13,20 @@
   "expected_scored_record_count": 470,
   "hard_factual": true,
   "scorers": [
-    {
-      "name": "session_recall_any_at_5_10",
-      "class": "deterministic"
-    },
-    {
-      "name": "session_recall_all_at_5_10",
-      "class": "deterministic"
-    },
-    {
-      "name": "session_ndcg_any_at_5_10",
-      "class": "deterministic"
-    },
-    {
-      "name": "session_mrr",
-      "class": "deterministic"
-    }
+    {"name": "session_recall_any_at_5_10", "class": "deterministic"},
+    {"name": "session_recall_all_at_5_10", "class": "deterministic"},
+    {"name": "session_ndcg_any_at_5_10", "class": "deterministic"},
+    {"name": "session_mrr", "class": "deterministic"}
   ],
-  "run_id": "longmemeval-s-full-retrieval-20260715",
-  "conditions": [
-    "plain_token_overlap",
-    "vermory_lexical"
-  ],
+  "run_id": "longmemeval-s-full-retrieval-20260715-v1",
+  "implementation_revision": "0f59bf58d9a107ce47f79ba86fd61a7c35c8324b",
+  "conditions": ["plain_token_overlap", "vermory_lexical"],
+  "artifacts": {
+    "execution_manifest": "docs/evidence/snapshots/2026-07-15-longmemeval-s-full-retrieval-execution.json",
+    "failure_ledger": "docs/evidence/snapshots/2026-07-15-longmemeval-s-full-retrieval-failures.json",
+    "report": "docs/evidence/2026-07-15-longmemeval-s-full-retrieval.md",
+    "scores": "docs/evidence/snapshots/2026-07-15-longmemeval-s-full-retrieval-scores.json"
+  },
   "non_claims": [
     "This is not a full LongMemEval QA score.",
     "This execution does not use the official GPT-4o answer judge.",

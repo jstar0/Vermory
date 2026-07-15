@@ -67,6 +67,15 @@ pending. A separate 100,000-vector control with a current projection completed
 all 550 vector requests without degradation, so no scoped-HNSW production
 change was made. See [Vector Degradation Attribution](docs/evidence/2026-07-15-vector-degradation-attribution.md).
 
+W14 then executed every record in the pinned cleaned LongMemEval-S artifact:
+500 isolated conversation continuities, 23,867 governed session memories, and
+470 scored retrieval queries with zero runtime or scope failures. At K=10,
+production lexical retrieval measured RecallAll `0.7340`, below the same-text
+token-overlap baseline at `0.8383`; multi-session RecallAll was `0.5620`. The
+result is a full qualified-dataset retrieval diagnosis, not a QA score or a
+claim that lexical is optimal. See
+[LongMemEval-S Full Retrieval Evidence](docs/evidence/2026-07-15-longmemeval-s-full-retrieval.md).
+
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
 ## Architecture Direction
@@ -295,6 +304,20 @@ go run ./cmd/vermory benchmark-longmemeval \
 ```
 
 See [LongMemEval Original-Dataset Sample Evidence](docs/evidence/2026-07-14-longmemeval-original-sample.md).
+
+Run the deterministic full LongMemEval-S retrieval qualification without an
+LLM provider:
+
+```bash
+go run ./cmd/vermory benchmark-longmemeval-retrieval \
+  --database-url "$VERMORY_BENCHMARK_DATABASE_URL" \
+  --source-dataset /path/to/longmemeval_s_cleaned.json \
+  --implementation-revision "$(git rev-parse HEAD)" \
+  --run-id longmemeval-s-full-retrieval
+```
+
+Use `--resume` only with matching atomic checkpoints. See
+[LongMemEval-S Full Retrieval Evidence](docs/evidence/2026-07-15-longmemeval-s-full-retrieval.md).
 
 ## OpenClaw Integration
 

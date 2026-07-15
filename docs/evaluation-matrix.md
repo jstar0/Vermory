@@ -110,7 +110,7 @@ Benchmark coverage reports write:
 - `benchmark-coverage/<run-id>/report.json`
 - `benchmark-coverage/<run-id>/report.md`
 
-The benchmark coverage runner validates that all named public benchmarks are at least `translated_task`, at least 4 reach `executable_evaluation`, and executable benchmarks name concrete case ids. It reports translated proxies, design mappings, and registered original executions as separate counters. Every original evidence path must load a valid execution manifest and qualification; a path string alone is rejected. The current map covers 11 public benchmarks, 8 executable translated evaluations, 3 design mappings, and 1 qualified original-data sample execution.
+The benchmark coverage runner validates that all named public benchmarks are at least `translated_task`, at least 4 reach `executable_evaluation`, and executable benchmarks name concrete case ids. It reports translated proxies, design mappings, and registered original executions as separate counters. Every original evidence path must load a valid execution manifest and qualification; a path string alone is rejected. The current map covers 11 public benchmarks, 8 executable translated evaluations, 3 design mappings, and 2 qualified original-data executions: one oracle QA sample and one full LongMemEval-S retrieval run.
 
 Internal Ready reports write:
 
@@ -167,6 +167,7 @@ go run ./cmd/vermory benchmark-coverage \
 - Duojie core matrix: completed
 - Internal Ready mock chain: completed
 - LongMemEval original oracle sample with Grok: completed as `dataset_sample`
+- LongMemEval-S full retrieval: completed as `qualified_dataset_full`
 - Explicit source revision runtime with Grok MCP: completed
 - Governed source conflict candidate runtime with Grok MCP: completed
 - Provider-assisted unkeyed source target matching with Grok MCP: completed
@@ -183,6 +184,7 @@ go run ./cmd/vermory benchmark-coverage \
 - Benchmark coverage smoke run ID: `benchmark-coverage-smoke`
 - Internal Ready smoke run ID: `internal-ready-smoke`
 - LongMemEval original sample run ID: `longmemeval-original-sample-grok-20260714-attempt-6`
+- LongMemEval-S full retrieval run ID: `longmemeval-s-full-retrieval-20260715-v1`
 - Source revision Grok session: `955B4CA6-68EB-4D0E-9CB4-96BE91AC1776`
 - Source candidate Grok session: `019f5f3c-d836-7d80-a8de-995dcde29ef8`
 - Source candidate stale-probe session: `019f5f3e-4b7f-7510-8cda-a26e0ba89725`
@@ -468,6 +470,27 @@ These are deterministic local sample metrics, not official LongMemEval GPT-4o
 judge accuracy. The run retained a multi-session counting failure and an
 unresolved source-conflict observation rather than upgrading the result to a
 full benchmark claim. See [the evidence document](evidence/2026-07-14-longmemeval-original-sample.md).
+
+## LongMemEval-S Full Retrieval
+
+W14 streamed all 500 records from the pinned 277,383,467-byte cleaned
+LongMemEval-S artifact into 500 isolated conversation continuities and 23,867
+active governed session memories. It scored 470 non-abstention records through
+the production lexical coordinator and the same-text token-overlap baseline.
+
+| Condition | K | Recall any | Recall all | nDCG | MRR |
+|---|---:|---:|---:|---:|---:|
+| token overlap | 10 | `0.9489` | `0.8383` | `0.7983` | `0.8119` |
+| Vermory lexical | 10 | `0.9021` | `0.7340` | `0.6918` | `0.6974` |
+
+The run retained the quality regression instead of tuning on the evaluated
+labels. Multi-session RecallAll at K10 was `0.5620`. The old `0a995998`
+counting failure had all three answer sessions in Vermory's first three ranks,
+so it is downstream of retrieval. For `6a1eabeb`, both update sessions were
+available by K10, but the older session ranked sixth and remained a separate
+source memory. The run had zero runtime failures, 23,867 distinct operation
+IDs, and a byte-stable score/failure result after idempotent resume. See
+[the W14 evidence](evidence/2026-07-15-longmemeval-s-full-retrieval.md).
 
 ## Duojie Core Matrix Findings
 

@@ -357,39 +357,39 @@ git commit -m "feat: run full governed LongMemEval retrieval"
 - Modify: `docs/evaluation-matrix.md`
 - Modify: `README.md`
 - Modify: `README.zh-CN.md`
-- Modify: `docs/hypothesis-register.md`
+- Modify: `docs/superpowers/specs/2026-07-11-vermory-hypothesis-register.md`
 
 **Interfaces:**
 - Consumes: the pinned source at `/tmp/vermory-longmemeval-98d7416/longmemeval_s_cleaned.json`.
 - Produces: one full deterministic public benchmark execution and explicit attribution for the two known sample QA failures.
 
-- [ ] **Step 1: Build the exact implementation binary**
+- [x] **Step 1: Build the exact implementation binary**
 
 Record `git rev-parse HEAD`, build with `-trimpath`, and create a dedicated
 database named for the W14 run. Do not reuse `vermory_test` or any service
 database.
 
-- [ ] **Step 2: Execute the clean full run**
+- [x] **Step 2: Execute the clean full run**
 
 Run `benchmark-longmemeval-retrieval` without `--resume`. Preserve stdout,
 stderr, elapsed time, database size, record count, memory count, and artifact
 hashes. If execution fails, retain the attempt log and classify the defect
 before changing code or rerunning.
 
-- [ ] **Step 3: Execute the idempotent resume proof**
+- [x] **Step 3: Execute the idempotent resume proof**
 
 Run the same binary, run ID, database, and artifact root with `--resume`.
 Require zero new governed memories and a byte-identical normalized score and
 failure digest.
 
-- [ ] **Step 4: Inspect failure attribution**
+- [x] **Step 4: Inspect failure attribution**
 
 Report overall and per-question-type metrics for both conditions. For retained
 sample failures `0a995998` (multi-session counting) and `6a1eabeb`
 (knowledge-update conflict), record the exact retrieved official session IDs
 and whether all evidence was present. Do not alter ranking or cases in W14.
 
-- [ ] **Step 5: Verify hard gates and commit evidence**
+- [x] **Step 5: Verify hard gates and commit evidence**
 
 Query PostgreSQL for 500 continuities, 23,867 active memories, zero non-active
 returned IDs, zero cross-continuity IDs, and zero duplicate operation effects.

@@ -63,6 +63,14 @@ projection 始终 current 的 10 万向量控制组完成了 `550/550` 次有效
 请求且零降级，因此没有引入 scoped HNSW 生产改动。详见
 [Vector 降级归因实证](docs/evidence/2026-07-15-vector-degradation-attribution.md)。
 
+W14 随后对固定 revision 的 LongMemEval-S cleaned artifact 完成全量检索资格：
+500 条隔离 conversation continuity、23,867 条 governed session memory、470 条
+计分查询，runtime failure 和 scope leakage 均为 0。生产 lexical 在 K10 的
+RecallAll 为 `0.7340`，低于同文本 token-overlap baseline 的 `0.8383`；
+multi-session RecallAll 为 `0.5620`。这是一份全量数据集检索诊断，不是 QA
+分数，也不宣称 lexical 已经最优。详见
+[LongMemEval-S 全量检索实证](docs/evidence/2026-07-15-longmemeval-s-full-retrieval.md)。
+
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
 ## 快速开始
@@ -82,6 +90,20 @@ go vet ./...
 ```bash
 go run ./cmd/vermory --help
 ```
+
+对官方 LongMemEval-S cleaned artifact 运行不依赖 LLM provider 的全量检索
+资格：
+
+```bash
+go run ./cmd/vermory benchmark-longmemeval-retrieval \
+  --database-url "$VERMORY_BENCHMARK_DATABASE_URL" \
+  --source-dataset /path/to/longmemeval_s_cleaned.json \
+  --implementation-revision "$(git rev-parse HEAD)" \
+  --run-id longmemeval-s-full-retrieval
+```
+
+只有 checkpoint 的 run、revision、dataset 和 record-set 全部一致时才使用
+`--resume`。
 
 验证冻结案例：
 
