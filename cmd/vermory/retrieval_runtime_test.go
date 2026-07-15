@@ -28,7 +28,7 @@ func TestRetrievalRuntimeCommandsAndSharedFlagsAreRegistered(t *testing.T) {
 			}
 		}
 	}
-	for _, name := range []string{"retrieval-worker", "retrieval-status", "retrieval-rebuild"} {
+	for _, name := range []string{"retrieval-worker", "retrieval-status", "retrieval-rebuild", "retrieval-snapshot-rebuild"} {
 		if !commands[name] {
 			t.Fatalf("root command is missing %s", name)
 		}
@@ -39,6 +39,12 @@ func TestRetrievalRuntimeCommandsAndSharedFlagsAreRegistered(t *testing.T) {
 			for _, flag := range []string{"database-url", "tenant-id", "profile-id", "embedding-base-url", "embedding-api-key-env", "embedding-model", "embedding-dimensions", "once", "poll-interval", "batch-size"} {
 				if command.Flags().Lookup(flag) == nil {
 					t.Fatalf("retrieval-worker is missing --%s", flag)
+				}
+			}
+		case "retrieval-snapshot-rebuild":
+			for _, flag := range []string{"database-url", "tenant-id", "profile-id", "embedding-base-url", "embedding-api-key-env", "embedding-model", "embedding-dimensions", "snapshot-page-size"} {
+				if command.Flags().Lookup(flag) == nil {
+					t.Fatalf("retrieval-snapshot-rebuild is missing --%s", flag)
 				}
 			}
 		case "retrieval-status", "retrieval-rebuild":

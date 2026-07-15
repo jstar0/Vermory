@@ -20,24 +20,24 @@ worker. Lag counts pending tenant rows rather than global event-ID distance.
 
 ## Task 1: Freeze W12
 
-- [ ] Commit the versioned case manifest, README, design, and this checklist.
-- [ ] Validate manifest arithmetic and preserve its SHA-256 in the evidence.
+- [x] Commit the versioned case manifest, README, design, and this checklist.
+- [x] Validate manifest arithmetic and preserve its SHA-256 in the evidence.
 
 ## Task 2: Correct Multi-Tenant Lag
 
-- [ ] Add a failing interleaved-tenant test that proves ID-distance lag is
+- [x] Add a failing interleaved-tenant test that proves ID-distance lag is
       wrong.
-- [ ] Count actual pending tenant rows and preserve latest/cursor semantics.
-- [ ] Run retrieval store, worker, coordinator, and race gates.
+- [x] Count actual pending tenant rows and preserve latest/cursor semantics.
+- [x] Run retrieval store, worker, coordinator, and race gates.
 
 ## Task 3: Current-Authority Snapshot Bootstrap
 
-- [ ] Add failing tests for history collapse, watermark tail handling,
+- [x] Add failing tests for history collapse, watermark tail handling,
       concurrent deletion, provider failure, dimensions, and advisory locking.
-- [ ] Implement `ProjectionWorker.RebuildCurrent` with stable paging and
+- [x] Implement `ProjectionWorker.RebuildCurrent` with stable paging and
       authority recheck.
-- [ ] Add a production CLI surface using the registered direct provider profile.
-- [ ] Verify normal tail worker behavior and exact lexical degradation.
+- [x] Add a production CLI surface using the registered direct provider profile.
+- [x] Verify normal tail worker behavior and exact lexical degradation.
 
 ## Task 4: W12 Harness
 

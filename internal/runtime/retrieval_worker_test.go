@@ -125,6 +125,140 @@ func TestProjectionWorkerProjectsOnlyCurrentActiveFacts(t *testing.T) {
 	assertVectorPresence(t, store, revised.Memory.MemoryID, false)
 }
 
+func TestProjectionWorkerRebuildCurrentCollapsesEventHistory(t *testing.T) {
+	store, tenantID, _, active := seedProjectionWorkerActive(t, "retrieval-rebuild-history")
+	ctx := context.Background()
+	for version := 2; version <= 4; version++ {
+		if _, err := store.pool.Exec(ctx, `
+UPDATE governed_memories
+SET content = $3, updated_at = now()
+WHERE tenant_id = $1 AND id = $2::uuid`,
+			tenantID, active.Memory.MemoryID, "Current projection fact version "+string(rune('0'+version))+"."); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var eventCount, watermark int64
+	if err := store.pool.QueryRow(ctx, `
+SELECT count(*), max(event_id)
+FROM memory_projection_events
+WHERE tenant_id = $1`, tenantID).Scan(&eventCount, &watermark); err != nil {
+		t.Fatal(err)
+	}
+	if eventCount != 4 {
+		t.Fatalf("history event count=%d want 4", eventCount)
+	}
+	embedder := &projectionTestEmbedder{vector: testVector1024(0.25)}
+	worker := mustProjectionWorker(t, store, embedder, tenantID, 8)
+	result, err := worker.RebuildCurrent(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Scanned != 1 || result.Projected != 1 || result.SkippedChanged != 0 ||
+		result.Watermark != watermark || result.LastEventID != watermark || result.Lag != 0 {
+		t.Fatalf("unexpected current rebuild result: %#v", result)
+	}
+	if embedder.calls.Load() != 1 {
+		t.Fatalf("current rebuild replayed history: calls=%d", embedder.calls.Load())
+	}
+	assertVectorPresence(t, store, active.Memory.MemoryID, true)
+}
+
+func TestProjectionWorkerRebuildCurrentLeavesConcurrentDeleteInTail(t *testing.T) {
+	store, tenantID, repoRoot, active := seedProjectionWorkerActive(t, "retrieval-rebuild-delete")
+	blocking := &projectionTestEmbedder{
+		vector: testVector1024(0.5), started: make(chan struct{}, 1), release: make(chan struct{}),
+	}
+	worker := mustProjectionWorker(t, store, blocking, tenantID, 8)
+	resultCh := make(chan ProjectionRebuildResult, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		result, err := worker.RebuildCurrent(context.Background())
+		resultCh <- result
+		errCh <- err
+	}()
+	select {
+	case <-blocking.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("current rebuild did not reach embedding")
+	}
+	if _, err := NewGovernanceService(store, tenantID).Forget(
+		context.Background(), repoRoot, active.Memory.MemoryID, "retrieval-rebuild-delete-op",
+	); err != nil {
+		t.Fatal(err)
+	}
+	close(blocking.release)
+	result := <-resultCh
+	if err := <-errCh; err != nil {
+		t.Fatal(err)
+	}
+	if result.Scanned != 1 || result.Projected != 0 || result.SkippedChanged != 1 || result.Lag != 1 {
+		t.Fatalf("concurrent delete was not left in tail: %#v", result)
+	}
+	assertVectorPresence(t, store, active.Memory.MemoryID, false)
+
+	tail := mustProjectionWorker(t, store, &projectionTestEmbedder{vector: testVector1024(0.1)}, tenantID, 8)
+	tailResult, err := tail.RunOnce(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tailResult.Processed != 1 || tailResult.Lag != 0 {
+		t.Fatalf("delete tail did not drain: %#v", tailResult)
+	}
+	assertVectorPresence(t, store, active.Memory.MemoryID, false)
+}
+
+func TestProjectionWorkerRebuildCurrentFailureLeavesCursorPending(t *testing.T) {
+	store, tenantID, _, active := seedProjectionWorkerActive(t, "retrieval-rebuild-failure")
+	worker := mustProjectionWorker(t, store, &projectionTestEmbedder{err: errors.New("provider unavailable")}, tenantID, 8)
+	result, err := worker.RebuildCurrent(context.Background())
+	if err == nil || result.FailureCode != "embedding_unavailable" {
+		t.Fatalf("current rebuild failure was not bounded: result=%#v err=%v", result, err)
+	}
+	if result.LastEventID != 0 || result.Lag != 1 || result.Status != "failed" {
+		t.Fatalf("failed current rebuild advanced cursor: %#v", result)
+	}
+	assertVectorPresence(t, store, active.Memory.MemoryID, false)
+}
+
+func TestProjectionWorkerRebuildCurrentRejectsWrongDimensions(t *testing.T) {
+	store, tenantID, _, active := seedProjectionWorkerActive(t, "retrieval-rebuild-dimensions")
+	worker := mustProjectionWorker(t, store, &projectionTestEmbedder{vector: []float32{1, 2, 3}}, tenantID, 8)
+	result, err := worker.RebuildCurrent(context.Background())
+	if err == nil || result.FailureCode != "embedding_dimension_mismatch" || result.LastEventID != 0 || result.Lag != 1 {
+		t.Fatalf("wrong snapshot dimensions were accepted: result=%#v err=%v", result, err)
+	}
+	assertVectorPresence(t, store, active.Memory.MemoryID, false)
+}
+
+func TestProjectionWorkerRebuildCurrentSharesWorkerLock(t *testing.T) {
+	store := openProjectionTestStore(t, 2)
+	tenantID := "retrieval-rebuild-lock"
+	seedProjectionWorkerActiveInStore(t, store, tenantID)
+	blocking := &projectionTestEmbedder{
+		vector: testVector1024(0.5), started: make(chan struct{}, 1), release: make(chan struct{}),
+	}
+	rebuild := mustProjectionWorker(t, store, blocking, tenantID, 8)
+	done := make(chan error, 1)
+	go func() {
+		_, err := rebuild.RebuildCurrent(context.Background())
+		done <- err
+	}()
+	select {
+	case <-blocking.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("snapshot rebuild did not acquire the projection lock")
+	}
+	competitor := mustProjectionWorker(t, store, &projectionTestEmbedder{vector: testVector1024(0.1)}, tenantID, 8)
+	result, err := competitor.RunOnce(context.Background())
+	if err != nil || !result.AlreadyRunning || result.FailureCode != "already_running" {
+		t.Fatalf("tail worker acquired the snapshot rebuild lock: result=%#v err=%v", result, err)
+	}
+	close(blocking.release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestProjectionWorkerFailureLeavesAuthorityAndCursorPending(t *testing.T) {
 	store, tenantID, repoRoot, active := seedProjectionWorkerActive(t, "retrieval-worker-failure")
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {

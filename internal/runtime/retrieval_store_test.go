@@ -34,6 +34,59 @@ func TestProductionRetrievalProfileIsFrozen(t *testing.T) {
 	}
 }
 
+func TestRetrievalProjectionStatusCountsTenantEventsAcrossGlobalIDGaps(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	governanceA := NewGovernanceService(store, "retrieval-lag-tenant-a")
+	governanceB := NewGovernanceService(store, "retrieval-lag-tenant-b")
+	const repoA = "/fixtures/retrieval-lag/a"
+	const repoB = "/fixtures/retrieval-lag/b"
+	if _, err := governanceA.ConfirmWorkspace(ctx, repoA); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := governanceB.ConfirmWorkspace(ctx, repoB); err != nil {
+		t.Fatal(err)
+	}
+	add := func(governance *GovernanceService, repoRoot, operationID, memoryKey string) {
+		t.Helper()
+		if _, err := governance.AddSource(ctx, repoRoot, GovernanceWriteRequest{
+			OperationID: operationID,
+			MemoryKey:   memoryKey,
+			Content:     "Projection lag fixture " + operationID + ".",
+			SourceRef:   "fixture:" + operationID,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	add(governanceA, repoA, "lag-a-1", "lag.a.1")
+	add(governanceB, repoB, "lag-b-1", "lag.b.1")
+	add(governanceB, repoB, "lag-b-2", "lag.b.2")
+	add(governanceA, repoA, "lag-a-2", "lag.a.2")
+
+	var firstA, latestA int64
+	if err := store.pool.QueryRow(ctx, `
+SELECT min(event_id), max(event_id)
+FROM memory_projection_events
+WHERE tenant_id = 'retrieval-lag-tenant-a'`).Scan(&firstA, &latestA); err != nil {
+		t.Fatal(err)
+	}
+	if latestA-firstA <= 1 {
+		t.Fatalf("fixture did not create global event ID gaps: first=%d latest=%d", firstA, latestA)
+	}
+	if _, err := store.pool.Exec(ctx, `
+INSERT INTO memory_projection_cursors (tenant_id, profile_id, last_event_id, status)
+VALUES ($1, $2, $3, 'idle')`, "retrieval-lag-tenant-a", ProductionRetrievalProfileID, firstA); err != nil {
+		t.Fatal(err)
+	}
+	status, err := store.RetrievalProjectionStatus(ctx, "retrieval-lag-tenant-a", ProductionRetrievalProfileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.LatestEventID != latestA || status.Lag != 1 {
+		t.Fatalf("tenant lag counted global ID gaps: %#v", status)
+	}
+}
+
 func TestResetVectorProjectionRejectsRunningWorker(t *testing.T) {
 	store, tenantID, _, _ := seedProjectionWorkerActive(t, "retrieval-reset-lock")
 	blocking := &projectionTestEmbedder{

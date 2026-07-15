@@ -212,6 +212,80 @@ func newRetrievalWorkerCommand() *cobra.Command {
 	return command
 }
 
+type retrievalSnapshotRebuildCommandOptions struct {
+	DatabaseURL      string
+	TenantID         string
+	ProfileID        string
+	Embedding        retrievalRuntimeOptions
+	SnapshotPageSize int
+}
+
+func newRetrievalSnapshotRebuildCommand() *cobra.Command {
+	options := retrievalSnapshotRebuildCommandOptions{
+		ProfileID:        runtime.ProductionRetrievalProfileID,
+		Embedding:        defaultRetrievalRuntimeOptions(),
+		SnapshotPageSize: 128,
+	}
+	options.Embedding.Mode = runtime.RetrievalVector
+	command := &cobra.Command{
+		Use:   "retrieval-snapshot-rebuild",
+		Short: "Rebuild one tenant's vector projection from current authority",
+		Args:  cobra.NoArgs,
+		RunE: func(command *cobra.Command, args []string) error {
+			if strings.TrimSpace(options.DatabaseURL) == "" {
+				return fmt.Errorf("--database-url is required")
+			}
+			if strings.TrimSpace(options.TenantID) == "" {
+				return fmt.Errorf("--tenant-id is required")
+			}
+			options.Embedding.ProfileID = strings.TrimSpace(options.ProfileID)
+			apiKey, err := options.Embedding.validateSemantic()
+			if err != nil {
+				return err
+			}
+			store, err := runtime.OpenStoreWithOptions(
+				command.Context(), options.DatabaseURL, runtime.StoreOptions{EnforceTenantContext: true},
+			)
+			if err != nil {
+				return fmt.Errorf("open retrieval snapshot rebuild store")
+			}
+			defer store.Close()
+			if err := store.ValidateRuntimeRole(command.Context()); err != nil {
+				return err
+			}
+			profile := options.Embedding.profile()
+			embedder, err := memorybackend.NewOpenAIEmbedder(
+				profile.BaseURL, apiKey, profile.Model, profile.Dimensions, &http.Client{Timeout: 60 * time.Second},
+			)
+			if err != nil {
+				return fmt.Errorf("configure embedding provider")
+			}
+			worker, err := runtime.NewProjectionWorker(store, embedder, runtime.ProjectionWorkerOptions{
+				TenantID:         options.TenantID,
+				Profile:          profile,
+				SnapshotPageSize: options.SnapshotPageSize,
+			})
+			if err != nil {
+				return err
+			}
+			result, rebuildErr := worker.RebuildCurrent(command.Context())
+			if err := json.NewEncoder(command.OutOrStdout()).Encode(result); err != nil {
+				return err
+			}
+			return rebuildErr
+		},
+	}
+	command.Flags().StringVar(&options.DatabaseURL, "database-url", "", "restricted runtime PostgreSQL connection URL")
+	command.Flags().StringVar(&options.TenantID, "tenant-id", "", "fixed tenant identifier")
+	command.Flags().StringVar(&options.ProfileID, "profile-id", options.ProfileID, "retrieval profile identifier")
+	command.Flags().StringVar(&options.Embedding.EmbeddingBaseURL, "embedding-base-url", options.Embedding.EmbeddingBaseURL, "direct embedding API base URL")
+	command.Flags().StringVar(&options.Embedding.EmbeddingAPIKeyEnv, "embedding-api-key-env", options.Embedding.EmbeddingAPIKeyEnv, "environment variable containing the embedding API key")
+	command.Flags().StringVar(&options.Embedding.EmbeddingModel, "embedding-model", options.Embedding.EmbeddingModel, "embedding model name")
+	command.Flags().IntVar(&options.Embedding.EmbeddingDimensions, "embedding-dimensions", options.Embedding.EmbeddingDimensions, "embedding vector dimensions")
+	command.Flags().IntVar(&options.SnapshotPageSize, "snapshot-page-size", options.SnapshotPageSize, "current-authority rows loaded per page")
+	return command
+}
+
 func newRetrievalStatusCommand() *cobra.Command {
 	var databaseURL, tenantID, profileID string
 	command := &cobra.Command{

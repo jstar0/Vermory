@@ -44,9 +44,14 @@ WHERE tenant_id = $1 AND profile_id = $2`, tenantID, profileID).Scan(
 		return ProjectionStatus{}, fmt.Errorf("read retrieval projection cursor: %w", err)
 	}
 	if err := querier.QueryRow(ctx, `
-SELECT COALESCE(max(event_id), 0)
-FROM memory_projection_events
-WHERE tenant_id = $1`, tenantID).Scan(&status.LatestEventID); err != nil {
+SELECT GREATEST(COALESCE((
+         SELECT max(event_id)
+         FROM memory_projection_events
+         WHERE tenant_id = $1
+       ), 0), $2),
+       (SELECT count(*)
+        FROM memory_projection_events
+        WHERE tenant_id = $1 AND event_id > $2)`, tenantID, status.LastEventID).Scan(&status.LatestEventID, &status.Lag); err != nil {
 		return ProjectionStatus{}, fmt.Errorf("read latest retrieval projection event: %w", err)
 	}
 	if err := querier.QueryRow(ctx, `
@@ -54,10 +59,6 @@ SELECT count(*)
 FROM memory_vector_documents
 WHERE tenant_id = $1 AND profile_id = $2`, tenantID, profileID).Scan(&status.VectorCount); err != nil {
 		return ProjectionStatus{}, fmt.Errorf("count retrieval vector documents: %w", err)
-	}
-	status.Lag = status.LatestEventID - status.LastEventID
-	if status.Lag < 0 {
-		status.Lag = 0
 	}
 	return status, nil
 }

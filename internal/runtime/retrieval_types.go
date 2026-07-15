@@ -175,10 +175,11 @@ type ProjectionEvent struct {
 }
 
 type ProjectionWorkerOptions struct {
-	TenantID     string
-	Profile      RetrievalProfile
-	BatchSize    int
-	PollInterval time.Duration
+	TenantID         string
+	Profile          RetrievalProfile
+	BatchSize        int
+	SnapshotPageSize int
+	PollInterval     time.Duration
 }
 
 func (o *ProjectionWorkerOptions) normalize() error {
@@ -195,6 +196,12 @@ func (o *ProjectionWorkerOptions) normalize() error {
 	if o.BatchSize > 256 {
 		o.BatchSize = 256
 	}
+	if o.SnapshotPageSize <= 0 {
+		o.SnapshotPageSize = 128
+	}
+	if o.SnapshotPageSize > 1000 {
+		o.SnapshotPageSize = 1000
+	}
 	if o.PollInterval <= 0 {
 		o.PollInterval = time.Second
 	}
@@ -203,6 +210,19 @@ func (o *ProjectionWorkerOptions) normalize() error {
 
 type ProjectionRunResult struct {
 	Processed      int    `json:"processed"`
+	LastEventID    int64  `json:"last_event_id"`
+	LatestEventID  int64  `json:"latest_event_id"`
+	Lag            int64  `json:"lag"`
+	Status         string `json:"status"`
+	FailureCode    string `json:"failure_code,omitempty"`
+	AlreadyRunning bool   `json:"already_running"`
+}
+
+type ProjectionRebuildResult struct {
+	Scanned        int    `json:"scanned"`
+	Projected      int    `json:"projected"`
+	SkippedChanged int    `json:"skipped_changed"`
+	Watermark      int64  `json:"watermark"`
 	LastEventID    int64  `json:"last_event_id"`
 	LatestEventID  int64  `json:"latest_event_id"`
 	Lag            int64  `json:"lag"`
