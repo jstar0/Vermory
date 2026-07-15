@@ -250,7 +250,7 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 	if _, err := worker.RunOnce(ctx); err != nil {
 		t.Fatal(err)
 	}
-	candidateEmbedder := &projectionTestEmbedder{vector: testVector512(0.25)}
+	candidateEmbedder := &projectionTestEmbedder{vector: testVector2560(0.25)}
 	candidateWorker, err := NewProjectionWorker(source, candidateEmbedder, ProjectionWorkerOptions{
 		TenantID:  "ops-retrieval-tenant",
 		Profile:   dimensionalMigrationProfile(t),
@@ -441,11 +441,11 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 }
 
 type operationsRetrievalTableCounts struct {
-	Events     int
-	Cursors    int
-	Vectors    int
-	Vectors512 int
-	Audits     int
+	Events      int
+	Cursors     int
+	Vectors     int
+	Vectors2560 int
+	Audits      int
 }
 
 func operationsRetrievalCounts(t *testing.T, pool *pgxpool.Pool) operationsRetrievalTableCounts {
@@ -456,13 +456,13 @@ SELECT
   (SELECT count(*) FROM memory_projection_events),
   (SELECT count(*) FROM memory_projection_cursors),
   (SELECT count(*) FROM memory_vector_documents),
-	  (SELECT count(*) FROM memory_vector_documents_512),
+	  (SELECT count(*) FROM memory_vector_documents_2560),
   (SELECT count(*) FROM memory_retrieval_runs)`).Scan(
-		&counts.Events, &counts.Cursors, &counts.Vectors, &counts.Vectors512, &counts.Audits,
+		&counts.Events, &counts.Cursors, &counts.Vectors, &counts.Vectors2560, &counts.Audits,
 	); err != nil {
 		t.Fatal(err)
 	}
-	if counts.Events == 0 || counts.Cursors == 0 || counts.Vectors == 0 || counts.Vectors512 == 0 || counts.Audits == 0 {
+	if counts.Events == 0 || counts.Cursors == 0 || counts.Vectors == 0 || counts.Vectors2560 == 0 || counts.Audits == 0 {
 		t.Fatalf("retrieval dump source is incomplete: %#v", counts)
 	}
 	return counts

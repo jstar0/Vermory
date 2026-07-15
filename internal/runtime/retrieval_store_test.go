@@ -24,7 +24,7 @@ func TestProductionRetrievalProfileIsFrozen(t *testing.T) {
 		"credentials": func(profile *RetrievalProfile) { profile.BaseURL = "https://user:secret@example.com/v1" },
 		"model":       func(profile *RetrievalProfile) { profile.Model = "other" },
 		"dimensions":  func(profile *RetrievalProfile) { profile.Dimensions = 768 },
-		"class":       func(profile *RetrievalProfile) { profile.ProjectionClass = ProjectionClass512 },
+		"class":       func(profile *RetrievalProfile) { profile.ProjectionClass = ProjectionClass2560 },
 	} {
 		t.Run(name, func(t *testing.T) {
 			profile := valid

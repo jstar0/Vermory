@@ -109,7 +109,7 @@ func validDimensionalMigrationReportFixture() DimensionalMigrationReport {
 		"physical_classes_converged":            true,
 		"ineligible_rows_absent":                true,
 		"candidate_reset_isolated":              true,
-		"real_provider_512_dimensions":          true,
+		"real_provider_2560_dimensions":         true,
 		"retrieval_audits_profile_scoped":       true,
 		"default_profile_unchanged":             true,
 	}
@@ -128,8 +128,8 @@ func validDimensionalMigrationReportFixture() DimensionalMigrationReport {
 		Profiles: DimensionalMigrationProfiles{
 			IncumbentID: ProductionRetrievalProfileID, IncumbentClass: ProjectionClass1024,
 			IncumbentDimensions: 1024, IncumbentLifecycle: "active",
-			CandidateID: DimensionalMigrationRetrievalProfileID, CandidateClass: ProjectionClass512,
-			CandidateDimensions: 512, CandidateLifecycle: "candidate",
+			CandidateID: DimensionalMigrationRetrievalProfileID, CandidateClass: ProjectionClass2560,
+			CandidateDimensions: 2560, CandidateLifecycle: "candidate",
 		},
 		Counts: DimensionalMigrationCounts{
 			InitialActive: 20000, Revisions: 2000, Deleted: 500, NewFacts: 500,
@@ -157,8 +157,8 @@ func validDimensionalMigrationReportFixture() DimensionalMigrationReport {
 			AuthorityUnchanged: true, CandidateRebuilt: true,
 		},
 		Provider: DimensionalMigrationProvider{
-			BaseURL: "https://api.siliconflow.cn/v1", Model: "BAAI/bge-small-zh-v1.5",
-			Dimensions: 512, Requests: 2, DurationMS: 350,
+			BaseURL: "https://api.siliconflow.cn/v1", Model: "Qwen/Qwen3-Embedding-4B",
+			Dimensions: 2560, Requests: 2, DurationMS: 350,
 			ProjectionResponseSHA256: strings.Repeat("b", 64), QueryResponseSHA256: strings.Repeat("c", 64),
 		},
 		HardGates: hardGates,

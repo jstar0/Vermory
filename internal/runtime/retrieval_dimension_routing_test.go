@@ -13,7 +13,7 @@ func TestDimensionalProjectionClassRoutesWorkerSearchAndReset(t *testing.T) {
 	ctx := context.Background()
 	continuityID := mustWorkspaceContinuity(t, store, tenantID, repoRoot)
 
-	candidateWorker, err := NewProjectionWorker(store, &projectionTestEmbedder{vector: testVector512(1)}, ProjectionWorkerOptions{
+	candidateWorker, err := NewProjectionWorker(store, &projectionTestEmbedder{vector: testVector2560(1)}, ProjectionWorkerOptions{
 		TenantID:  tenantID,
 		Profile:   dimensionalMigrationProfile(t),
 		BatchSize: 8,
@@ -41,7 +41,7 @@ func TestDimensionalProjectionClassRoutesWorkerSearchAndReset(t *testing.T) {
 
 	candidateCoordinator, err := NewRetrievalCoordinator(
 		store,
-		&projectionTestEmbedder{vector: testVector512(1)},
+		&projectionTestEmbedder{vector: testVector2560(1)},
 		dimensionalMigrationProfile(t),
 	)
 	if err != nil {
@@ -122,7 +122,7 @@ func TestDimensionalProjectionProfilesUseIndependentLocks(t *testing.T) {
 	store, tenantID, _, _ := seedProjectionWorkerActive(t, "retrieval-dimension-locks")
 	defer store.Close()
 	blocking := &projectionTestEmbedder{
-		vector:  testVector512(0.7),
+		vector:  testVector2560(0.7),
 		started: make(chan struct{}, 1),
 		release: make(chan struct{}),
 	}
@@ -180,7 +180,7 @@ func TestDimensionalProjectionLateEmbeddingCannotRestoreDeletedMemory(t *testing
 	store, tenantID, repoRoot, active := seedProjectionWorkerActive(t, "retrieval-dimension-late-delete")
 	defer store.Close()
 	blocking := &projectionTestEmbedder{
-		vector:  testVector512(0.8),
+		vector:  testVector2560(0.8),
 		started: make(chan struct{}, 1),
 		release: make(chan struct{}),
 	}
@@ -217,7 +217,7 @@ func TestDimensionalProjectionLateEmbeddingCannotRestoreDeletedMemory(t *testing
 	}
 	assertDimensionalVectorPresence(t, store, active.Memory.MemoryID, false)
 
-	retry, err := NewProjectionWorker(store, &projectionTestEmbedder{vector: testVector512(0.1)}, ProjectionWorkerOptions{
+	retry, err := NewProjectionWorker(store, &projectionTestEmbedder{vector: testVector2560(0.1)}, ProjectionWorkerOptions{
 		TenantID:  tenantID,
 		Profile:   dimensionalMigrationProfile(t),
 		BatchSize: 8,
@@ -243,8 +243,8 @@ func dimensionalMigrationProfile(t *testing.T) RetrievalProfile {
 	}
 }
 
-func testVector512(value float32) []float32 {
-	vector := make([]float32, 512)
+func testVector2560(value float32) []float32 {
+	vector := make([]float32, 2560)
 	vector[0] = value
 	return vector
 }
@@ -254,7 +254,7 @@ func assertDimensionalVectorPresence(t *testing.T, store *Store, memoryID string
 	var count int
 	if err := store.pool.QueryRow(context.Background(), `
 SELECT count(*)
-FROM memory_vector_documents_512
+FROM memory_vector_documents_2560
 WHERE profile_id = $1 AND memory_id = $2::uuid`,
 		DimensionalMigrationRetrievalProfileID, memoryID,
 	).Scan(&count); err != nil {

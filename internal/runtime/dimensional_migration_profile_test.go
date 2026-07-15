@@ -17,7 +17,7 @@ func TestDimensionalMigrationHarnessMiniature(t *testing.T) {
 		t.Fatalf("mini lexical rebuild rows=%d err=%v", rows, err)
 	}
 	incumbentEmbedder := &dimensionalFixtureEmbedder{dimensions: 1024}
-	candidateDelegate := &dimensionalFixtureEmbedder{dimensions: 512}
+	candidateDelegate := &dimensionalFixtureEmbedder{dimensions: 2560}
 	incumbentProfile, _ := SupportedRetrievalProfile(ProductionRetrievalProfileID)
 	incumbent := RetrievalProfile{
 		ID: incumbentProfile.ID, BaseURL: incumbentProfile.BaseURL, Model: incumbentProfile.Model,
@@ -133,7 +133,7 @@ func TestDimensionalMigrationHarnessMiniature(t *testing.T) {
 		}
 		authorityIDs := governedActiveIDs(t, store, tenantID)
 		incumbentIDs := dimensionalVectorIDs(t, store, tenantID, ProjectionClass1024)
-		candidateIDs := dimensionalVectorIDs(t, store, tenantID, ProjectionClass512)
+		candidateIDs := dimensionalVectorIDs(t, store, tenantID, ProjectionClass2560)
 		if len(authorityIDs) != 20 || !sameStringSet(authorityIDs, incumbentIDs) || !sameStringSet(authorityIDs, candidateIDs) {
 			t.Fatalf("mini projection convergence tenant=%s authority/incumbent/candidate=%d/%d/%d", tenantID, len(authorityIDs), len(incumbentIDs), len(candidateIDs))
 		}
@@ -145,7 +145,7 @@ func TestDimensionalMigrationHarnessMiniature(t *testing.T) {
 	if err := store.ResetVectorProjection(ctx, resetTenant, DimensionalMigrationRetrievalProfileID); err != nil {
 		t.Fatal(err)
 	}
-	if candidateAfterReset := dimensionalVectorIDs(t, store, resetTenant, ProjectionClass512); len(candidateAfterReset) != 0 {
+	if candidateAfterReset := dimensionalVectorIDs(t, store, resetTenant, ProjectionClass2560); len(candidateAfterReset) != 0 {
 		t.Fatalf("mini candidate reset rows=%d want 0", len(candidateAfterReset))
 	}
 	if incumbentAfter := dimensionalVectorIDs(t, store, resetTenant, ProjectionClass1024); !sameStringSet(incumbentBefore, incumbentAfter) {
@@ -158,7 +158,7 @@ func TestDimensionalMigrationHarnessMiniature(t *testing.T) {
 	if err != nil || rebuild.Projected != 20 || rebuild.Lag != 0 {
 		t.Fatalf("mini candidate rebuild after reset=%#v err=%v", rebuild, err)
 	}
-	if candidateAfterRebuild := dimensionalVectorIDs(t, store, resetTenant, ProjectionClass512); !sameStringSet(authorityBefore, candidateAfterRebuild) {
+	if candidateAfterRebuild := dimensionalVectorIDs(t, store, resetTenant, ProjectionClass2560); !sameStringSet(authorityBefore, candidateAfterRebuild) {
 		t.Fatal("mini candidate rebuild did not restore authority equivalence")
 	}
 }

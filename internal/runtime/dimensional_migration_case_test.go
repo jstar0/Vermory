@@ -69,7 +69,7 @@ func TestDimensionalMigrationCaseIsFrozen(t *testing.T) {
 		t.Fatalf("W17 query or hard-gate contract drifted: %#v", manifest)
 	}
 	if manifest.IncumbentProfileID != ProductionRetrievalProfileID ||
-		manifest.CandidateProfileID != "siliconflow-bge-small-zh-512-v3" {
+		manifest.CandidateProfileID != "siliconflow-qwen3-embedding-4b-2560-v3" {
 		t.Fatalf("W17 profile IDs drifted: %#v", manifest)
 	}
 }

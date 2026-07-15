@@ -221,7 +221,7 @@ func TestActiveBacklogDimensionalMigrationProfile(t *testing.T) {
 	if outageAuditRows != 0 {
 		t.Fatalf("W17 outage audit rows=%d want 0", outageAuditRows)
 	}
-	partialCandidateRows := dimensionalDatasetVectorCount(t, store, dataset, ProjectionClass512)
+	partialCandidateRows := dimensionalDatasetVectorCount(t, store, dataset, ProjectionClass2560)
 	var interruptedCursorAdvance int64
 	for _, tenantID := range dataset.Tenants {
 		status, err := store.RetrievalProjectionStatus(ctx, tenantID, DimensionalMigrationRetrievalProfileID)
@@ -267,7 +267,7 @@ func TestActiveBacklogDimensionalMigrationProfile(t *testing.T) {
 		}
 		authorityIDs := governedActiveIDs(t, store, tenantID)
 		incumbentIDs := dimensionalVectorIDs(t, store, tenantID, ProjectionClass1024)
-		candidateIDs := dimensionalVectorIDs(t, store, tenantID, ProjectionClass512)
+		candidateIDs := dimensionalVectorIDs(t, store, tenantID, ProjectionClass2560)
 		if !sameStringSet(authorityIDs, incumbentIDs) || !sameStringSet(authorityIDs, candidateIDs) {
 			t.Fatalf("W17 projection ID mismatch tenant=%s authority/incumbent/candidate=%d/%d/%d", tenantID, len(authorityIDs), len(incumbentIDs), len(candidateIDs))
 		}
@@ -276,7 +276,7 @@ func TestActiveBacklogDimensionalMigrationProfile(t *testing.T) {
 		t.Fatalf("W17 projection authority hash mismatches=%d", mismatches)
 	}
 	incumbentFinalVectors := dimensionalDatasetVectorCount(t, store, dataset, ProjectionClass1024)
-	candidateFinalVectors := dimensionalDatasetVectorCount(t, store, dataset, ProjectionClass512)
+	candidateFinalVectors := dimensionalDatasetVectorCount(t, store, dataset, ProjectionClass2560)
 	if incumbentFinalVectors != manifest.InitialActiveCount || candidateFinalVectors != manifest.InitialActiveCount {
 		t.Fatalf("W17 final vectors incumbent/candidate=%d/%d", incumbentFinalVectors, candidateFinalVectors)
 	}
@@ -303,7 +303,7 @@ func TestActiveBacklogDimensionalMigrationProfile(t *testing.T) {
 	if err := store.ResetVectorProjection(ctx, resetTenant, DimensionalMigrationRetrievalProfileID); err != nil {
 		t.Fatal(err)
 	}
-	candidateRowsAfterReset := len(dimensionalVectorIDs(t, store, resetTenant, ProjectionClass512))
+	candidateRowsAfterReset := len(dimensionalVectorIDs(t, store, resetTenant, ProjectionClass2560))
 	incumbentRowsUnchanged := len(dimensionalVectorIDs(t, store, resetTenant, ProjectionClass1024)) == resetIncumbentRows
 	authorityUnchanged := dimensionalAuthorityFingerprint(t, store, dataset) == resetAuthority
 	rebuildAfterReset, err := candidateWorkers[resetTenant].RebuildCurrent(ctx)
@@ -311,7 +311,7 @@ func TestActiveBacklogDimensionalMigrationProfile(t *testing.T) {
 		t.Fatalf("W17 candidate rebuild after reset=%#v err=%v", rebuildAfterReset, err)
 	}
 	candidateRebuilt := sameStringSet(
-		governedActiveIDs(t, store, resetTenant), dimensionalVectorIDs(t, store, resetTenant, ProjectionClass512),
+		governedActiveIDs(t, store, resetTenant), dimensionalVectorIDs(t, store, resetTenant, ProjectionClass2560),
 	)
 	if candidateRowsAfterReset != 0 || !incumbentRowsUnchanged || !authorityUnchanged || !candidateRebuilt {
 		t.Fatalf("W17 candidate reset isolation rows=%d incumbent=%t authority=%t rebuilt=%t", candidateRowsAfterReset, incumbentRowsUnchanged, authorityUnchanged, candidateRebuilt)
@@ -320,7 +320,7 @@ func TestActiveBacklogDimensionalMigrationProfile(t *testing.T) {
 	providerStarted := time.Now()
 	realProvider := runDimensionalRealProviderProbe(t, store, manifest.RealProviderTenantID, apiKey, candidateProfile)
 	providerDuration := time.Since(providerStarted)
-	if realProvider.Requests != 2 || realProvider.Dimensions != 512 {
+	if realProvider.Requests != 2 || realProvider.Dimensions != 2560 {
 		t.Fatalf("W17 real provider evidence=%#v", realProvider)
 	}
 
@@ -339,7 +339,7 @@ func TestActiveBacklogDimensionalMigrationProfile(t *testing.T) {
 		"physical_classes_converged":            incumbentFinalVectors == manifest.InitialActiveCount && candidateFinalVectors == manifest.InitialActiveCount,
 		"ineligible_rows_absent":                dimensionalProjectionHashMismatches(t, store, dataset) == 0,
 		"candidate_reset_isolated":              candidateRowsAfterReset == 0 && incumbentRowsUnchanged && authorityUnchanged && candidateRebuilt,
-		"real_provider_512_dimensions":          realProvider.Requests == 2 && realProvider.Dimensions == 512,
+		"real_provider_2560_dimensions":         realProvider.Requests == 2 && realProvider.Dimensions == 2560,
 		"retrieval_audits_profile_scoped":       incumbentAuditCount > 0 && candidateAuditCount > 0,
 		"default_profile_unchanged":             profilesUnchanged && defaultRetrievalProfileIDForQualification() == ProductionRetrievalProfileID,
 	}
@@ -513,7 +513,7 @@ func runDimensionalRealProviderProbe(
 	}
 	receipt, err := governance.AddSource(context.Background(), repoRoot, GovernanceWriteRequest{
 		OperationID: "w17-real-provider-source", MemoryKey: "w17.real.provider.recovery",
-		Content:   "The dimensional migration recovery code is ORCHID-512 after the candidate projection reaches zero lag.",
+		Content:   "The dimensional migration recovery code is ORCHID-2560 after the candidate projection reaches zero lag.",
 		SourceRef: "fixture:w17:real-provider",
 	})
 	if err != nil {
@@ -530,7 +530,7 @@ func runDimensionalRealProviderProbe(
 	result, err := coordinator.Retrieve(context.Background(), RetrievalRequest{
 		OperationID: "w17-real-provider-query", TenantID: tenantID,
 		ContinuityIDs: []string{resolution.ContinuityID},
-		Query:         "What recovery code applies after the 512-dimensional candidate catches up?",
+		Query:         "What recovery code applies after the 2560-dimensional candidate catches up?",
 		Limit:         1, Mode: RetrievalVector,
 	})
 	if err != nil || result.Effective != RetrievalVector || len(result.Memories) != 1 || result.Memories[0].ID != receipt.Memory.MemoryID {
@@ -563,8 +563,8 @@ func dimensionalDatasetVectorCount(t *testing.T, store *Store, dataset dimension
 	t.Helper()
 	query := `SELECT count(*) FROM memory_vector_documents WHERE tenant_id = ANY($1::text[]) AND profile_id = $2`
 	profileID := ProductionRetrievalProfileID
-	if class == ProjectionClass512 {
-		query = `SELECT count(*) FROM memory_vector_documents_512 WHERE tenant_id = ANY($1::text[]) AND profile_id = $2`
+	if class == ProjectionClass2560 {
+		query = `SELECT count(*) FROM memory_vector_documents_2560 WHERE tenant_id = ANY($1::text[]) AND profile_id = $2`
 		profileID = DimensionalMigrationRetrievalProfileID
 	}
 	var count int
@@ -591,7 +591,7 @@ WHERE document.tenant_id = ANY($1::text[])
 	}
 	if err := store.pool.QueryRow(context.Background(), `
 SELECT count(*)
-FROM memory_vector_documents_512 document
+FROM memory_vector_documents_2560 document
 JOIN governed_memories memory
   ON memory.tenant_id = document.tenant_id AND memory.id = document.memory_id
 WHERE document.tenant_id = ANY($1::text[])

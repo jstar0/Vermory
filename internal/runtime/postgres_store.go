@@ -149,7 +149,7 @@ func (s *Store) SchemaVersion(ctx context.Context) (int64, error) {
 func (s *Store) ResetForTest(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 TRUNCATE vermory_auth.api_tokens,
-  memory_retrieval_runs, memory_vector_documents_512, memory_vector_documents,
+  memory_retrieval_runs, memory_vector_documents_2560, memory_vector_documents,
   memory_projection_cursors, memory_projection_events,
   source_formation_items, source_formation_runs, source_match_decisions,
   conversation_links, bridge_memory_effects, bridge_events, bridge_operations,
@@ -221,7 +221,7 @@ WHERE rolname = current_user`).Scan(&canLogin, &superuser, &bypassRLS); err != n
 		"bridge_operations", "bridge_events", "bridge_memory_effects", "conversation_links",
 		"source_match_decisions", "source_formation_runs", "source_formation_items",
 		"memory_projection_events", "memory_projection_cursors", "memory_vector_documents",
-		"memory_vector_documents_512", "memory_retrieval_runs",
+		"memory_vector_documents_2560", "memory_retrieval_runs",
 	}
 	var ownedTables int
 	if err := s.pool.QueryRow(validationCtx, `

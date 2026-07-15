@@ -30,14 +30,14 @@ func retrievalProjectionSQLForClass(class ProjectionClass) (retrievalProjectionS
 			upsertMemory:   projectionUpsertMemory1024SQL,
 			upsertSnapshot: projectionUpsertSnapshot1024SQL,
 		}, nil
-	case ProjectionClass512:
+	case ProjectionClass2560:
 		return retrievalProjectionSQL{
-			count:          projectionCount512SQL,
-			clearTenant:    projectionClearTenant512SQL,
-			search:         projectionSearch512SQL,
-			deleteMemory:   projectionDeleteMemory512SQL,
-			upsertMemory:   projectionUpsertMemory512SQL,
-			upsertSnapshot: projectionUpsertSnapshot512SQL,
+			count:          projectionCount2560SQL,
+			clearTenant:    projectionClearTenant2560SQL,
+			search:         projectionSearch2560SQL,
+			deleteMemory:   projectionDeleteMemory2560SQL,
+			upsertMemory:   projectionUpsertMemory2560SQL,
+			upsertSnapshot: projectionUpsertSnapshot2560SQL,
 		}, nil
 	default:
 		return retrievalProjectionSQL{}, fmt.Errorf("unsupported retrieval projection class %q", class)
@@ -49,17 +49,17 @@ SELECT count(*)
 FROM memory_vector_documents
 WHERE tenant_id = $1 AND profile_id = $2`
 
-const projectionCount512SQL = `
+const projectionCount2560SQL = `
 SELECT count(*)
-FROM memory_vector_documents_512
+FROM memory_vector_documents_2560
 WHERE tenant_id = $1 AND profile_id = $2`
 
 const projectionClearTenant1024SQL = `
 DELETE FROM memory_vector_documents
 WHERE tenant_id = $1 AND profile_id = $2`
 
-const projectionClearTenant512SQL = `
-DELETE FROM memory_vector_documents_512
+const projectionClearTenant2560SQL = `
+DELETE FROM memory_vector_documents_2560
 WHERE tenant_id = $1 AND profile_id = $2`
 
 const projectionSearch1024SQL = `
@@ -96,10 +96,10 @@ WHERE memory.continuity_id = ANY($3::uuid[])
 ORDER BY candidate.distance, candidate.authority_rank DESC, memory.id
 LIMIT $6`
 
-const projectionSearch512SQL = `
+const projectionSearch2560SQL = `
 WITH candidates AS (
   SELECT document.memory_id, document.content_sha256,
-         document.embedding <=> $4::vector AS distance,
+         document.embedding <=> $4::halfvec(2560) AS distance,
          CASE origin.observation_kind
            WHEN 'user_correction' THEN 4
            WHEN 'user_confirmation' THEN 4
@@ -107,7 +107,7 @@ WITH candidates AS (
            WHEN 'bridge_promote' THEN 2
            ELSE 1
          END AS authority_rank
-  FROM memory_vector_documents_512 document
+  FROM memory_vector_documents_2560 document
   JOIN governed_memories memory
     ON memory.tenant_id = $2 AND memory.id = document.memory_id
   JOIN observations origin
@@ -115,7 +115,7 @@ WITH candidates AS (
   WHERE document.profile_id = $1
     AND document.tenant_id = $2
     AND document.continuity_id = ANY($3::uuid[])
-  ORDER BY document.embedding <=> $4::vector, document.memory_id
+  ORDER BY document.embedding <=> $4::halfvec(2560), document.memory_id
   LIMIT $5
 )
 SELECT memory.id::text, memory.content
@@ -134,8 +134,8 @@ const projectionDeleteMemory1024SQL = `
 DELETE FROM memory_vector_documents
 WHERE profile_id = $1 AND tenant_id = $2 AND memory_id = $3::uuid`
 
-const projectionDeleteMemory512SQL = `
-DELETE FROM memory_vector_documents_512
+const projectionDeleteMemory2560SQL = `
+DELETE FROM memory_vector_documents_2560
 WHERE profile_id = $1 AND tenant_id = $2 AND memory_id = $3::uuid`
 
 const projectionUpsertMemory1024SQL = `
@@ -148,10 +148,10 @@ ON CONFLICT (profile_id, tenant_id, memory_id) DO UPDATE SET
   embedding = EXCLUDED.embedding,
   updated_at = now()`
 
-const projectionUpsertMemory512SQL = `
-INSERT INTO memory_vector_documents_512 (
+const projectionUpsertMemory2560SQL = `
+INSERT INTO memory_vector_documents_2560 (
   profile_id, tenant_id, continuity_id, memory_id, content_sha256, embedding, updated_at
-) VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6::vector, now())
+) VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6::halfvec(2560), now())
 ON CONFLICT (profile_id, tenant_id, memory_id) DO UPDATE SET
   continuity_id = EXCLUDED.continuity_id,
   content_sha256 = EXCLUDED.content_sha256,
@@ -178,11 +178,11 @@ ON CONFLICT (profile_id, tenant_id, memory_id) DO UPDATE SET
   embedding = EXCLUDED.embedding,
   updated_at = now()`
 
-const projectionUpsertSnapshot512SQL = `
-INSERT INTO memory_vector_documents_512 (
+const projectionUpsertSnapshot2560SQL = `
+INSERT INTO memory_vector_documents_2560 (
   profile_id, tenant_id, continuity_id, memory_id, content_sha256, embedding, updated_at
 )
-SELECT $1, memory.tenant_id, memory.continuity_id, memory.id, $5, $6::vector, now()
+SELECT $1, memory.tenant_id, memory.continuity_id, memory.id, $5, $6::halfvec(2560), now()
 FROM governed_memories memory
 WHERE memory.tenant_id = $2
   AND memory.id = $3::uuid

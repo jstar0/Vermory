@@ -131,7 +131,7 @@ func TestRuntimeRoleCanLookupButCannotReadAuthOrLegacyTables(t *testing.T) {
 		"source_match_decisions",
 		"source_formation_runs",
 		"source_formation_items",
-		"memory_vector_documents_512",
+		"memory_vector_documents_2560",
 	} {
 		var canUseAudit bool
 		if err := pool.QueryRow(ctx, `SELECT has_table_privilege($1, 'public.' || $2, 'SELECT,INSERT,UPDATE,DELETE')`, roleName, table).Scan(&canUseAudit); err != nil {

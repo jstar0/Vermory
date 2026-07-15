@@ -29,7 +29,7 @@ func TestProductionRetrievalMigrationCreatesProjectionTables(t *testing.T) {
 			"profile_id", "projection_class", "tenant_id", "continuity_id", "memory_id", "content_sha256",
 			"embedding", "updated_at",
 		},
-		"memory_vector_documents_512": {
+		"memory_vector_documents_2560": {
 			"profile_id", "projection_class", "tenant_id", "continuity_id", "memory_id", "content_sha256",
 			"embedding", "updated_at",
 		},
@@ -111,7 +111,7 @@ WHERE conrelid IN (
   'public.memory_projection_events'::regclass,
   'public.memory_projection_cursors'::regclass,
   'public.memory_vector_documents'::regclass,
-	  'public.memory_vector_documents_512'::regclass,
+	  'public.memory_vector_documents_2560'::regclass,
   'public.memory_retrieval_runs'::regclass
 ) AND contype = 'c'`).Scan(&checks); err != nil {
 		t.Fatal(err)
@@ -151,7 +151,7 @@ WHERE profile_id = $1 AND lifecycle_status = 'candidate'`,
 	).Scan(&dimensionalModel, &dimensionalDimensions, &dimensionalClass); err != nil {
 		t.Fatal(err)
 	}
-	if dimensionalModel != "BAAI/bge-small-zh-v1.5" || dimensionalDimensions != 512 || dimensionalClass != "vector_512" {
+	if dimensionalModel != "Qwen/Qwen3-Embedding-4B" || dimensionalDimensions != 2560 || dimensionalClass != "halfvec_2560" {
 		t.Fatalf("unexpected dimensional profile %q/%d/%q", dimensionalModel, dimensionalDimensions, dimensionalClass)
 	}
 

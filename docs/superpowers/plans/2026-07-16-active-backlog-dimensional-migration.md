@@ -4,13 +4,13 @@
 > `superpowers:executing-plans` to implement this plan inline, task by task.
 > Steps use checkbox (`- [ ]`) syntax for tracking. Do not dispatch subagents.
 
-**Goal:** Qualify a 512-dimensional candidate projection class while the
+**Goal:** Qualify a 2560-dimensional candidate projection class while the
 1024-dimensional incumbent continues serving and both profiles consume an
 active PostgreSQL event backlog through restart, deletion, reset, rebuild, and
 a real direct-provider probe.
 
 **Architecture:** Migration 16 keeps the existing `vector(1024)` table and
-adds an isolated `vector(512)` table. A closed projection-class enum maps each
+adds an isolated `halfvec(2560)` table. A closed projection-class enum maps each
 supported profile to fixed SQL; no runtime string becomes a table name. One
 opt-in W17 harness drives a dedicated PostgreSQL 18 cluster with deterministic
 scale embeddings and a separate direct SiliconFlow probe.
@@ -24,19 +24,32 @@ release tooling.
 - PostgreSQL governed memories remain the only authority.
 - Lexical remains the product default; `siliconflow-bge-m3-1024-v1` remains the
   active semantic profile.
-- The candidate is exactly `siliconflow-bge-small-zh-512-v3`, direct
-  `https://api.siliconflow.cn/v1`, model `BAAI/bge-small-zh-v1.5`, 512
+- The candidate is exactly `siliconflow-qwen3-embedding-4b-2560-v3`, direct
+  `https://api.siliconflow.cn/v1`, model `Qwen/Qwen3-Embedding-4B`, 2560
   dimensions, lifecycle `candidate`.
 - No Redis, mem0, MemOS, Supermemory, NewAPI, arbitrary SQL identifiers,
   automatic promotion, or automatic rollback.
 - Every production-code change follows red-green-refactor; the failing test is
   run and observed before implementation.
 - Deterministic embeddings prove mechanics only. The formal run is incomplete
-  until the direct 512-dimensional provider probe succeeds.
+  until the direct 2560-dimensional provider probe succeeds.
 - Failed formal attempts are retained and never overwritten by a passing run.
 - No credentials, raw vectors, provider response bodies, private paths, DSNs,
   tokens, or passwords enter Git or GitHub.
 - W17 completion does not complete the active overall Vermory goal.
+
+**Provider correction:** The initially frozen `BAAI/bge-small-zh-v1.5` tuple
+returned HTTP 400/provider code 20012 (`Model does not exist`) in a direct
+preflight. The provider returned 1024 dimensions for Qwen3-Embedding-0.6B,
+2560 for Qwen3-Embedding-4B, and 4096 for Qwen3-Embedding-8B. The plan now
+freezes the available non-Pro 4B/2560 tuple. The failed 512 attempt and the
+earlier pre-request zsh `status` wrapper error remain retained evidence.
+
+**Index correction:** Fresh migration execution proved pgvector 0.8.5 rejects
+HNSW indexes on `vector` columns above 2000 dimensions. Its documented
+`halfvec` HNSW limit is 4000. W17 therefore uses physical class
+`halfvec_2560`, `halfvec(2560)` storage, and `halfvec_cosine_ops`; all 2560
+provider dimensions remain present and the precision change is explicit.
 
 ---
 
@@ -77,7 +90,7 @@ The manifest must encode:
   "worker_batch_size": 128,
   "pool_max_connections": 48,
   "incumbent_profile_id": "siliconflow-bge-m3-1024-v1",
-  "candidate_profile_id": "siliconflow-bge-small-zh-512-v3",
+  "candidate_profile_id": "siliconflow-qwen3-embedding-4b-2560-v3",
   "real_provider_tenant_id": "w17-real-provider-tenant",
   "reference_hardware": {
     "os": "Darwin arm64",
@@ -99,7 +112,7 @@ The manifest must encode:
     "database_size_gib": 8
   },
   "hard_gates": [
-    "schema 16 isolates vector_1024 and vector_512 projection classes",
+    "schema 16 isolates vector_1024 and halfvec_2560 projection classes",
     "authority writes do not wait for candidate embedding work",
     "incumbent vector queries continue while candidate backlog is active",
     "immediate restart commits no interrupted candidate vector or cursor",
@@ -108,7 +121,7 @@ The manifest must encode:
     "both physical classes converge to the same 20000 eligible memory IDs",
     "superseded deleted redacted proposed and cross-scope rows remain absent",
     "candidate reset and rebuild leave incumbent and authority unchanged",
-    "direct SiliconFlow projection and retrieval use exactly 512 dimensions",
+    "direct SiliconFlow projection and retrieval use exactly 2560 dimensions",
     "retrieval audits separate incumbent and candidate operations",
     "incumbent remains active default and candidate remains unpromoted"
   ]
@@ -134,22 +147,22 @@ The test must migrate a fresh database and require:
 
 ```text
 schema version                         16
-new profile                            siliconflow-bge-small-zh-512-v3
-profile model                          BAAI/bge-small-zh-v1.5
-profile dimensions                     512
-profile projection_class               vector_512
+new profile                            siliconflow-qwen3-embedding-4b-2560-v3
+profile model                          Qwen/Qwen3-Embedding-4B
+profile dimensions                     2560
+profile projection_class               halfvec_2560
 profile lifecycle                      candidate
 existing profile projection_class      vector_1024
-table                                  memory_vector_documents_512
-embedding type                         vector(512)
+table                                  memory_vector_documents_2560
+embedding type                         halfvec(2560)
 tenant-aware foreign keys              continuity and governed memory
 profile foreign key                    memory_retrieval_profiles
 RLS enabled and forced by runtime role tenant context
-HNSW vector_cosine_ops index            present
+HNSW halfvec_cosine_ops index           present
 ```
 
 Also assert PostgreSQL rejects a 1024-dimensional literal inserted into the
-512 table and rejects the 512 profile ID in the 1024 table through the profile
+2560 table and rejects the 2560 profile ID in the 1024 table through the profile
 class constraint introduced by migration 16.
 
 - [x] **Step 4: Run the focused tests and observe RED.**
@@ -163,7 +176,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 ```
 
 Expected: the case test passes and the schema test fails because migration 16,
-the 512 table, and the candidate profile do not exist.
+the 2560 table, and the candidate profile do not exist.
 
 ---
 
@@ -178,7 +191,7 @@ the 512 table, and the candidate profile do not exist.
 **Interfaces:**
 - Consumes: `RetrievalProfileSpec`, `RetrievalProfile.Validate`, migration 15
   registry, and the schema tests from Task 1.
-- Produces: `ProjectionClass`, `ProjectionClass1024`, `ProjectionClass512`,
+- Produces: `ProjectionClass`, `ProjectionClass1024`, `ProjectionClass2560`,
   `DimensionalMigrationRetrievalProfileID`, and migration 16.
 
 - [x] **Step 1: Add failing profile-validation tests.**
@@ -186,11 +199,11 @@ the 512 table, and the candidate profile do not exist.
 Require:
 
 ```go
-const DimensionalMigrationRetrievalProfileID = "siliconflow-bge-small-zh-512-v3"
+const DimensionalMigrationRetrievalProfileID = "siliconflow-qwen3-embedding-4b-2560-v3"
 
 spec, ok := SupportedRetrievalProfile(DimensionalMigrationRetrievalProfileID)
-// ok, direct SiliconFlow, BAAI/bge-small-zh-v1.5, 512,
-// ProjectionClass512, candidate
+// ok, direct SiliconFlow, Qwen/Qwen3-Embedding-4B, 2560,
+// ProjectionClass2560, candidate
 ```
 
 Reject a candidate with the wrong base URL, model, dimensions, projection
@@ -217,7 +230,7 @@ type ProjectionClass string
 
 const (
     ProjectionClass1024 ProjectionClass = "vector_1024"
-    ProjectionClass512  ProjectionClass = "vector_512"
+    ProjectionClass2560 ProjectionClass = "halfvec_2560"
 )
 ```
 
@@ -232,11 +245,11 @@ The Up migration must:
 1. add `projection_class` to `memory_retrieval_profiles`;
 2. assign both existing rows `vector_1024`;
 3. make the column non-null with a two-value check;
-4. register the 512 candidate;
-5. create `memory_vector_documents_512` with exact FKs, RLS, scope index, and
+4. register the 2560 candidate;
+5. create `memory_vector_documents_2560` with exact FKs, RLS, scope index, and
    HNSW cosine index;
 6. add constraints that bind the incumbent table to `vector_1024` and the new
-   table to `vector_512` through composite profile-class foreign keys;
+   table to `halfvec_2560` through composite profile-class foreign keys;
 7. revoke PUBLIC privileges.
 
 The profile registry needs a unique `(profile_id, projection_class)` key so
@@ -288,29 +301,29 @@ git commit -m "feat: add dimensional projection classes"
 
 - [x] **Step 1: Add failing store tests for class isolation.**
 
-Seed one tenant and one active memory. Insert deterministic 1024 and 512
+Seed one tenant and one active memory. Insert deterministic 1024 and 2560
 vectors through the real store/worker paths. Require:
 
 - each profile status counts only its physical table;
 - 1024 search reads only the incumbent table;
-- 512 search reads only the candidate table;
-- resetting the candidate clears only 512 rows and its cursor;
+- 2560 search reads only the candidate table;
+- resetting the candidate clears only 2560 rows and its cursor;
 - resetting the incumbent clears only 1024 rows and its cursor;
 - the same operation ID under two profile-specific retrieval fingerprints is
   not treated as the same audit request.
 
-- [x] **Step 2: Add failing worker tests for 512 upsert, delete, rebuild, and races.**
+- [x] **Step 2: Add failing worker tests for 2560 upsert, delete, rebuild, and races.**
 
 Use deterministic embedders returning exact dimensions. Require:
 
-- candidate event processing writes one 512 row and no 1024 row;
-- candidate deletion removes the 512 row;
+- candidate event processing writes one 2560 row and no 1024 row;
+- candidate deletion removes the 2560 row;
 - candidate snapshot rebuild populates current authority and advances only the
   candidate cursor;
 - a 1024 result from the candidate embedder records
   `embedding_dimension_mismatch` and advances no cursor;
 - an authority revision or deletion during candidate embedding returns
-  `authority_changed` and leaves no stale 512 row;
+  `authority_changed` and leaves no stale 2560 row;
 - incumbent and candidate advisory locks are independent for the same tenant.
 
 - [x] **Step 3: Run the focused tests and observe RED.**
@@ -328,7 +341,7 @@ Expected: failure because all SQL still targets `memory_vector_documents`.
 - [x] **Step 4: Add a private fixed SQL selector.**
 
 Use a closed helper that returns predeclared SQL strings or a private struct of
-queries for `ProjectionClass1024` and `ProjectionClass512`. It must return an
+queries for `ProjectionClass1024` and `ProjectionClass2560`. It must return an
 error for any unknown class. Do not return a table name for interpolation.
 
 The selected query set must cover:
@@ -396,7 +409,7 @@ git commit -m "feat: route dimensional vector projections"
 
 **Interfaces:**
 - Consumes: schema 16 and Task 3 class routing.
-- Produces: restricted runtime access to the 512 table, schema-16 reset and
+- Produces: restricted runtime access to the 2560 table, schema-16 reset and
   recovery inventories, and explicit candidate CLI validation.
 
 - [x] **Step 1: Add failing role, reset, recovery, and CLI tests.**
@@ -404,13 +417,13 @@ git commit -m "feat: route dimensional vector projections"
 Require:
 
 - restricted runtime role has tenant-scoped CRUD on
-  `memory_vector_documents_512` and does not own it;
-- a tenant context cannot see another tenant's 512 rows even when the
+  `memory_vector_documents_2560` and does not own it;
+- a tenant context cannot see another tenant's 2560 rows even when the
   application query omits a tenant predicate;
-- `ResetForTest` truncates both vector tables;
+- `ResetForTest` truncates both projection tables;
 - operations migration replay reports schema 16;
-- logical dump/restore preserves both profile registry classes and 512 rows;
-- projection reset/rebuild can reconstruct 512 rows from governed authority;
+- logical dump/restore preserves both profile registry classes and 2560 rows;
+- projection reset/rebuild can reconstruct 2560 rows from governed authority;
 - CLI accepts the exact candidate tuple and rejects a mismatched model,
   dimension, class, or base URL without printing the key;
 - W16's opt-in harness expects current schema 16 when rerun, without rewriting
@@ -426,12 +439,12 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
   -run 'Test.*RuntimeRole|TestOperationsRecovery|Test.*Dimensional|Test.*RetrievalRuntime'
 ```
 
-Expected: failures for missing 512 privileges, reset inventory, schema version,
+Expected: failures for missing 2560 privileges, reset inventory, schema version,
 recovery inventory, and candidate CLI tuple.
 
 - [x] **Step 3: Extend served-table and reset inventories.**
 
-Add `memory_vector_documents_512` to `authn.servedTables`, runtime validation,
+Add `memory_vector_documents_2560` to `authn.servedTables`, runtime validation,
 test reset, backup authority inventory, restore assertions, and RLS inventory.
 Do not grant runtime access to `memory_retrieval_profiles` or any legacy
 ungoverned table.
@@ -579,7 +592,7 @@ The formal harness must:
 8. drain both profile cursors to zero lag;
 9. compare the exact 20,000 eligible memory-ID sets and content hashes;
 10. reset and rebuild one tenant's candidate rows without incumbent drift;
-11. perform the direct 512-dimensional provider projection/query probe;
+11. perform the direct 2560-dimensional provider projection/query probe;
 12. write the completed normalized report and attempt history.
 
 - [x] **Step 7: Run report, miniature, race, and full serial tests.**
@@ -649,7 +662,7 @@ VERMORY_LIVE_EMBEDDING_API_KEY='<process-only-secret>' \
   -run '^TestActiveBacklogDimensionalMigrationProfile$'
 ```
 
-Expected: PASS only if all 12 gates and the real 512-dimensional probe pass.
+Expected: PASS only if all 12 gates and the real 2560-dimensional probe pass.
 If it fails, retain the root and attempt report, fix the implementation, and
 use a new run ID.
 
@@ -670,7 +683,7 @@ all counts and arithmetic match the manifest
 both physical ID sets and authority hashes match
 all cursors have zero lag
 candidate reset isolation is true
-provider dimensions equal 512
+provider dimensions equal 2560
 incumbent remains active and candidate remains candidate
 every failed attempt is listed
 no secret-shaped value appears
@@ -791,7 +804,7 @@ duplicate an existing W17 section and do not create a tag or Release.
 - [ ] **Step 7: Keep the overall Vermory goal active.**
 
 W17 closes only active-backlog dimensional migration for the named
-1024-to-512 profile. Remaining work includes genuine external sealed
+1024-to-2560 profile. Remaining work includes genuine external sealed
 evaluation, long-duration retention and pruning, cross-host HA evidence,
 artifact signing, and final release acceptance. Do not call
 `update_goal(status="complete")`.

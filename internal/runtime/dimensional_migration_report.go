@@ -218,7 +218,7 @@ func ValidateDimensionalMigrationReport(report DimensionalMigrationReport) error
 	if report.Environment.SchemaVersion != 16 || report.Profiles.IncumbentID != ProductionRetrievalProfileID ||
 		report.Profiles.IncumbentClass != ProjectionClass1024 || report.Profiles.IncumbentDimensions != 1024 ||
 		report.Profiles.IncumbentLifecycle != "active" || report.Profiles.CandidateID != DimensionalMigrationRetrievalProfileID ||
-		report.Profiles.CandidateClass != ProjectionClass512 || report.Profiles.CandidateDimensions != 512 ||
+		report.Profiles.CandidateClass != ProjectionClass2560 || report.Profiles.CandidateDimensions != 2560 ||
 		report.Profiles.CandidateLifecycle != "candidate" {
 		return errors.New("dimensional migration profile contract is invalid")
 	}

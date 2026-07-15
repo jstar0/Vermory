@@ -220,10 +220,10 @@ FROM memory_vector_documents
 WHERE tenant_id = $1 AND profile_id = $2
 ORDER BY memory_id`
 	profileID := ProductionRetrievalProfileID
-	if class == ProjectionClass512 {
+	if class == ProjectionClass2560 {
 		query = `
 SELECT memory_id::text
-FROM memory_vector_documents_512
+FROM memory_vector_documents_2560
 WHERE tenant_id = $1 AND profile_id = $2
 ORDER BY memory_id`
 		profileID = DimensionalMigrationRetrievalProfileID

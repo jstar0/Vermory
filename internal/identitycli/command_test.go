@@ -165,7 +165,7 @@ SELECT has_function_privilege($1, 'vermory_auth.authenticate_token(text,bytea)',
 	}
 	for _, table := range []string{
 		"memory_projection_events", "memory_projection_cursors",
-		"memory_vector_documents", "memory_vector_documents_512", "memory_retrieval_runs",
+		"memory_vector_documents", "memory_vector_documents_2560", "memory_retrieval_runs",
 	} {
 		var canSelect, canInsert, canUpdate, canDelete bool
 		if err := pool.QueryRow(context.Background(), `

@@ -246,8 +246,8 @@ func TestRetrievalRuntimeProfileIDResolvesFrozenTuple(t *testing.T) {
 	profile := options.profile()
 	if profile.ID != runtime.DimensionalMigrationRetrievalProfileID ||
 		profile.BaseURL != "https://api.siliconflow.cn/v1" ||
-		profile.Model != "BAAI/bge-small-zh-v1.5" ||
-		profile.Dimensions != 512 || profile.ProjectionClass != runtime.ProjectionClass512 {
+		profile.Model != "Qwen/Qwen3-Embedding-4B" ||
+		profile.Dimensions != 2560 || profile.ProjectionClass != runtime.ProjectionClass2560 {
 		t.Fatalf("candidate profile ID inherited the incumbent tuple: %#v", profile)
 	}
 	if _, err := options.validateSemantic(); err != nil {

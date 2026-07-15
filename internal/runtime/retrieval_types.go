@@ -12,14 +12,14 @@ import (
 const (
 	ProductionRetrievalProfileID           = "siliconflow-bge-m3-1024-v1"
 	MigrationRetrievalProfileID            = "siliconflow-bge-large-zh-1024-v2"
-	DimensionalMigrationRetrievalProfileID = "siliconflow-bge-small-zh-512-v3"
+	DimensionalMigrationRetrievalProfileID = "siliconflow-qwen3-embedding-4b-2560-v3"
 )
 
 type ProjectionClass string
 
 const (
 	ProjectionClass1024 ProjectionClass = "vector_1024"
-	ProjectionClass512  ProjectionClass = "vector_512"
+	ProjectionClass2560 ProjectionClass = "halfvec_2560"
 )
 
 type RetrievalProfileSpec struct {
@@ -43,7 +43,7 @@ func SupportedRetrievalProfile(id string) (RetrievalProfileSpec, bool) {
 		},
 		DimensionalMigrationRetrievalProfileID: {
 			ID: DimensionalMigrationRetrievalProfileID, BaseURL: "https://api.siliconflow.cn/v1",
-			Model: "BAAI/bge-small-zh-v1.5", Dimensions: 512, ProjectionClass: ProjectionClass512, Status: "candidate",
+			Model: "Qwen/Qwen3-Embedding-4B", Dimensions: 2560, ProjectionClass: ProjectionClass2560, Status: "candidate",
 		},
 	}
 	spec, ok := specs[strings.TrimSpace(id)]

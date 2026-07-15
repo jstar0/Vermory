@@ -58,10 +58,10 @@ func TestDimensionalMigrationProfileSpecIsFrozen(t *testing.T) {
 	if production.ProjectionClass != ProjectionClass1024 || existingCandidate.ProjectionClass != ProjectionClass1024 {
 		t.Fatalf("existing profiles left the 1024 class: production=%#v candidate=%#v", production, existingCandidate)
 	}
-	if candidate.ID != "siliconflow-bge-small-zh-512-v3" ||
+	if candidate.ID != "siliconflow-qwen3-embedding-4b-2560-v3" ||
 		candidate.BaseURL != "https://api.siliconflow.cn/v1" ||
-		candidate.Model != "BAAI/bge-small-zh-v1.5" ||
-		candidate.Dimensions != 512 || candidate.ProjectionClass != ProjectionClass512 ||
+		candidate.Model != "Qwen/Qwen3-Embedding-4B" ||
+		candidate.Dimensions != 2560 || candidate.ProjectionClass != ProjectionClass2560 ||
 		candidate.Status != "candidate" {
 		t.Fatalf("unexpected dimensional candidate: %#v", candidate)
 	}

@@ -27,13 +27,13 @@ SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&version); 
 	if err := store.pool.QueryRow(ctx, `
 SELECT model, dimensions, projection_class, lifecycle_status
 FROM memory_retrieval_profiles
-WHERE profile_id = 'siliconflow-bge-small-zh-512-v3'`).Scan(
+WHERE profile_id = 'siliconflow-qwen3-embedding-4b-2560-v3'`).Scan(
 		&model, &dimensions, &projectionClass, &lifecycle,
 	); err != nil {
 		t.Fatal(err)
 	}
-	if model != "BAAI/bge-small-zh-v1.5" || dimensions != 512 ||
-		projectionClass != "vector_512" || lifecycle != "candidate" {
+	if model != "Qwen/Qwen3-Embedding-4B" || dimensions != 2560 ||
+		projectionClass != "halfvec_2560" || lifecycle != "candidate" {
 		t.Fatalf("unexpected candidate profile: model=%s dimensions=%d class=%s lifecycle=%s", model, dimensions, projectionClass, lifecycle)
 	}
 
@@ -41,12 +41,12 @@ WHERE profile_id = 'siliconflow-bge-small-zh-512-v3'`).Scan(
 	if err := store.pool.QueryRow(ctx, `
 SELECT format_type(a.atttypid, a.atttypmod)
 FROM pg_attribute a
-WHERE a.attrelid = 'public.memory_vector_documents_512'::regclass
+WHERE a.attrelid = 'public.memory_vector_documents_2560'::regclass
   AND a.attname = 'embedding'`).Scan(&embeddingType); err != nil {
 		t.Fatal(err)
 	}
-	if embeddingType != "vector(512)" {
-		t.Fatalf("candidate embedding type=%q want vector(512)", embeddingType)
+	if embeddingType != "halfvec(2560)" {
+		t.Fatalf("candidate embedding type=%q want halfvec(2560)", embeddingType)
 	}
 
 	var policyCount int
@@ -54,7 +54,7 @@ WHERE a.attrelid = 'public.memory_vector_documents_512'::regclass
 SELECT count(*)
 FROM pg_policies
 WHERE schemaname = 'public'
-  AND tablename = 'memory_vector_documents_512'`).Scan(&policyCount); err != nil {
+  AND tablename = 'memory_vector_documents_2560'`).Scan(&policyCount); err != nil {
 		t.Fatal(err)
 	}
 	if policyCount != 1 {
@@ -66,8 +66,8 @@ WHERE schemaname = 'public'
 SELECT count(*)
 FROM pg_indexes
 WHERE schemaname = 'public'
-  AND tablename = 'memory_vector_documents_512'
-  AND indexdef LIKE '%hnsw%vector_cosine_ops%'`).Scan(&indexCount); err != nil {
+  AND tablename = 'memory_vector_documents_2560'
+  AND indexdef LIKE '%hnsw%halfvec_cosine_ops%'`).Scan(&indexCount); err != nil {
 		t.Fatal(err)
 	}
 	if indexCount != 1 {
@@ -78,8 +78,8 @@ WHERE schemaname = 'public'
 	if err := store.pool.QueryRow(ctx, `
 SELECT count(*)
 FROM pg_constraint
-WHERE conrelid = 'public.memory_vector_documents_512'::regclass
-  AND pg_get_constraintdef(oid) LIKE '%vector_512%'`).Scan(&classConstraintCount); err != nil {
+WHERE conrelid = 'public.memory_vector_documents_2560'::regclass
+  AND pg_get_constraintdef(oid) LIKE '%halfvec_2560%'`).Scan(&classConstraintCount); err != nil {
 		t.Fatal(err)
 	}
 	if classConstraintCount < 1 {

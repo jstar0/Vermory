@@ -16,7 +16,7 @@
   "worker_batch_size": 128,
   "pool_max_connections": 48,
   "incumbent_profile_id": "siliconflow-bge-m3-1024-v1",
-  "candidate_profile_id": "siliconflow-bge-small-zh-512-v3",
+  "candidate_profile_id": "siliconflow-qwen3-embedding-4b-2560-v3",
   "real_provider_tenant_id": "w17-real-provider-tenant",
   "reference_hardware": {
     "os": "Darwin arm64",
@@ -38,7 +38,7 @@
     "database_size_gib": 8
   },
   "hard_gates": [
-    "schema 16 isolates vector_1024 and vector_512 projection classes",
+    "schema 16 isolates vector_1024 and halfvec_2560 projection classes",
     "authority writes do not wait for candidate embedding work",
     "incumbent vector queries continue while candidate backlog is active",
     "immediate restart commits no interrupted candidate vector or cursor",
@@ -47,7 +47,7 @@
     "both physical classes converge to the same 20000 eligible memory IDs",
     "superseded deleted redacted proposed and cross-scope rows remain absent",
     "candidate reset and rebuild leave incumbent and authority unchanged",
-    "direct SiliconFlow projection and retrieval use exactly 512 dimensions",
+    "direct SiliconFlow projection and retrieval use exactly 2560 dimensions",
     "retrieval audits separate incumbent and candidate operations",
     "incumbent remains active default and candidate remains unpromoted"
   ]
