@@ -12,10 +12,12 @@ import (
 )
 
 type LongMemEvalSummary struct {
-	RecordCount     int    `json:"record_count"`
-	SessionCount    int    `json:"session_count"`
-	TurnCount       int    `json:"turn_count"`
-	RecordSetSHA256 string `json:"record_set_sha256"`
+	RecordCount           int    `json:"record_count"`
+	ScoredRecordCount     int    `json:"scored_record_count"`
+	AbstentionRecordCount int    `json:"abstention_record_count"`
+	SessionCount          int    `json:"session_count"`
+	TurnCount             int    `json:"turn_count"`
+	RecordSetSHA256       string `json:"record_set_sha256"`
 }
 
 func ScanLongMemEval(path string, visit func(LongMemEvalRecord) error) (LongMemEvalSummary, error) {
@@ -52,6 +54,11 @@ func ScanLongMemEval(path string, visit func(LongMemEvalRecord) error) (LongMemE
 		seen[record.QuestionID] = struct{}{}
 		recordIDs = append(recordIDs, record.QuestionID)
 		summary.RecordCount++
+		if strings.HasSuffix(record.QuestionID, "_abs") {
+			summary.AbstentionRecordCount++
+		} else {
+			summary.ScoredRecordCount++
+		}
 		summary.SessionCount += len(record.HaystackSessions)
 		for _, session := range record.HaystackSessions {
 			summary.TurnCount += len(session)

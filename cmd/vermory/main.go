@@ -99,6 +99,7 @@ func newRootCommand() *cobra.Command {
 	rootCmd.AddCommand(newWebChatCommand())
 	rootCmd.AddCommand(newServeCommand())
 	rootCmd.AddCommand(newBenchmarkLongMemEvalCommand())
+	rootCmd.AddCommand(newBenchmarkLongMemEvalRetrievalCommand())
 	rootCmd.AddCommand(newRetrievalAblationCommand())
 	rootCmd.AddCommand(newRetrievalProfileComparisonCommand())
 	rootCmd.AddCommand(newRetrievalWorkerCommand())

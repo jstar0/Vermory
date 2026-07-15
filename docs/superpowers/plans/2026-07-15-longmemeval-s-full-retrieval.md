@@ -249,17 +249,15 @@ git commit -m "feat: stream and score LongMemEval retrieval"
 **Files:**
 - Create: `internal/app/longmemeval_retrieval.go`
 - Create: `internal/app/longmemeval_retrieval_test.go`
-- Modify: `internal/runtime/postgres_store.go`
 - Create: `cmd/vermory/benchmark_longmemeval_retrieval.go`
 - Modify: `cmd/vermory/main.go`
 - Modify: `cmd/vermory/main_test.go`
 
 **Interfaces:**
 - Produces: `app.RunLongMemEvalRetrieval(ctx context.Context, opts LongMemEvalRetrievalOptions) (LongMemEvalRetrievalReport, error)`.
-- Produces: `runtime.GetGovernedMemories(ctx, tenantID string, memoryIDs []string) ([]GovernedMemoryLocation, error)` for lifecycle/continuity hard-gate verification.
 - Produces: CLI command `vermory benchmark-longmemeval-retrieval`.
 
-- [ ] **Step 1: Write failing PostgreSQL integration tests**
+- [x] **Step 1: Write failing PostgreSQL integration tests**
 
 Use a two-record fixture with independent answer and distractor sessions. The
 test must prove:
@@ -274,7 +272,7 @@ test must prove:
 - per-record checkpoint files exist before final aggregate files;
 - failures appear in `failure-ledger.json`.
 
-- [ ] **Step 2: Verify runner RED**
+- [x] **Step 2: Verify runner RED**
 
 Run:
 
@@ -283,17 +281,17 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 go test -p 1 ./internal/app ./cmd/vermory -run 'TestLongMemEvalRetrieval|TestBenchmarkLongMemEvalRetrieval' -count=1
 ```
 
-Expected: FAIL because the runner, lifecycle lookup, and command do not exist.
+Expected: FAIL because the runner and command do not exist.
 
-- [ ] **Step 3: Add the narrow lifecycle lookup**
+- [x] **Step 3: Verify complete source shape and authority**
 
-Return only memory ID, continuity ID, lifecycle status, and content for the
-requested tenant-scoped IDs. Reject an empty tenant, more than 12 IDs, duplicate
-IDs, missing IDs, and any row outside the tenant context. This API exists only
-to verify retrieval output against authority; do not expose source references
-or add a general query surface.
+Extend the full execution manifest with positive `expected_session_count` and
+`expected_turn_count` values. Validate the streamed summary against them before
+opening the runtime. Use the existing tenant/continuity-scoped
+`Store.ListGovernedMemories` result to prove every returned memory is active and
+belongs to the current record; do not add a broader memory-inspection API.
 
-- [ ] **Step 4: Implement record execution**
+- [x] **Step 4: Implement record execution**
 
 For each streamed record:
 
@@ -313,7 +311,7 @@ raw session ID so repeated upstream IDs remain distinct and idempotent.
 Checkpoint validation must compare run ID, implementation revision, dataset
 digest, record-set digest, question ID, condition names, and imported count.
 
-- [ ] **Step 5: Implement deterministic finalization**
+- [x] **Step 5: Implement deterministic finalization**
 
 Sort checkpoints by official question ID, require 500 total and 470 scored,
 aggregate overall and by question type, write upstream-compatible JSONL,
@@ -322,7 +320,7 @@ Classify each answerable condition result exactly as
 `all_evidence_retrieved`, `partial_evidence_retrieved`,
 `no_evidence_retrieved`, or `runtime_failure`.
 
-- [ ] **Step 6: Register the CLI**
+- [x] **Step 6: Register the CLI**
 
 Expose exactly these flags:
 
@@ -340,13 +338,13 @@ Expose exactly these flags:
 The command output must state target, scope, records, scored records, and report
 URI without printing individual dataset content.
 
-- [ ] **Step 7: Verify GREEN and commit**
+- [x] **Step 7: Verify GREEN and commit**
 
 Run the focused PostgreSQL tests twice, once normally and once with `-race`,
 then:
 
 ```bash
-git add internal/app/longmemeval_retrieval.go internal/app/longmemeval_retrieval_test.go internal/runtime/postgres_store.go cmd/vermory
+git add internal/app/longmemeval_retrieval.go internal/app/longmemeval_retrieval_test.go internal/benchmark/manifest.go internal/benchmark/manifest_test.go casebook/benchmarks/executions/longmemeval-s-full-retrieval.json cmd/vermory
 git commit -m "feat: run full governed LongMemEval retrieval"
 ```
 

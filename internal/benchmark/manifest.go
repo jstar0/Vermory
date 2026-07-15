@@ -97,26 +97,29 @@ type ExecutionScorer struct {
 }
 
 type ExecutionManifest struct {
-	SchemaVersion     string            `json:"schema_version"`
-	Benchmark         string            `json:"benchmark"`
-	QualificationPath string            `json:"qualification_path"`
-	DatasetSHA256     string            `json:"dataset_sha256"`
-	EvaluationTarget  EvaluationTarget  `json:"evaluation_target"`
-	ExecutionScope    ExecutionScope    `json:"execution_scope"`
-	ClaimScope        ClaimScope        `json:"claim_scope"`
-	SelectionMode     SelectionMode     `json:"selection_mode,omitempty"`
-	RecordSetSHA256   string            `json:"record_set_sha256,omitempty"`
-	SamplingRule      string            `json:"sampling_rule,omitempty"`
-	FixturePath       string            `json:"fixture_path,omitempty"`
-	FixtureSHA256     string            `json:"fixture_sha256,omitempty"`
-	SelectedRecordIDs []string          `json:"selected_record_ids,omitempty"`
-	HardFactual       bool              `json:"hard_factual"`
-	Scorers           []ExecutionScorer `json:"scorers,omitempty"`
-	RunID             string            `json:"run_id,omitempty"`
-	ImplementationRev string            `json:"implementation_revision,omitempty"`
-	Conditions        []string          `json:"conditions,omitempty"`
-	Artifacts         map[string]string `json:"artifacts,omitempty"`
-	NonClaims         []string          `json:"non_claims,omitempty"`
+	SchemaVersion             string            `json:"schema_version"`
+	Benchmark                 string            `json:"benchmark"`
+	QualificationPath         string            `json:"qualification_path"`
+	DatasetSHA256             string            `json:"dataset_sha256"`
+	EvaluationTarget          EvaluationTarget  `json:"evaluation_target"`
+	ExecutionScope            ExecutionScope    `json:"execution_scope"`
+	ClaimScope                ClaimScope        `json:"claim_scope"`
+	SelectionMode             SelectionMode     `json:"selection_mode,omitempty"`
+	RecordSetSHA256           string            `json:"record_set_sha256,omitempty"`
+	ExpectedSessionCount      int               `json:"expected_session_count,omitempty"`
+	ExpectedTurnCount         int               `json:"expected_turn_count,omitempty"`
+	ExpectedScoredRecordCount int               `json:"expected_scored_record_count,omitempty"`
+	SamplingRule              string            `json:"sampling_rule,omitempty"`
+	FixturePath               string            `json:"fixture_path,omitempty"`
+	FixtureSHA256             string            `json:"fixture_sha256,omitempty"`
+	SelectedRecordIDs         []string          `json:"selected_record_ids,omitempty"`
+	HardFactual               bool              `json:"hard_factual"`
+	Scorers                   []ExecutionScorer `json:"scorers,omitempty"`
+	RunID                     string            `json:"run_id,omitempty"`
+	ImplementationRev         string            `json:"implementation_revision,omitempty"`
+	Conditions                []string          `json:"conditions,omitempty"`
+	Artifacts                 map[string]string `json:"artifacts,omitempty"`
+	NonClaims                 []string          `json:"non_claims,omitempty"`
 }
 
 var sha256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -246,7 +249,8 @@ func ValidateExecution(qualification Qualification, manifest ExecutionManifest) 
 		if manifest.ClaimScope != ClaimScopeDatasetSample {
 			return fmt.Errorf("sample execution claim_scope must be dataset_sample")
 		}
-		if manifest.SelectionMode != "" || manifest.RecordSetSHA256 != "" {
+		if manifest.SelectionMode != "" || manifest.RecordSetSHA256 != "" ||
+			manifest.ExpectedSessionCount != 0 || manifest.ExpectedTurnCount != 0 || manifest.ExpectedScoredRecordCount != 0 {
 			return fmt.Errorf("sample execution cannot use full-dataset selection fields")
 		}
 	case ExecutionScopeFull:
@@ -258,6 +262,15 @@ func ValidateExecution(qualification Qualification, manifest ExecutionManifest) 
 		}
 		if manifest.ClaimScope != ClaimScopeQualifiedDatasetFull {
 			return fmt.Errorf("full execution claim_scope must be qualified_dataset_full")
+		}
+		if manifest.ExpectedSessionCount <= 0 {
+			return fmt.Errorf("full execution expected_session_count must be positive")
+		}
+		if manifest.ExpectedTurnCount <= 0 {
+			return fmt.Errorf("full execution expected_turn_count must be positive")
+		}
+		if manifest.ExpectedScoredRecordCount <= 0 || manifest.ExpectedScoredRecordCount > qualification.Dataset.RecordCount {
+			return fmt.Errorf("full execution expected_scored_record_count must be between 1 and dataset record count")
 		}
 		if strings.TrimSpace(manifest.SamplingRule) != "" || strings.TrimSpace(manifest.FixturePath) != "" ||
 			strings.TrimSpace(manifest.FixtureSHA256) != "" || len(manifest.SelectedRecordIDs) != 0 {

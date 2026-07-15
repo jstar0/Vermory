@@ -8,6 +8,9 @@
   "claim_scope": "qualified_dataset_full",
   "selection_mode": "all_records",
   "record_set_sha256": "f038965c54b03632f86a59104dd77848b66e3f80c08d5fbabdd3984d16457811",
+  "expected_session_count": 23867,
+  "expected_turn_count": 246750,
+  "expected_scored_record_count": 470,
   "hard_factual": true,
   "scorers": [
     {

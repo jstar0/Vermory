@@ -62,11 +62,11 @@ func (record *LongMemEvalRecord) UnmarshalJSON(data []byte) error {
 }
 
 type LongMemEvalSession struct {
-	ID    string
-	Date  string
-	Turns []LongMemEvalTurn
-	score int
-	index int
+	ID       string
+	Date     string
+	Turns    []LongMemEvalTurn
+	Position int
+	score    int
 }
 
 type DeterministicScore struct {
@@ -178,17 +178,17 @@ func RetrieveSessions(record LongMemEvalRecord, limit int) []LongMemEvalSession 
 	sessions := make([]LongMemEvalSession, 0, len(record.HaystackSessions))
 	for i, turns := range record.HaystackSessions {
 		session := LongMemEvalSession{
-			ID:    record.HaystackSessionIDs[i],
-			Date:  record.HaystackDates[i],
-			Turns: append([]LongMemEvalTurn(nil), turns...),
-			index: i,
+			ID:       record.HaystackSessionIDs[i],
+			Date:     record.HaystackDates[i],
+			Turns:    append([]LongMemEvalTurn(nil), turns...),
+			Position: i,
 		}
 		session.score = overlapCount(queryTokens, tokenSet(normalizeText(session.SemanticText())))
 		sessions = append(sessions, session)
 	}
 	sort.SliceStable(sessions, func(i, j int) bool {
 		if sessions[i].score == sessions[j].score {
-			return sessions[i].index < sessions[j].index
+			return sessions[i].Position < sessions[j].Position
 		}
 		return sessions[i].score > sessions[j].score
 	})

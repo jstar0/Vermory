@@ -205,14 +205,16 @@ raw runtime scores SHA-256:
 2be12512e3520cc38e0d425fcab07d95026711b8d41443b9f39e439cf82614d0
 
 normalized execution snapshot SHA-256:
-45839d90e38b512401858ced4b11be395a932c8143e788c25386e0cffd36dd00
+4f332ec093fec00a21d77fc558e39292497ee529a2cc828292a029ae34cea076
 
 raw runtime execution manifest SHA-256:
 83916ae2b556981c4b38ee03e239b412af436454616da60a698225b27c403e10
 ```
 
 Committed snapshots normalize generated artifact URIs to repository-relative
-paths. The ignored raw runtime artifacts remain byte-for-byte unchanged.
+paths. The normalized execution snapshot now also states
+`evaluation_target=qa` explicitly for the target-specific evidence contract;
+the ignored raw runtime artifacts remain byte-for-byte unchanged.
 
 Generated request/response artifacts remain under
 `artifacts/benchmarks/longmemeval-original-sample-grok-20260714-attempt-6/`

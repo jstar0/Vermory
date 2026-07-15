@@ -32,7 +32,7 @@ func TestScanLongMemEvalCountsAndCanonicalizesRecordIDs(t *testing.T) {
 	if strings.Join(visited, ",") != "record-b,record-a" {
 		t.Fatalf("visitor order changed: %v", visited)
 	}
-	if summary.RecordCount != 2 || summary.SessionCount != 2 || summary.TurnCount != 3 {
+	if summary.RecordCount != 2 || summary.ScoredRecordCount != 2 || summary.AbstentionRecordCount != 0 || summary.SessionCount != 2 || summary.TurnCount != 3 {
 		t.Fatalf("unexpected summary: %#v", summary)
 	}
 	if summary.RecordSetSHA256 == "" || summary.RecordSetSHA256 != reversed.RecordSetSHA256 {
@@ -121,7 +121,7 @@ func TestScanQualifiedLongMemEvalSMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary.RecordCount != 500 || summary.SessionCount != 23867 || summary.TurnCount != 246750 {
+	if summary.RecordCount != 500 || summary.ScoredRecordCount != 470 || summary.AbstentionRecordCount != 30 || summary.SessionCount != 23867 || summary.TurnCount != 246750 {
 		t.Fatalf("unexpected qualified source summary: %#v", summary)
 	}
 	if summary.RecordSetSHA256 != "f038965c54b03632f86a59104dd77848b66e3f80c08d5fbabdd3984d16457811" {

@@ -69,6 +69,24 @@ func TestExecutionRejectsFullRunWithoutRecordSetDigest(t *testing.T) {
 	}
 }
 
+func TestExecutionRejectsFullRunWithoutExpectedSourceCounts(t *testing.T) {
+	manifest := validFullRetrievalExecution()
+	manifest.ExpectedSessionCount = 0
+	if err := ValidateExecution(validQualification(), manifest); err == nil || !strings.Contains(err.Error(), "expected_session_count") {
+		t.Fatalf("expected session-count rejection, got %v", err)
+	}
+	manifest = validFullRetrievalExecution()
+	manifest.ExpectedTurnCount = 0
+	if err := ValidateExecution(validQualification(), manifest); err == nil || !strings.Contains(err.Error(), "expected_turn_count") {
+		t.Fatalf("expected turn-count rejection, got %v", err)
+	}
+	manifest = validFullRetrievalExecution()
+	manifest.ExpectedScoredRecordCount = 0
+	if err := ValidateExecution(validQualification(), manifest); err == nil || !strings.Contains(err.Error(), "expected_scored_record_count") {
+		t.Fatalf("expected scored-record rejection, got %v", err)
+	}
+}
+
 func TestExecutionRejectsBenchmarkWideRetrievalClaim(t *testing.T) {
 	manifest := validFullRetrievalExecution()
 	manifest.ClaimScope = ClaimScopeBenchmarkWide
@@ -167,6 +185,9 @@ func validFullRetrievalExecution() ExecutionManifest {
 	manifest.ClaimScope = ClaimScopeQualifiedDatasetFull
 	manifest.SelectionMode = SelectionModeAllRecords
 	manifest.RecordSetSHA256 = strings.Repeat("d", 64)
+	manifest.ExpectedSessionCount = 1000
+	manifest.ExpectedTurnCount = 10000
+	manifest.ExpectedScoredRecordCount = 470
 	manifest.SamplingRule = ""
 	manifest.FixturePath = ""
 	manifest.FixtureSHA256 = ""
