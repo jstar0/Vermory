@@ -217,8 +217,25 @@ The rejected prequalification run ID
 During judge execution, Grok attempted an `update_goal` path, proving that the
 flag did not establish the frozen no-tools boundary. Its partial artifacts and
 logs remain outside the formal artifact root and cannot contribute to W15
-scores. The corrected formal run ID is
-`longmemeval-s-full-reader-qa-grok-20260715-v2`.
+scores.
+
+The rejected run ID `longmemeval-s-full-reader-qa-grok-20260715-v2` corrected
+the tool boundary, but its foreground reader was twice interrupted by the host
+PTY lifecycle. A subsequent `launchctl submit` resume inherited the system-only
+launchd `PATH`; Grok's `#!/usr/bin/env node` entrypoint could not locate the
+Homebrew Node binary, producing 188 terminal reader failures with
+`env: node: No such file or directory`. The submitted job also exposed
+launchd's inferred keepalive behavior, so this execution transport is forbidden
+for formal runs. All v2 successes and failures remain preserved outside the
+formal artifact root and cannot contribute to W15 scores.
+
+The corrected formal run ID is
+`longmemeval-s-full-reader-qa-grok-20260715-v3`. Formal reader and judge phases
+must run under one-shot LaunchAgent plists with `RunAtLoad=true`,
+`KeepAlive=false`, an explicit Homebrew-aware `PATH`, independent exit markers,
+and post-run proof that every job has `runs=1`. Before the dataset run starts,
+the same LaunchAgent transport must execute both formal model probes and prove
+exit zero, `tool_count=0`, no tool call, one turn, and `EndTurn`.
 
 Reader raw artifacts retain model usage and request identity when the provider
 returns them. Reports aggregate input, cached-input, output, reasoning, and

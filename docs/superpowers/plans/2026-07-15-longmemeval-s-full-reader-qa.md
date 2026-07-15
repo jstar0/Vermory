@@ -617,14 +617,18 @@ Create mode-`0700` temporary HOME/GROK_HOME, copy only current `auth.json` and
 `agent_id` with mode `0600`, and create an operator-owned wrapper outside Git.
 Run `grok inspect --json` through the wrapper and require empty project
 instructions, plugins, skills, MCP servers, and hooks. Preserve only the
-redaction-safe inspection summary.
+redaction-safe inspection summary. Run formal phases through one-shot
+LaunchAgent plists with `RunAtLoad=true`, `KeepAlive=false`, an explicit
+`PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin`, independent exit
+markers, and post-run proof that `runs=1`. Do not use foreground PTYs, `nohup`,
+`screen`, or `launchctl submit` as the formal execution transport.
 
 - [ ] **Step 3: Run reader phase with bounded concurrency**
 
 Use formal run ID:
 
 ```text
-longmemeval-s-full-reader-qa-grok-20260715-v2
+longmemeval-s-full-reader-qa-grok-20260715-v3
 ```
 
 Run against the pinned source and W14 JSONL. Capture wall time, max RSS, raw log
@@ -633,9 +637,13 @@ Do not stop the complete run for individual provider failures.
 
 The discarded `v1` prequalification run used an empty Grok tool allowlist and
 was stopped after an observed `update_goal` path proved that boundary
-ineffective. Preserve that failed-run log and partial artifacts outside the
-formal `v2` artifact root. Before starting `v2`, require debug probes for both
-formal models to report `tool_count=0`.
+ineffective. The discarded `v2` run corrected that boundary, but two host PTY
+interruptions and a `launchctl submit` resume with a system-only `PATH` produced
+188 terminal `env: node: No such file or directory` failures; the submit job
+also used inferred keepalive semantics. Preserve both failed runs outside the
+formal `v3` artifact root. Before starting `v3`, require one-shot LaunchAgent
+debug probes for both formal models to report `runs=1`, exit zero,
+`tool_count=0`, no tool call, one turn, and `EndTurn`.
 
 - [ ] **Step 4: Run custom judge and finalize**
 
