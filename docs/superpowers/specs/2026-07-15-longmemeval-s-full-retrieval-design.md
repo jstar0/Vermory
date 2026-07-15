@@ -78,10 +78,25 @@ one production lexical retrieval request per record at K=12
 ```
 
 Each source memory contains only timestamped semantic session text. Its memory
-ID is mapped to the official session ID at import time; model-facing or report
-content never needs to infer IDs from text. The production
+ID is mapped to the official session occurrence at import time; model-facing
+or report content never needs to infer IDs from text. The production
 `RetrievalCoordinator` performs the Vermory query. Direct SQL ranking or an
 in-memory imitation cannot count as the Vermory condition.
+
+The cleaned S artifact contains 13 records where one distractor session ID is
+repeated at two timestamps. In every case the content is identical, the dates
+differ, and the duplicated ID is not an answer session. This is valid upstream
+data, not a loader error. Vermory stores each position as a distinct governed
+memory using an occurrence key while retaining the raw official session ID for
+upstream-compatible metrics. A repeated distractor may therefore occupy two
+ranking positions exactly as it does in the official evaluator.
+
+The artifact also contains 12 unlabeled turns with an empty `content` field:
+nine user turns and three assistant turns. No complete session is empty and no
+empty turn is answer-labeled. The streaming loader retains them in source turn
+counts, while semantic session text omits their empty content exactly as the
+upstream flat retriever does. Missing roles, empty answer-labeled turns, and
+sessions with no non-empty content remain invalid.
 
 The runner computes K=5 and K=10 metrics from the K=12 ranking prefix. It also
 executes a deterministic token-overlap baseline over the same official
@@ -98,7 +113,7 @@ For every non-abstention record and condition, W14 records:
 - `ndcg_any@10`;
 - `recall_any@12` and `recall_all@12` as a Vermory product-limit diagnostic;
 - first relevant rank and reciprocal rank;
-- retrieved official session IDs in exact order;
+- retrieved official session occurrence keys and raw IDs in exact order;
 - latency and failure category.
 
 The DCG and recall definitions reproduce the pinned upstream evaluator. The

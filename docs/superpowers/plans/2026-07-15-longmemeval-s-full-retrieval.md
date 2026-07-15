@@ -173,14 +173,17 @@ git commit -m "feat: define full retrieval benchmark evidence"
 - Produces: `EvaluateSessionRetrieval(ranked, relevant []string, k int) SessionRetrievalMetric`.
 - Produces: `AggregateSessionRetrieval(results []SessionRetrievalResult) RetrievalAggregate`.
 
-- [ ] **Step 1: Write failing streaming-loader tests**
+- [x] **Step 1: Write failing streaming-loader tests**
 
 Cover a valid JSON array, duplicate IDs, malformed parallel arrays, trailing
 JSON, visitor failure propagation, canonical digest independence from source
 record order, and exact record/session/turn counts. Include a test that feeds
 the same records in opposite order and requires the same sorted-ID digest.
+Also prove that unlabeled empty turns are retained in the turn count but omitted
+from semantic text, while an all-empty session or empty answer-labeled turn is
+rejected.
 
-- [ ] **Step 2: Verify streaming RED**
+- [x] **Step 2: Verify streaming RED**
 
 Run:
 
@@ -190,14 +193,14 @@ go test ./internal/benchmark -run 'TestScanLongMemEval' -count=1
 
 Expected: FAIL because `ScanLongMemEval` does not exist.
 
-- [ ] **Step 3: Implement streaming JSON-array decoding**
+- [x] **Step 3: Implement streaming JSON-array decoding**
 
 Use `json.Decoder`, require the opening `[` and closing `]`, validate every
 record with the existing `record.validate`, reject duplicates, and retain only
 the record IDs needed for the final sorted newline-delimited SHA-256. Do not
 read the whole 277 MB file with `os.ReadFile`.
 
-- [ ] **Step 4: Write failing metric tests from upstream definitions**
+- [x] **Step 4: Write failing metric tests from upstream definitions**
 
 Use cases that prove:
 
@@ -207,15 +210,18 @@ K=2 -> recall_any=1, recall_all=0
 K=3 -> recall_any=1, recall_all=1
 ```
 
-Also test duplicate retrieved IDs, no relevant IDs, first relevant rank, MRR,
+Also test repeated distractor IDs, no relevant IDs, first relevant rank, MRR,
 and NDCG using the upstream DCG discount where rank 1 is undiscounted and later
-ranks divide by `log2(rank)`.
+ranks divide by `log2(rank)`. The official cleaned S artifact contains 13
+records with one repeated non-answer session ID, so repeated ranked IDs must
+occupy distinct positions rather than being rejected or collapsed.
 
-- [ ] **Step 5: Implement and verify metrics**
+- [x] **Step 5: Implement and verify metrics**
 
-Reject duplicate ranked IDs because one official session may not occupy two
-positions. Keep abstention exclusion outside the metric function so the report
-still retains those records.
+Reject empty IDs but preserve repeated ranked IDs as distinct corpus
+occurrences. Deduplicate the relevant-ID set as the upstream evaluator does.
+Keep abstention exclusion outside the metric function so the report still
+retains those records.
 
 Run:
 
@@ -223,7 +229,7 @@ Run:
 go test ./internal/benchmark -run 'TestScanLongMemEval|TestEvaluateSessionRetrieval|TestAggregateSessionRetrieval' -count=1
 ```
 
-- [ ] **Step 6: Verify the real source metadata and commit**
+- [x] **Step 6: Verify the real source metadata and commit**
 
 Run a focused test gated by:
 
@@ -294,7 +300,7 @@ For each streamed record:
 ```text
 resolve/create benchmark conversation continuity
 -> commit every timestamped session as source_update
--> retain memory_id -> official session_id mapping
+-> retain memory_id -> official session occurrence mapping
 -> run token-overlap baseline at K=12
 -> run production RetrievalCoordinator lexical query at K=12
 -> verify returned authority rows are active and in the record continuity
@@ -302,7 +308,8 @@ resolve/create benchmark conversation continuity
 -> atomically write the record checkpoint
 ```
 
-Use stable operation IDs containing run ID, question ID, and session ID.
+Use stable operation IDs containing run ID, question ID, session position, and
+raw session ID so repeated upstream IDs remain distinct and idempotent.
 Checkpoint validation must compare run ID, implementation revision, dataset
 digest, record-set digest, question ID, condition names, and imported count.
 

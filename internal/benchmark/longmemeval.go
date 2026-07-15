@@ -118,22 +118,28 @@ func (record LongMemEvalRecord) validate() error {
 	if len(record.HaystackSessions) == 0 {
 		return fmt.Errorf("at least one haystack session is required")
 	}
-	seen := make(map[string]struct{}, len(record.HaystackSessionIDs))
 	for i, id := range record.HaystackSessionIDs {
 		if strings.TrimSpace(id) == "" {
 			return fmt.Errorf("haystack session %d has an empty id", i)
 		}
-		if _, exists := seen[id]; exists {
-			return fmt.Errorf("duplicate haystack session id %q", id)
-		}
-		seen[id] = struct{}{}
 		if len(record.HaystackSessions[i]) == 0 {
 			return fmt.Errorf("haystack session %q has no turns", id)
 		}
+		nonEmptyTurns := 0
 		for _, turn := range record.HaystackSessions[i] {
-			if strings.TrimSpace(turn.Role) == "" || strings.TrimSpace(turn.Content) == "" {
-				return fmt.Errorf("haystack session %q has an empty role or content", id)
+			if strings.TrimSpace(turn.Role) == "" {
+				return fmt.Errorf("haystack session %q has an empty role", id)
 			}
+			if strings.TrimSpace(turn.Content) == "" {
+				if turn.HasAnswer {
+					return fmt.Errorf("haystack session %q has an empty answer-labeled turn", id)
+				}
+				continue
+			}
+			nonEmptyTurns++
+		}
+		if nonEmptyTurns == 0 {
+			return fmt.Errorf("haystack session %q has no non-empty turns", id)
 		}
 	}
 	return nil
