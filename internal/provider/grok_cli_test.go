@@ -195,8 +195,9 @@ sleep 30 &
 child=$!
 group=$(ps -o pgid= -p $$ | tr -d ' ')
 printf '%%s %%s\n' "$child" "$group" > %q
+mv %q %q
 wait "$child"
-`, childPath)
+`, childPath+".tmp", childPath+".tmp", childPath)
 	if err := os.WriteFile(commandPath, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
