@@ -31,7 +31,7 @@ for argument in "$@"; do
 done
 test -n "$prompt_file"
 cp "$prompt_file" %q
-printf '%%s\n' '{"text":"grok response","modelUsage":{"grok-4.5":{}}}'
+printf '%%s\n' '{"text":"grok response","usage":{"input_tokens":2718,"cache_read_input_tokens":7285,"output_tokens":97,"reasoning_tokens":11,"total_tokens":10111},"modelUsage":{"grok-4.5":{}}}'
 `, capturePath, promptCapturePath)
 	if err := os.WriteFile(commandPath, []byte(script), 0o700); err != nil {
 		t.Fatalf("write fake grok command: %v", err)
@@ -58,6 +58,15 @@ printf '%%s\n' '{"text":"grok response","modelUsage":{"grok-4.5":{}}}'
 	if !json.Valid(resp.RawArtifact) {
 		t.Fatalf("raw artifact should be the Grok JSON response, got %q", resp.RawArtifact)
 	}
+	if resp.Usage == nil || *resp.Usage != (TokenUsage{
+		InputTokens:       2718,
+		CachedInputTokens: 7285,
+		OutputTokens:      97,
+		ReasoningTokens:   11,
+		TotalTokens:       10111,
+	}) {
+		t.Fatalf("unexpected Grok usage: %#v", resp.Usage)
+	}
 
 	arguments, err := os.ReadFile(capturePath)
 	if err != nil {
@@ -66,16 +75,23 @@ printf '%%s\n' '{"text":"grok response","modelUsage":{"grok-4.5":{}}}'
 	lines := strings.Split(strings.TrimSpace(string(arguments)), "\n")
 	var promptPath string
 	foundMaxTurns := false
+	foundEmptyTools := false
 	foundJSONSchema := false
 	for index, line := range lines {
 		if line == "--prompt-file" && index+1 < len(lines) {
 			promptPath = lines[index+1]
 		}
 		if line == "--max-turns" {
-			if index+1 >= len(lines) || lines[index+1] != "3" {
-				t.Fatalf("expected Grok max turns 3, got %q", strings.Join(lines, " "))
+			if index+1 >= len(lines) || lines[index+1] != "1" {
+				t.Fatalf("expected Grok max turns 1, got %q", strings.Join(lines, " "))
 			}
 			foundMaxTurns = true
+		}
+		if line == "--tools" {
+			if index+1 >= len(lines) || lines[index+1] != "" {
+				t.Fatalf("expected empty Grok tools, got %q", strings.Join(lines, " "))
+			}
+			foundEmptyTools = true
 		}
 		if line == "--json-schema" {
 			if index+1 >= len(lines) || !json.Valid([]byte(lines[index+1])) {
@@ -87,6 +103,9 @@ printf '%%s\n' '{"text":"grok response","modelUsage":{"grok-4.5":{}}}'
 	if !foundMaxTurns {
 		t.Fatalf("expected --max-turns in Grok arguments: %q", strings.Join(lines, " "))
 	}
+	if !foundEmptyTools {
+		t.Fatalf("expected empty --tools in Grok arguments: %q", strings.Join(lines, " "))
+	}
 	if !foundJSONSchema {
 		t.Fatalf("expected --json-schema in Grok arguments: %q", strings.Join(lines, " "))
 	}
@@ -97,6 +116,7 @@ printf '%%s\n' '{"text":"grok response","modelUsage":{"grok-4.5":{}}}'
 		"--no-plan",
 		"--no-subagents",
 		"--max-turns",
+		"--tools",
 		"--permission-mode",
 		"dontAsk",
 		"--output-format",

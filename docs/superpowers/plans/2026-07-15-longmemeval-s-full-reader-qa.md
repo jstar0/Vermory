@@ -166,7 +166,7 @@ git commit -m "feat: define full reader QA evidence"
 - Extends: `provider.GenerateResponse` with `Usage *TokenUsage`.
 - Changes: Grok invocation to `--max-turns 1` and `--tools ""`.
 
-- [ ] **Step 1: Write failing normalized-usage tests**
+- [x] **Step 1: Write failing normalized-usage tests**
 
 Test Grok raw JSON containing:
 
@@ -187,7 +187,7 @@ and reasoning detail. Require exact normalized fields. Add an argument-capture
 test requiring `--max-turns 1`, `--no-memory`, `--disable-web-search`,
 `--no-plan`, `--no-subagents`, and an empty `--tools` value.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 go test ./internal/provider -run 'TestGrokCLI.*Usage|TestGrokCLI.*Arguments|TestOpenAICompatible.*Usage' -count=1
@@ -196,7 +196,7 @@ go test ./internal/provider -run 'TestGrokCLI.*Usage|TestGrokCLI.*Arguments|Test
 Expected: FAIL because normalized usage is absent and Grok still allows three
 turns.
 
-- [ ] **Step 3: Implement usage normalization and the one-turn boundary**
+- [x] **Step 3: Implement usage normalization and the one-turn boundary**
 
 Add:
 
@@ -214,7 +214,7 @@ Populate it only when provider usage is present. Do not infer missing values.
 Keep raw artifacts unchanged. Change only Grok's stateless execution arguments;
 do not add login material or environment values to request artifacts.
 
-- [ ] **Step 4: Run provider tests and commit**
+- [x] **Step 4: Run provider tests and commit**
 
 ```bash
 go test ./internal/provider -count=1

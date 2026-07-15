@@ -30,7 +30,7 @@ func TestOpenAICompatibleProviderSendsDirectChatCompletionRequest(t *testing.T) 
 			t.Fatalf("decode request: %v", err)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"chatcmpl-test","model":"direct-model","choices":[{"message":{"role":"assistant","content":"direct ok"}}]}`))
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-test","model":"direct-model","choices":[{"message":{"role":"assistant","content":"direct ok"}}],"usage":{"prompt_tokens":120,"completion_tokens":15,"total_tokens":135,"prompt_tokens_details":{"cached_tokens":80},"completion_tokens_details":{"reasoning_tokens":7}}}`))
 	}))
 	defer server.Close()
 
@@ -72,6 +72,15 @@ func TestOpenAICompatibleProviderSendsDirectChatCompletionRequest(t *testing.T) 
 	}
 	if !json.Valid(resp.RawArtifact) {
 		t.Fatalf("raw artifact should be response JSON")
+	}
+	if resp.Usage == nil || *resp.Usage != (TokenUsage{
+		InputTokens:       120,
+		CachedInputTokens: 80,
+		OutputTokens:      15,
+		ReasoningTokens:   7,
+		TotalTokens:       135,
+	}) {
+		t.Fatalf("unexpected OpenAI-compatible usage: %#v", resp.Usage)
 	}
 }
 

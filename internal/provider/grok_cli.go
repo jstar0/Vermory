@@ -56,7 +56,8 @@ func (p *GrokCLI) Generate(ctx context.Context, req GenerateRequest) (GenerateRe
 		"--disable-web-search",
 		"--no-plan",
 		"--no-subagents",
-		"--max-turns", "3",
+		"--max-turns", "1",
+		"--tools", "",
 		"--permission-mode", "dontAsk",
 		"--output-format", "json",
 	}
@@ -136,12 +137,35 @@ func (p *GrokCLI) Generate(ctx context.Context, req GenerateRequest) (GenerateRe
 		Output:      output,
 		RawArtifact: raw,
 		Model:       model,
+		Usage:       decoded.Usage.normalized(),
 	}, nil
 }
 
 type grokCLIResponse struct {
 	Text       string                     `json:"text"`
 	ModelUsage map[string]json.RawMessage `json:"modelUsage"`
+	Usage      *grokCLIUsage              `json:"usage"`
+}
+
+type grokCLIUsage struct {
+	InputTokens          int `json:"input_tokens"`
+	CacheReadInputTokens int `json:"cache_read_input_tokens"`
+	OutputTokens         int `json:"output_tokens"`
+	ReasoningTokens      int `json:"reasoning_tokens"`
+	TotalTokens          int `json:"total_tokens"`
+}
+
+func (usage *grokCLIUsage) normalized() *TokenUsage {
+	if usage == nil {
+		return nil
+	}
+	return &TokenUsage{
+		InputTokens:       usage.InputTokens,
+		CachedInputTokens: usage.CacheReadInputTokens,
+		OutputTokens:      usage.OutputTokens,
+		ReasoningTokens:   usage.ReasoningTokens,
+		TotalTokens:       usage.TotalTokens,
+	}
 }
 
 func buildGrokCLIPrompt(req GenerateRequest) string {

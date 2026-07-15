@@ -84,6 +84,7 @@ func (p *OpenAICompatible) Generate(ctx context.Context, req GenerateRequest) (G
 		Output:      sanitizeModelOutput(output),
 		RawArtifact: raw,
 		Model:       model,
+		Usage:       decoded.Usage.normalized(),
 	}, nil
 }
 
@@ -170,6 +171,32 @@ type openAICompatibleResponse struct {
 			ReasoningContent string          `json:"reasoning_content"`
 		} `json:"message"`
 	} `json:"choices"`
+	Usage *openAICompatibleUsage `json:"usage"`
+}
+
+type openAICompatibleUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+	PromptDetails    struct {
+		CachedTokens int `json:"cached_tokens"`
+	} `json:"prompt_tokens_details"`
+	CompletionDetails struct {
+		ReasoningTokens int `json:"reasoning_tokens"`
+	} `json:"completion_tokens_details"`
+}
+
+func (usage *openAICompatibleUsage) normalized() *TokenUsage {
+	if usage == nil {
+		return nil
+	}
+	return &TokenUsage{
+		InputTokens:       usage.PromptTokens,
+		CachedInputTokens: usage.PromptDetails.CachedTokens,
+		OutputTokens:      usage.CompletionTokens,
+		ReasoningTokens:   usage.CompletionDetails.ReasoningTokens,
+		TotalTokens:       usage.TotalTokens,
+	}
 }
 
 func (r openAICompatibleResponse) FirstContent() string {
