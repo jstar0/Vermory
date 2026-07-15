@@ -198,7 +198,7 @@ func runHAFailoverPhase(t *testing.T, harness *clusterHarness, report *Report) t
 	})
 
 	haToken := issueProfileToken(t, adminPool, profileTenantA, "i03-ha-token", "i03-ha-client")
-	harness.forceArchiveCurrentSegment(t)
+	harness.forceArchiveCurrentSegment(t, harness.Primary)
 	preFailoverFlush := harness.currentFlushLSN(t, harness.Primary)
 	harness.waitForReplayLSN(t, harness.Standby, preFailoverFlush, 20*time.Second)
 	standbyReplay := harness.currentReplayLSN(t, harness.Standby)

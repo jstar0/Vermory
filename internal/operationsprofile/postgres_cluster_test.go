@@ -121,6 +121,7 @@ func TestRenderStandbyAndPITRConfigsContainExactRecoveryBoundary(t *testing.T) {
 	for _, required := range []string{
 		"unix_socket_directories = ''",
 		"recovery_target_lsn = '0/30001A0'",
+		"recovery_target_timeline = 'current'",
 		"recovery_target_inclusive = on",
 		"recovery_target_action = promote",
 		filepath.Join(root, "wal-archive"),

@@ -439,7 +439,7 @@ git commit -m "test: prove PostgreSQL standby failover"
 - Consumes: the Task 3 base-backup and WAL helpers, the T2 LSN/fingerprint captured by the profile, and existing governance, projection, token, authentication, and RLS APIs.
 - Produces: `runPITRPhase(t *testing.T, harness *clusterHarness, target targetState, report *Report)`, `TestPostgreSQLHAPITRProfile`, the `PITRReport` and `SecurityReport` sections, and hard gates for target-state equivalence and quarantine exit.
 
-- [ ] **Step 1: Write the failing PITR assertions**
+- [x] **Step 1: Write the failing PITR assertions**
 
 Define the target timeline in the test:
 
@@ -464,7 +464,7 @@ PITR target: exact T2 state restored
 quarantine exit: token A revoked again, new token works, old token returns 401
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 VERMORY_HA_PITR_PROFILE=1 \
@@ -473,7 +473,7 @@ VERMORY_HA_PITR_ROOT=/Volumes/JSData/ComputerScience/Mac/.vermory-ha-pitr/w16-pi
 go test -count=1 ./internal/operationsprofile -run 'TestPostgreSQLPITRProfile' -v
 ```
 
-- [ ] **Step 3: Implement exact target recovery**
+- [x] **Step 3: Implement exact target recovery**
 
 The test must copy the completed `pitr-base` backup into a fresh restore data
 directory, append:
@@ -521,7 +521,7 @@ func TestPostgreSQLHAPITRProfile(t *testing.T) {
 `TestPostgreSQLPITRProfile` may call the same phase helpers for focused
 development, but the formal evidence command uses the combined test above.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 ```bash
 VERMORY_HA_PITR_PROFILE=1 \

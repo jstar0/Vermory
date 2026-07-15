@@ -209,6 +209,7 @@ func renderPITRConfig(port int, archiveDir, targetLSN string) (string, error) {
 		"unix_socket_directories = ''",
 		"restore_command = '" + restoreCommand + "'",
 		"recovery_target_lsn = '" + targetLSN + "'",
+		"recovery_target_timeline = 'current'",
 		"recovery_target_inclusive = on",
 		"recovery_target_action = promote",
 		"logging_collector = off",
@@ -363,13 +364,13 @@ func (h *clusterHarness) waitForReplayLSN(t *testing.T, cluster postgresCluster,
 	h.waitForQuery(t, cluster, "SELECT COALESCE(pg_last_wal_replay_lsn() >= '"+targetLSN+"'::pg_lsn, false)", "t", timeout)
 }
 
-func (h *clusterHarness) forceArchiveCurrentSegment(t *testing.T) string {
+func (h *clusterHarness) forceArchiveCurrentSegment(t *testing.T, cluster postgresCluster) string {
 	t.Helper()
-	segment := h.execSQL(t, h.Primary, "SELECT pg_walfile_name(pg_current_wal_lsn())")
+	segment := h.execSQL(t, cluster, "SELECT pg_walfile_name(pg_current_wal_lsn())")
 	if !regexp.MustCompile(`^[0-9A-F]{24}$`).MatchString(segment) {
 		t.Fatalf("unexpected WAL segment name %q", segment)
 	}
-	h.execSQL(t, h.Primary, "SELECT pg_switch_wal()")
+	h.execSQL(t, cluster, "SELECT pg_switch_wal()")
 	path := filepath.Join(h.WALArchive, segment)
 	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
