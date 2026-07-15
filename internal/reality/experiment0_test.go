@@ -17,8 +17,8 @@ func TestBuildExperiment0ReportsFrozenPublicCoverage(t *testing.T) {
 	if !report.Pass || !report.PublicValidation.Pass {
 		t.Fatalf("expected public evidence to pass: %#v", report)
 	}
-	if len(report.PublicValidation.Results) != 9 {
-		t.Fatalf("expected nine cases, got %d", len(report.PublicValidation.Results))
+	if len(report.PublicValidation.Results) != 10 {
+		t.Fatalf("expected ten cases, got %d", len(report.PublicValidation.Results))
 	}
 	for _, result := range report.PublicValidation.Results {
 		if result.LockSHA256 == "" {
@@ -34,7 +34,7 @@ func TestBuildExperiment0ReportsFrozenPublicCoverage(t *testing.T) {
 	if len(report.PressureCoverage["explicit_deletion"]) != 1 {
 		t.Fatalf("expected deletion pressure coverage: %#v", report.PressureCoverage)
 	}
-	if report.EvidenceLevels[string(EvidencePublic)] != 9 || report.SealedStatus != "unavailable" {
+	if report.EvidenceLevels[string(EvidencePublic)] != 10 || report.SealedStatus != "unavailable" {
 		t.Fatalf("unexpected evidence status: levels=%#v sealed=%q", report.EvidenceLevels, report.SealedStatus)
 	}
 	if !containsText(report.Limitations, "target discovery coverage remains incomplete") {
@@ -43,7 +43,7 @@ func TestBuildExperiment0ReportsFrozenPublicCoverage(t *testing.T) {
 	if got := report.HypothesisSignals["H-013"]; len(got) != 1 || got[0] != "I01-authenticated-multitenant-rls" {
 		t.Fatalf("unexpected RLS hypothesis signal: %#v", got)
 	}
-	if got := report.HypothesisSignals["H-014"]; len(got) != 1 || got[0] != "I02-postgresql-operations-recovery" {
+	if got := report.HypothesisSignals["H-014"]; len(got) != 2 || got[0] != "I02-postgresql-operations-recovery" || got[1] != "I03-postgresql-ha-pitr" {
 		t.Fatalf("unexpected operations recovery hypothesis signal: %#v", got)
 	}
 }

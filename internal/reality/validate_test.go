@@ -261,6 +261,41 @@ func TestI02PostgreSQLOperationsRecoveryCaseIsFrozen(t *testing.T) {
 	}
 }
 
+func TestI03PostgreSQLHAPITRCaseIsFrozen(t *testing.T) {
+	c, err := LoadCase("../../reality/cases/I03-postgresql-ha-pitr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ValidateCase(c); len(got) != 0 {
+		t.Fatalf("expected valid I03 case, got violations: %#v", got)
+	}
+
+	requireStrings(t, c.Manifest.Pressures,
+		"physical_streaming_replication",
+		"primary_immediate_failure",
+		"standby_promotion",
+		"multi_host_runtime_reconnect",
+		"wal_archive",
+		"pitr_target_lsn",
+		"historical_deletion_resurrection",
+		"historical_token_resurrection",
+		"post_recovery_projection_rebuild",
+		"post_recovery_credential_governance",
+	)
+	for _, source := range c.Manifest.Sources {
+		data, err := os.ReadFile(filepath.Join("../../reality/cases/I03-postgresql-ha-pitr", source.FixturePath))
+		if err != nil {
+			t.Fatal(err)
+		}
+		lower := strings.ToLower(string(data))
+		for _, forbidden := range []string{"vmt_", "sk-", "password=", "postgresql://", "/users/", "/volumes/"} {
+			if strings.Contains(lower, forbidden) {
+				t.Fatalf("fixture %s contains forbidden value %q", source.FixturePath, forbidden)
+			}
+		}
+	}
+}
+
 func loadValidCase(t *testing.T) Case {
 	t.Helper()
 	c, err := LoadCase("../../reality/testdata/valid-public")

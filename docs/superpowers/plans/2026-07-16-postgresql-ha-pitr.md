@@ -39,7 +39,7 @@
 - Consumes: the version-1 reality case schema and `FreezeCase` fixture-lock contract.
 - Produces: a byte-frozen `I03-postgresql-ha-pitr` case with explicit HA, PITR, historical-state, and credential-governance pressures.
 
-- [ ] **Step 1: Write the failing I03 validation test**
+- [x] **Step 1: Write the failing I03 validation test**
 
 Append a test beside the I02 check:
 
@@ -79,7 +79,7 @@ func TestI03PostgreSQLHAPITRCaseIsFrozen(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 go test -count=1 ./internal/reality -run 'TestI03PostgreSQLHAPITRCaseIsFrozen' -v
@@ -87,7 +87,7 @@ go test -count=1 ./internal/reality -run 'TestI03PostgreSQLHAPITRCaseIsFrozen' -
 
 Expected: FAIL because `I03-postgresql-ha-pitr` does not exist.
 
-- [ ] **Step 3: Create the frozen case**
+- [x] **Step 3: Create the frozen case**
 
 The manifest must use:
 
@@ -117,7 +117,7 @@ The fixture and events must freeze the T0-T4 timeline from the design, require
 one transition failure with no receipt, and explicitly forbid treating a PITR
 target as automatically reconciled current state.
 
-- [ ] **Step 4: Freeze fixtures and register the hypothesis signal**
+- [x] **Step 4: Freeze fixtures and register the hypothesis signal**
 
 Run the existing freeze command:
 
@@ -129,7 +129,7 @@ go run ./cmd/vermory reality-freeze \
 Add I03 to the Experiment 0 `H-014` operations signal without changing other
 case counts or converting it to sealed evidence.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 ```bash
 go test -count=1 ./internal/reality
