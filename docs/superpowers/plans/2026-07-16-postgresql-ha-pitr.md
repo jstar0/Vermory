@@ -150,7 +150,7 @@ git commit -m "test: freeze PostgreSQL HA and PITR case"
 - Produces: `operationsprofile.Report`, `operationsprofile.Checkpoint`, `operationsprofile.WriteCheckpoint(root string, checkpoint Checkpoint) error`, `operationsprofile.WriteReport(root string, report Report) (ArtifactPaths, bool, error)`, and `operationsprofile.InventoryDigest(entries []ArchiveEntry) string`.
 - Consumes: only standard-library JSON, hashing, sorting, file, and time packages.
 
-- [ ] **Step 1: Write failing report and replay tests**
+- [x] **Step 1: Write failing report and replay tests**
 
 Use this public shape:
 
@@ -188,7 +188,7 @@ run ID, implementation revision, target LSN, failover duration, PITR duration,
 every failed attempt, hard-gate status, and the historical-state quarantine
 warning.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 go test -count=1 ./internal/operationsprofile -run 'TestWriteReport|TestInventoryDigest|TestValidateReport' -v
@@ -196,7 +196,7 @@ go test -count=1 ./internal/operationsprofile -run 'TestWriteReport|TestInventor
 
 Expected: FAIL because `internal/operationsprofile` does not exist.
 
-- [ ] **Step 3: Implement atomic deterministic report writing**
+- [x] **Step 3: Implement atomic deterministic report writing**
 
 `WriteReport` must write through a temporary file followed by `os.Rename`, sort
 map-derived output before Markdown generation, calculate a canonical request
@@ -223,7 +223,7 @@ authorization:
 Reject a report with a false hard gate. Preserve `Failures` even when a retry
 later succeeds.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 ```bash
 go test -count=1 ./internal/operationsprofile
