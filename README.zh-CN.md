@@ -71,6 +71,15 @@ multi-session RecallAll 为 `0.5620`。这是一份全量数据集检索诊断�
 分数，也不宣称 lexical 已经最优。详见
 [LongMemEval-S 全量检索实证](docs/evidence/2026-07-15-longmemeval-s-full-retrieval.md)。
 
+W15 随后把固定的 K10 ranking 交给真实 reader，完成 1000 条隔离任务：
+`grok-composer-2.5-fast` 负责回答，`grok-4.5` 使用固定 upstream prompt
+作为 custom judge。两组条件都完成 500/500，reader 和 judge 终态失败均为
+0。token-overlap 的 custom-judge accuracy 为 `0.7580`，Vermory lexical 为
+`0.6820`；paired outcomes 为 `310` 条都正确、`69` 条仅 plain 正确、`31`
+条仅 Vermory 正确、`90` 条都错误。该负结果被原样保留，不切换 lexical
+默认值，也不用于模型排名。详见
+[LongMemEval-S 全量 Reader QA 实证](docs/evidence/2026-07-15-longmemeval-s-full-reader-qa.md)。
+
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
 ## 快速开始
@@ -104,6 +113,22 @@ go run ./cmd/vermory benchmark-longmemeval-retrieval \
 
 只有 checkpoint 的 run、revision、dataset 和 record-set 全部一致时才使用
 `--resume`。
+
+取得固定 source、已资格化的 W14 retrieval JSONL 和隔离 provider command
+后，运行全量 reader QA：
+
+```bash
+go run ./cmd/vermory benchmark-longmemeval-qa \
+  --source-dataset /path/to/longmemeval_s_cleaned.json \
+  --retrieval-results /path/to/w14/retrieval-results.jsonl \
+  --implementation-revision "$(git rev-parse HEAD)" \
+  --run-id longmemeval-s-full-reader-qa \
+  --reader-command /path/to/isolated-grok-wrapper \
+  --judge-command /path/to/isolated-grok-wrapper
+```
+
+已提交结果使用 custom Grok judge，不是官方 GPT-4o judge。详见
+[LongMemEval-S 全量 Reader QA 实证](docs/evidence/2026-07-15-longmemeval-s-full-reader-qa.md)。
 
 验证冻结案例：
 

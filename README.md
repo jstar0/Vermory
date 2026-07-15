@@ -76,6 +76,15 @@ result is a full qualified-dataset retrieval diagnosis, not a QA score or a
 claim that lexical is optimal. See
 [LongMemEval-S Full Retrieval Evidence](docs/evidence/2026-07-15-longmemeval-s-full-retrieval.md).
 
+W15 then replayed the frozen K=10 rankings through 1,000 isolated real-reader
+tasks with `grok-composer-2.5-fast` and a custom upstream-prompt `grok-4.5`
+judge. Both conditions completed 500/500 tasks with zero terminal reader or
+judge failures. Plain token overlap scored `0.7580` custom-judge accuracy;
+Vermory lexical scored `0.6820`, with paired outcomes `310` both correct, `69`
+plain only, `31` Vermory only, and `90` neither. The regression is retained;
+the run does not change the lexical default or rank models. See
+[LongMemEval-S Full Reader QA Evidence](docs/evidence/2026-07-15-longmemeval-s-full-reader-qa.md).
+
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
 ## Architecture Direction
@@ -318,6 +327,22 @@ go run ./cmd/vermory benchmark-longmemeval-retrieval \
 
 Use `--resume` only with matching atomic checkpoints. See
 [LongMemEval-S Full Retrieval Evidence](docs/evidence/2026-07-15-longmemeval-s-full-retrieval.md).
+
+Run full reader QA only after obtaining the pinned source, the qualified W14
+retrieval JSONL, and isolated provider commands:
+
+```bash
+go run ./cmd/vermory benchmark-longmemeval-qa \
+  --source-dataset /path/to/longmemeval_s_cleaned.json \
+  --retrieval-results /path/to/w14/retrieval-results.jsonl \
+  --implementation-revision "$(git rev-parse HEAD)" \
+  --run-id longmemeval-s-full-reader-qa \
+  --reader-command /path/to/isolated-grok-wrapper \
+  --judge-command /path/to/isolated-grok-wrapper
+```
+
+The committed result uses a custom Grok judge, not the official GPT-4o judge.
+See [LongMemEval-S Full Reader QA Evidence](docs/evidence/2026-07-15-longmemeval-s-full-reader-qa.md).
 
 ## OpenClaw Integration
 

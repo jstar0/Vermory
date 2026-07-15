@@ -110,7 +110,7 @@ Benchmark coverage reports write:
 - `benchmark-coverage/<run-id>/report.json`
 - `benchmark-coverage/<run-id>/report.md`
 
-The benchmark coverage runner validates that all named public benchmarks are at least `translated_task`, at least 4 reach `executable_evaluation`, and executable benchmarks name concrete case ids. It reports translated proxies, design mappings, and registered original executions as separate counters. Every original evidence path must load a valid execution manifest and qualification; a path string alone is rejected. The current map covers 11 public benchmarks, 8 executable translated evaluations, 3 design mappings, and 2 qualified original-data executions: one oracle QA sample and one full LongMemEval-S retrieval run.
+The benchmark coverage runner validates that all named public benchmarks are at least `translated_task`, at least 4 reach `executable_evaluation`, and executable benchmarks name concrete case ids. It reports translated proxies, design mappings, and registered original executions as separate counters. Every original evidence path must load a valid execution manifest and qualification; a path string alone is rejected. The current map covers 11 public benchmarks, 8 executable translated evaluations, 3 design mappings, and 3 qualified original-data executions: one oracle QA sample, one full LongMemEval-S retrieval run, and one full LongMemEval-S reader QA run with a custom judge.
 
 Internal Ready reports write:
 
@@ -168,6 +168,7 @@ go run ./cmd/vermory benchmark-coverage \
 - Internal Ready mock chain: completed
 - LongMemEval original oracle sample with Grok: completed as `dataset_sample`
 - LongMemEval-S full retrieval: completed as `qualified_dataset_full`
+- LongMemEval-S full reader QA with Grok: completed as `qualified_dataset_full`
 - Explicit source revision runtime with Grok MCP: completed
 - Governed source conflict candidate runtime with Grok MCP: completed
 - Provider-assisted unkeyed source target matching with Grok MCP: completed
@@ -185,6 +186,7 @@ go run ./cmd/vermory benchmark-coverage \
 - Internal Ready smoke run ID: `internal-ready-smoke`
 - LongMemEval original sample run ID: `longmemeval-original-sample-grok-20260714-attempt-6`
 - LongMemEval-S full retrieval run ID: `longmemeval-s-full-retrieval-20260715-v1`
+- LongMemEval-S full reader QA run ID: `longmemeval-s-full-reader-qa-grok-20260715-v3`
 - Source revision Grok session: `955B4CA6-68EB-4D0E-9CB4-96BE91AC1776`
 - Source candidate Grok session: `019f5f3c-d836-7d80-a8de-995dcde29ef8`
 - Source candidate stale-probe session: `019f5f3e-4b7f-7510-8cda-a26e0ba89725`
@@ -491,6 +493,31 @@ available by K10, but the older session ranked sixth and remained a separate
 source memory. The run had zero runtime failures, 23,867 distinct operation
 IDs, and a byte-stable score/failure result after idempotent resume. See
 [the W14 evidence](evidence/2026-07-15-longmemeval-s-full-retrieval.md).
+
+## LongMemEval-S Full Reader QA
+
+W15 replayed the frozen W14 K=10 rankings through 1,000 isolated real-reader
+tasks: 500 `plain_token_overlap_k10` and 500 `vermory_lexical_k10`. The reader
+was `grok-composer-2.5-fast`; the custom judge was `grok-4.5` using the pinned
+upstream prompt branches. Both ran with no memory, web search, plans,
+subagents, or advertised tools under one-shot `KeepAlive=false` LaunchAgents.
+
+| Condition | Completed | Judge correct | Accuracy | Exact | Mean token F1 | Mean answer recall |
+|---|---:|---:|---:|---:|---:|---:|
+| token overlap K10 | `500` | `379` | `0.7580` | `252` | `0.5906` | `0.7060` |
+| Vermory lexical K10 | `500` | `341` | `0.6820` | `226` | `0.5328` | `0.6557` |
+
+Paired outcomes were `310` both correct, `69` plain only, `31` Vermory only,
+`90` neither, and `0` incomplete. The result retains the current lexical
+regression rather than tuning on the evaluated labels. Reader runtime failures,
+terminal judge failures, cross-condition incompleteness, and tool-call fields
+were all zero. Two judge attempts were retried: one fixed 120-second timeout
+and one strict rejection of Markdown-wrapped `**yes**`.
+
+This is a qualified public full-dataset reader QA execution with a custom Grok
+judge. It is not official GPT-4o LongMemEval accuracy, not a model ranking, and
+not withheld or externally sealed evidence. See
+[the W15 evidence](evidence/2026-07-15-longmemeval-s-full-reader-qa.md).
 
 ## Duojie Core Matrix Findings
 

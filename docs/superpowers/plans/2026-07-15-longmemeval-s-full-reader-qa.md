@@ -598,7 +598,7 @@ git commit -m "feat: add full LongMemEval QA command"
 - Consumes: isolated current Grok login material outside Git, pinned source, pinned W14 raw retrieval JSONL, and the W15 release binary.
 - Produces: full reader and custom-judge runtime artifacts plus normalized committed evidence.
 
-- [ ] **Step 1: Build the exact release binary**
+- [x] **Step 1: Build the exact release binary**
 
 ```bash
 full_head_sha="$(git rev-parse HEAD)"
@@ -611,7 +611,7 @@ CGO_ENABLED=0 go build -trimpath \
 Record `go version -m`, binary SHA-256, full implementation revision, OS,
 architecture, Go version, Grok version, and model list.
 
-- [ ] **Step 2: Create and verify isolated Grok state**
+- [x] **Step 2: Create and verify isolated Grok state**
 
 Create mode-`0700` temporary HOME/GROK_HOME, copy only current `auth.json` and
 `agent_id` with mode `0600`, and create an operator-owned wrapper outside Git.
@@ -623,7 +623,7 @@ LaunchAgent plists with `RunAtLoad=true`, `KeepAlive=false`, an explicit
 markers, and post-run proof that `runs=1`. Do not use foreground PTYs, `nohup`,
 `screen`, or `launchctl submit` as the formal execution transport.
 
-- [ ] **Step 3: Run reader phase with bounded concurrency**
+- [x] **Step 3: Run reader phase with bounded concurrency**
 
 Use formal run ID:
 
@@ -645,13 +645,13 @@ formal `v3` artifact root. Before starting `v3`, require one-shot LaunchAgent
 debug probes for both formal models to report `runs=1`, exit zero,
 `tool_count=0`, no tool call, one turn, and `EndTurn`.
 
-- [ ] **Step 4: Run custom judge and finalize**
+- [x] **Step 4: Run custom judge and finalize**
 
 Use the same isolated wrapper with `grok-4.5`. Require one terminal judge state
 for every completed reader response, then finalize all artifacts. Preserve all
 invalid labels and exhausted attempts.
 
-- [ ] **Step 5: Prove resume**
+- [x] **Step 5: Prove resume**
 
 Run `--phase all --resume` against the same artifact root. Require:
 
@@ -665,14 +665,14 @@ unchanged scores hash
 unchanged failure-ledger hash
 ```
 
-- [ ] **Step 6: Normalize evidence without hiding failures**
+- [x] **Step 6: Normalize evidence without hiding failures**
 
 Commit aggregate scores, complete failure categories, provider/model identity,
 usage totals, source/W14 hashes, known six-record attribution, exact commands
 with secrets omitted, and explicit non-claims. Do not commit full source
 sessions, copied auth, raw prompt contexts, or provider session files.
 
-- [ ] **Step 7: Commit formal evidence**
+- [x] **Step 7: Commit formal evidence**
 
 ```bash
 git add docs/evidence casebook/benchmarks docs/evaluation-matrix.md README.md README.zh-CN.md
