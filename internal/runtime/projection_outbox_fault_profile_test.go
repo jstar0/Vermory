@@ -377,7 +377,10 @@ func productionRetrievalProfile(t *testing.T) RetrievalProfile {
 	if !ok {
 		t.Fatal("production retrieval profile is not registered")
 	}
-	return RetrievalProfile{ID: spec.ID, BaseURL: spec.BaseURL, Model: spec.Model, Dimensions: spec.Dimensions}
+	return RetrievalProfile{
+		ID: spec.ID, BaseURL: spec.BaseURL, Model: spec.Model,
+		Dimensions: spec.Dimensions, ProjectionClass: spec.ProjectionClass,
+	}
 }
 
 func runProjectionUntilCurrent(t *testing.T, worker *ProjectionWorker) {

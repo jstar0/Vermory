@@ -10,27 +10,40 @@ import (
 )
 
 const (
-	ProductionRetrievalProfileID = "siliconflow-bge-m3-1024-v1"
-	MigrationRetrievalProfileID  = "siliconflow-bge-large-zh-1024-v2"
+	ProductionRetrievalProfileID           = "siliconflow-bge-m3-1024-v1"
+	MigrationRetrievalProfileID            = "siliconflow-bge-large-zh-1024-v2"
+	DimensionalMigrationRetrievalProfileID = "siliconflow-bge-small-zh-512-v3"
+)
+
+type ProjectionClass string
+
+const (
+	ProjectionClass1024 ProjectionClass = "vector_1024"
+	ProjectionClass512  ProjectionClass = "vector_512"
 )
 
 type RetrievalProfileSpec struct {
-	ID         string
-	BaseURL    string
-	Model      string
-	Dimensions int
-	Status     string
+	ID              string
+	BaseURL         string
+	Model           string
+	Dimensions      int
+	ProjectionClass ProjectionClass
+	Status          string
 }
 
 func SupportedRetrievalProfile(id string) (RetrievalProfileSpec, bool) {
 	specs := map[string]RetrievalProfileSpec{
 		ProductionRetrievalProfileID: {
 			ID: ProductionRetrievalProfileID, BaseURL: "https://api.siliconflow.cn/v1",
-			Model: "BAAI/bge-m3", Dimensions: 1024, Status: "active",
+			Model: "BAAI/bge-m3", Dimensions: 1024, ProjectionClass: ProjectionClass1024, Status: "active",
 		},
 		MigrationRetrievalProfileID: {
 			ID: MigrationRetrievalProfileID, BaseURL: "https://api.siliconflow.cn/v1",
-			Model: "BAAI/bge-large-zh-v1.5", Dimensions: 1024, Status: "candidate",
+			Model: "BAAI/bge-large-zh-v1.5", Dimensions: 1024, ProjectionClass: ProjectionClass1024, Status: "candidate",
+		},
+		DimensionalMigrationRetrievalProfileID: {
+			ID: DimensionalMigrationRetrievalProfileID, BaseURL: "https://api.siliconflow.cn/v1",
+			Model: "BAAI/bge-small-zh-v1.5", Dimensions: 512, ProjectionClass: ProjectionClass512, Status: "candidate",
 		},
 	}
 	spec, ok := specs[strings.TrimSpace(id)]
@@ -120,10 +133,11 @@ type MemoryRetriever interface {
 }
 
 type RetrievalProfile struct {
-	ID         string
-	BaseURL    string
-	Model      string
-	Dimensions int
+	ID              string
+	BaseURL         string
+	Model           string
+	Dimensions      int
+	ProjectionClass ProjectionClass
 }
 
 func (p RetrievalProfile) Validate() error {
@@ -144,6 +158,9 @@ func (p RetrievalProfile) Validate() error {
 	}
 	if p.Dimensions != spec.Dimensions {
 		return fmt.Errorf("embedding dimensions must be %d", spec.Dimensions)
+	}
+	if p.ProjectionClass != spec.ProjectionClass {
+		return fmt.Errorf("retrieval projection class must be %s", spec.ProjectionClass)
 	}
 	return nil
 }

@@ -9,10 +9,11 @@ import (
 
 func TestProductionRetrievalProfileIsFrozen(t *testing.T) {
 	valid := RetrievalProfile{
-		ID:         ProductionRetrievalProfileID,
-		BaseURL:    "https://api.siliconflow.cn/v1",
-		Model:      "BAAI/bge-m3",
-		Dimensions: 1024,
+		ID:              ProductionRetrievalProfileID,
+		BaseURL:         "https://api.siliconflow.cn/v1",
+		Model:           "BAAI/bge-m3",
+		Dimensions:      1024,
+		ProjectionClass: ProjectionClass1024,
 	}
 	if err := valid.Validate(); err != nil {
 		t.Fatal(err)
@@ -23,6 +24,7 @@ func TestProductionRetrievalProfileIsFrozen(t *testing.T) {
 		"credentials": func(profile *RetrievalProfile) { profile.BaseURL = "https://user:secret@example.com/v1" },
 		"model":       func(profile *RetrievalProfile) { profile.Model = "other" },
 		"dimensions":  func(profile *RetrievalProfile) { profile.Dimensions = 768 },
+		"class":       func(profile *RetrievalProfile) { profile.ProjectionClass = ProjectionClass512 },
 	} {
 		t.Run(name, func(t *testing.T) {
 			profile := valid

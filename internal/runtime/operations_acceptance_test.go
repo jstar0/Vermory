@@ -50,8 +50,8 @@ func TestOperationsRecovery(t *testing.T) {
 		if err := admin.pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&schemaVersion); err != nil {
 			t.Fatal(err)
 		}
-		if schemaVersion != 15 {
-			t.Fatalf("expected schema version 15 after replay, got %d", schemaVersion)
+		if schemaVersion != 16 {
+			t.Fatalf("expected schema version 16 after replay, got %d", schemaVersion)
 		}
 
 		continuityID, activeContent, staleContent, deletedContent := seedOperationsProjection(t, admin.pool)
@@ -205,12 +205,12 @@ func TestOperationsRecovery(t *testing.T) {
 		if err := pool.QueryRow(context.Background(), `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&schemaVersion); err != nil {
 			t.Fatal(err)
 		}
-		if schemaVersion != 15 {
+		if schemaVersion != 16 {
 			t.Fatalf("release migration reached schema %d", schemaVersion)
 		}
 	})
 
-	t.Run("schema 15 retrieval dump restore and disposable rebuild", func(t *testing.T) {
+	t.Run("schema 16 retrieval dump restore and disposable rebuild", func(t *testing.T) {
 		testProductionRetrievalDumpRestore(t, databaseURL)
 	})
 }
@@ -251,10 +251,11 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 		t.Fatal(err)
 	}
 	coordinator, err := NewRetrievalCoordinator(source, embedder, RetrievalProfile{
-		ID:         ProductionRetrievalProfileID,
-		BaseURL:    "https://api.siliconflow.cn/v1",
-		Model:      "BAAI/bge-m3",
-		Dimensions: 1024,
+		ID:              ProductionRetrievalProfileID,
+		BaseURL:         "https://api.siliconflow.cn/v1",
+		Model:           "BAAI/bge-m3",
+		Dimensions:      1024,
+		ProjectionClass: ProjectionClass1024,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -281,11 +282,11 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 	pgRestore := postgresTestTool(t, "pg_restore")
 	dump := exec.Command(pgDump, "--format=custom", "--file", dumpPath, sourceURL)
 	if output, err := dump.CombinedOutput(); err != nil {
-		t.Fatalf("dump schema 15 retrieval database: %v\n%s", err, output)
+		t.Fatalf("dump schema 16 retrieval database: %v\n%s", err, output)
 	}
 	restore := exec.Command(pgRestore, "--no-owner", "--dbname", targetURL, dumpPath)
 	if output, err := restore.CombinedOutput(); err != nil {
-		t.Fatalf("restore schema 15 retrieval database: %v\n%s", err, output)
+		t.Fatalf("restore schema 16 retrieval database: %v\n%s", err, output)
 	}
 
 	target, err := OpenStore(ctx, targetURL)
@@ -297,7 +298,7 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version != 15 {
+	if version != 16 {
 		t.Fatalf("restored schema version=%d", version)
 	}
 	if targetCounts := operationsRetrievalCounts(t, target.pool); !reflect.DeepEqual(targetCounts, sourceCounts) {
@@ -308,10 +309,11 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 	}
 
 	targetCoordinator, err := NewRetrievalCoordinator(target, embedder, RetrievalProfile{
-		ID:         ProductionRetrievalProfileID,
-		BaseURL:    "https://api.siliconflow.cn/v1",
-		Model:      "BAAI/bge-m3",
-		Dimensions: 1024,
+		ID:              ProductionRetrievalProfileID,
+		BaseURL:         "https://api.siliconflow.cn/v1",
+		Model:           "BAAI/bge-m3",
+		Dimensions:      1024,
+		ProjectionClass: ProjectionClass1024,
 	})
 	if err != nil {
 		t.Fatal(err)

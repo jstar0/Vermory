@@ -301,10 +301,11 @@ func TestProjectionWorkerRunStopsOnCancellation(t *testing.T) {
 	worker, err := NewProjectionWorker(store, &projectionTestEmbedder{vector: testVector1024(0.1)}, ProjectionWorkerOptions{
 		TenantID: tenantID,
 		Profile: RetrievalProfile{
-			ID:         ProductionRetrievalProfileID,
-			BaseURL:    "https://api.siliconflow.cn/v1",
-			Model:      "BAAI/bge-m3",
-			Dimensions: 1024,
+			ID:              ProductionRetrievalProfileID,
+			BaseURL:         "https://api.siliconflow.cn/v1",
+			Model:           "BAAI/bge-m3",
+			Dimensions:      1024,
+			ProjectionClass: ProjectionClass1024,
 		},
 		BatchSize:    8,
 		PollInterval: time.Hour,
@@ -437,10 +438,11 @@ func TestCandidateProfileLateEmbeddingCannotRestoreDeletedMemory(t *testing.T) {
 	worker, err := NewProjectionWorker(store, blocking, ProjectionWorkerOptions{
 		TenantID: tenantID,
 		Profile: RetrievalProfile{
-			ID:         MigrationRetrievalProfileID,
-			BaseURL:    "https://api.siliconflow.cn/v1",
-			Model:      "BAAI/bge-large-zh-v1.5",
-			Dimensions: 1024,
+			ID:              MigrationRetrievalProfileID,
+			BaseURL:         "https://api.siliconflow.cn/v1",
+			Model:           "BAAI/bge-large-zh-v1.5",
+			Dimensions:      1024,
+			ProjectionClass: ProjectionClass1024,
 		},
 		BatchSize: 8,
 	})
@@ -473,10 +475,11 @@ func TestCandidateProfileLateEmbeddingCannotRestoreDeletedMemory(t *testing.T) {
 	retry, err := NewProjectionWorker(store, &projectionTestEmbedder{vector: testVector1024(0.1)}, ProjectionWorkerOptions{
 		TenantID: tenantID,
 		Profile: RetrievalProfile{
-			ID:         MigrationRetrievalProfileID,
-			BaseURL:    "https://api.siliconflow.cn/v1",
-			Model:      "BAAI/bge-large-zh-v1.5",
-			Dimensions: 1024,
+			ID:              MigrationRetrievalProfileID,
+			BaseURL:         "https://api.siliconflow.cn/v1",
+			Model:           "BAAI/bge-large-zh-v1.5",
+			Dimensions:      1024,
+			ProjectionClass: ProjectionClass1024,
 		},
 		BatchSize: 8,
 	})
@@ -546,10 +549,11 @@ func mustProjectionWorker(t *testing.T, store *Store, embedder Embedder, tenantI
 	worker, err := NewProjectionWorker(store, embedder, ProjectionWorkerOptions{
 		TenantID: tenantID,
 		Profile: RetrievalProfile{
-			ID:         ProductionRetrievalProfileID,
-			BaseURL:    "https://api.siliconflow.cn/v1",
-			Model:      "BAAI/bge-m3",
-			Dimensions: 1024,
+			ID:              ProductionRetrievalProfileID,
+			BaseURL:         "https://api.siliconflow.cn/v1",
+			Model:           "BAAI/bge-m3",
+			Dimensions:      1024,
+			ProjectionClass: ProjectionClass1024,
 		},
 		BatchSize:    batchSize,
 		PollInterval: time.Millisecond,

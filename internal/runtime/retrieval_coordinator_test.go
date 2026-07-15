@@ -458,10 +458,11 @@ func TestRetrievalCoordinatorRecomputesLinkedConversationAuthorization(t *testin
 func mustRetrievalCoordinator(t *testing.T, store *Store, embedder Embedder) *RetrievalCoordinator {
 	t.Helper()
 	coordinator, err := NewRetrievalCoordinator(store, embedder, RetrievalProfile{
-		ID:         ProductionRetrievalProfileID,
-		BaseURL:    "https://api.siliconflow.cn/v1",
-		Model:      "BAAI/bge-m3",
-		Dimensions: 1024,
+		ID:              ProductionRetrievalProfileID,
+		BaseURL:         "https://api.siliconflow.cn/v1",
+		Model:           "BAAI/bge-m3",
+		Dimensions:      1024,
+		ProjectionClass: ProjectionClass1024,
 	})
 	if err != nil {
 		t.Fatal(err)

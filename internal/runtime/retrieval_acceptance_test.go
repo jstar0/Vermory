@@ -481,10 +481,11 @@ func (retriever productionModeRetriever) Retrieve(ctx context.Context, request r
 
 func retrievalProfile(manifest productionRetrievalCase) runtime.RetrievalProfile {
 	return runtime.RetrievalProfile{
-		ID:         manifest.Profile.ID,
-		BaseURL:    manifest.Profile.BaseURL,
-		Model:      manifest.Profile.Model,
-		Dimensions: manifest.Profile.Dimensions,
+		ID:              manifest.Profile.ID,
+		BaseURL:         manifest.Profile.BaseURL,
+		Model:           manifest.Profile.Model,
+		Dimensions:      manifest.Profile.Dimensions,
+		ProjectionClass: runtime.ProjectionClass1024,
 	}
 }
 

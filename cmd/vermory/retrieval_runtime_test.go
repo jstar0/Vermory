@@ -89,10 +89,11 @@ func TestRetrievalStatusAndRebuildCommandsUseTenantScopedJSON(t *testing.T) {
 	worker, err := runtime.NewProjectionWorker(store, commandTestEmbedder{}, runtime.ProjectionWorkerOptions{
 		TenantID: tenantID,
 		Profile: runtime.RetrievalProfile{
-			ID:         runtime.ProductionRetrievalProfileID,
-			BaseURL:    "https://api.siliconflow.cn/v1",
-			Model:      "BAAI/bge-m3",
-			Dimensions: 1024,
+			ID:              runtime.ProductionRetrievalProfileID,
+			BaseURL:         "https://api.siliconflow.cn/v1",
+			Model:           "BAAI/bge-m3",
+			Dimensions:      1024,
+			ProjectionClass: runtime.ProjectionClass1024,
 		},
 		BatchSize: 8,
 	})

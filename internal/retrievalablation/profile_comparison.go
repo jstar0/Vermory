@@ -249,7 +249,10 @@ func runOneProfileComparison(
 	spec runtime.RetrievalProfileSpec,
 	embedder *profileCountingEmbedder,
 ) (ProfileComparisonReport, error) {
-	profile := runtime.RetrievalProfile{ID: spec.ID, BaseURL: spec.BaseURL, Model: spec.Model, Dimensions: spec.Dimensions}
+	profile := runtime.RetrievalProfile{
+		ID: spec.ID, BaseURL: spec.BaseURL, Model: spec.Model,
+		Dimensions: spec.Dimensions, ProjectionClass: spec.ProjectionClass,
+	}
 	buildDuration, vectorCount, lag, err := buildProfileProjection(ctx, store, seeded, profile, embedder)
 	if err != nil {
 		return ProfileComparisonReport{}, fmt.Errorf("build profile %q: %w", spec.ID, err)

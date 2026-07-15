@@ -37,11 +37,17 @@ func defaultRetrievalRuntimeOptions() retrievalRuntimeOptions {
 }
 
 func (options retrievalRuntimeOptions) profile() runtime.RetrievalProfile {
+	profileID := strings.TrimSpace(options.ProfileID)
+	var projectionClass runtime.ProjectionClass
+	if spec, ok := runtime.SupportedRetrievalProfile(profileID); ok {
+		projectionClass = spec.ProjectionClass
+	}
 	return runtime.RetrievalProfile{
-		ID:         strings.TrimSpace(options.ProfileID),
-		BaseURL:    strings.TrimSpace(options.EmbeddingBaseURL),
-		Model:      strings.TrimSpace(options.EmbeddingModel),
-		Dimensions: options.EmbeddingDimensions,
+		ID:              profileID,
+		BaseURL:         strings.TrimSpace(options.EmbeddingBaseURL),
+		Model:           strings.TrimSpace(options.EmbeddingModel),
+		Dimensions:      options.EmbeddingDimensions,
+		ProjectionClass: projectionClass,
 	}
 }
 

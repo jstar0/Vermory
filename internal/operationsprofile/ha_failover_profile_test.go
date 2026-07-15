@@ -104,8 +104,8 @@ func runHAFailoverPhase(t *testing.T, harness *clusterHarness, report *Report) t
 	}
 	if version, err := adminStore.SchemaVersion(ctx); err != nil {
 		t.Fatal(err)
-	} else if version != 15 {
-		t.Fatalf("dedicated primary reached schema %d, want 15", version)
+	} else if version != 16 {
+		t.Fatalf("dedicated primary reached schema %d, want 16", version)
 	}
 	adminPool, err := pgxpool.New(ctx, adminURL)
 	if err != nil {
@@ -151,7 +151,7 @@ func runHAFailoverPhase(t *testing.T, harness *clusterHarness, report *Report) t
 	report.Topology.StandbySystemID = standbySystemID
 	report.Topology.SameHost = true
 	writeProfileCheckpoint(t, harness.Config.Root, *report, "cluster_initialized", map[string]string{
-		"schema_version":    "15",
+		"schema_version":    "16",
 		"primary_system_id": primarySystemID,
 		"standby_system_id": standbySystemID,
 	})

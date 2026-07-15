@@ -124,8 +124,8 @@ WHERE conrelid IN (
 	if err := store.pool.QueryRow(ctx, `SELECT count(*) FROM memory_retrieval_profiles`).Scan(&profileCount); err != nil {
 		t.Fatal(err)
 	}
-	if profileCount != 2 {
-		t.Fatalf("retrieval profile registry count=%d, want 2", profileCount)
+	if profileCount != 3 {
+		t.Fatalf("retrieval profile registry count=%d, want 3", profileCount)
 	}
 	var candidateModel string
 	if err := store.pool.QueryRow(ctx, `
@@ -135,6 +135,19 @@ WHERE profile_id = $1 AND lifecycle_status = 'candidate'`, MigrationRetrievalPro
 	}
 	if candidateModel != "BAAI/bge-large-zh-v1.5" {
 		t.Fatalf("unexpected migration profile model %q", candidateModel)
+	}
+	var dimensionalModel, dimensionalClass string
+	var dimensionalDimensions int
+	if err := store.pool.QueryRow(ctx, `
+SELECT model, dimensions, projection_class
+FROM memory_retrieval_profiles
+WHERE profile_id = $1 AND lifecycle_status = 'candidate'`,
+		DimensionalMigrationRetrievalProfileID,
+	).Scan(&dimensionalModel, &dimensionalDimensions, &dimensionalClass); err != nil {
+		t.Fatal(err)
+	}
+	if dimensionalModel != "BAAI/bge-small-zh-v1.5" || dimensionalDimensions != 512 || dimensionalClass != "vector_512" {
+		t.Fatalf("unexpected dimensional profile %q/%d/%q", dimensionalModel, dimensionalDimensions, dimensionalClass)
 	}
 
 	var triggerCount, hnswCount int
@@ -236,7 +249,7 @@ func TestProductionRetrievalMigrationSeedsExistingGovernedMemory(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		if err := goose.UpToContext(context.Background(), db, "migrations", 14); err != nil {
-			t.Errorf("restore schema 15: %v", err)
+			t.Errorf("restore schema 16: %v", err)
 		}
 	})
 

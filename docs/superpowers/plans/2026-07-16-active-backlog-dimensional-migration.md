@@ -54,7 +54,7 @@ release tooling.
 - Produces: `dimensionalMigrationCase`, `loadDimensionalMigrationCase`, and
   failing database assertions for migration 16.
 
-- [ ] **Step 1: Add the frozen case manifest and README.**
+- [x] **Step 1: Add the frozen case manifest and README.**
 
 The manifest must encode:
 
@@ -115,7 +115,7 @@ The manifest must encode:
 }
 ```
 
-- [ ] **Step 2: Add case-identity and arithmetic tests.**
+- [x] **Step 2: Add case-identity and arithmetic tests.**
 
 Require exact identity, hardware profile, profile IDs, 20,000 initial facts,
 5,000 tail events, 320 queries, 12 hard gates, and this arithmetic:
@@ -128,7 +128,7 @@ finalActive := initial - manifest.DeleteCount + manifest.NewFactCount
 
 Assert `initial == 20000`, `tail == 5000`, and `finalActive == 20000`.
 
-- [ ] **Step 3: Add failing migration-16 assertions.**
+- [x] **Step 3: Add failing migration-16 assertions.**
 
 The test must migrate a fresh database and require:
 
@@ -152,7 +152,7 @@ Also assert PostgreSQL rejects a 1024-dimensional literal inserted into the
 512 table and rejects the 512 profile ID in the 1024 table through the profile
 class constraint introduced by migration 16.
 
-- [ ] **Step 4: Run the focused tests and observe RED.**
+- [x] **Step 4: Run the focused tests and observe RED.**
 
 Run:
 
@@ -181,7 +181,7 @@ the 512 table, and the candidate profile do not exist.
 - Produces: `ProjectionClass`, `ProjectionClass1024`, `ProjectionClass512`,
   `DimensionalMigrationRetrievalProfileID`, and migration 16.
 
-- [ ] **Step 1: Add failing profile-validation tests.**
+- [x] **Step 1: Add failing profile-validation tests.**
 
 Require:
 
@@ -197,7 +197,7 @@ Reject a candidate with the wrong base URL, model, dimensions, projection
 class, or profile ID. Require both existing profiles to report
 `ProjectionClass1024`.
 
-- [ ] **Step 2: Run the profile tests and observe RED.**
+- [x] **Step 2: Run the profile tests and observe RED.**
 
 Run:
 
@@ -208,7 +208,7 @@ go test -count=1 ./internal/runtime \
 
 Expected: compile failure because the new constants and field do not exist.
 
-- [ ] **Step 3: Implement the closed projection-class type.**
+- [x] **Step 3: Implement the closed projection-class type.**
 
 Add:
 
@@ -225,7 +225,7 @@ Add `ProjectionClass ProjectionClass` to both profile structs. Keep the
 supported-profile map compile-time and immutable. Validation compares the
 entire tuple to the supported spec.
 
-- [ ] **Step 4: Implement migration 16.**
+- [x] **Step 4: Implement migration 16.**
 
 The Up migration must:
 
@@ -244,7 +244,7 @@ both typed tables can reference the immutable class. The Down migration must
 remove only candidate audit/cursor/projection rows and the candidate registry
 row before restoring schema 15.
 
-- [ ] **Step 5: Run migration Up, Down, and profile tests.**
+- [x] **Step 5: Run migration Up, Down, and profile tests.**
 
 Run:
 
@@ -256,7 +256,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 
 Expected: PASS, including wrong-dimension and wrong-class database rejection.
 
-- [ ] **Step 6: Commit the frozen schema boundary.**
+- [x] **Step 6: Commit the frozen schema boundary.**
 
 ```bash
 git add runtime/cases/W17-active-backlog-dimensional-migration \

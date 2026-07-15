@@ -31,11 +31,60 @@ func TestRetrievalProfileSpecsKeepProductionAndMigrationProfilesDistinct(t *test
 	if production.Status != "active" || migration.Status != "candidate" {
 		t.Fatalf("unexpected profile lifecycle: production=%#v migration=%#v", production, migration)
 	}
-	if err := (RetrievalProfile{ID: MigrationRetrievalProfileID, BaseURL: migration.BaseURL, Model: migration.Model, Dimensions: migration.Dimensions}).Validate(); err != nil {
+	if err := (RetrievalProfile{
+		ID: MigrationRetrievalProfileID, BaseURL: migration.BaseURL, Model: migration.Model,
+		Dimensions: migration.Dimensions, ProjectionClass: migration.ProjectionClass,
+	}).Validate(); err != nil {
 		t.Fatal(err)
 	}
 	if IsSupportedRetrievalProfileID("unknown-profile") {
 		t.Fatal("unknown retrieval profile was accepted")
+	}
+}
+
+func TestDimensionalMigrationProfileSpecIsFrozen(t *testing.T) {
+	production, ok := SupportedRetrievalProfile(ProductionRetrievalProfileID)
+	if !ok {
+		t.Fatal("production retrieval profile is not registered")
+	}
+	existingCandidate, ok := SupportedRetrievalProfile(MigrationRetrievalProfileID)
+	if !ok {
+		t.Fatal("existing migration retrieval profile is not registered")
+	}
+	candidate, ok := SupportedRetrievalProfile(DimensionalMigrationRetrievalProfileID)
+	if !ok {
+		t.Fatal("dimensional migration retrieval profile is not registered")
+	}
+	if production.ProjectionClass != ProjectionClass1024 || existingCandidate.ProjectionClass != ProjectionClass1024 {
+		t.Fatalf("existing profiles left the 1024 class: production=%#v candidate=%#v", production, existingCandidate)
+	}
+	if candidate.ID != "siliconflow-bge-small-zh-512-v3" ||
+		candidate.BaseURL != "https://api.siliconflow.cn/v1" ||
+		candidate.Model != "BAAI/bge-small-zh-v1.5" ||
+		candidate.Dimensions != 512 || candidate.ProjectionClass != ProjectionClass512 ||
+		candidate.Status != "candidate" {
+		t.Fatalf("unexpected dimensional candidate: %#v", candidate)
+	}
+	valid := RetrievalProfile{
+		ID: candidate.ID, BaseURL: candidate.BaseURL, Model: candidate.Model,
+		Dimensions: candidate.Dimensions, ProjectionClass: candidate.ProjectionClass,
+	}
+	if err := valid.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(*RetrievalProfile){
+		"base URL":         func(profile *RetrievalProfile) { profile.BaseURL = "https://example.com/v1" },
+		"model":            func(profile *RetrievalProfile) { profile.Model = "other" },
+		"dimensions":       func(profile *RetrievalProfile) { profile.Dimensions = 1024 },
+		"projection class": func(profile *RetrievalProfile) { profile.ProjectionClass = ProjectionClass1024 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			profile := valid
+			mutate(&profile)
+			if err := profile.Validate(); err == nil {
+				t.Fatalf("invalid dimensional profile was accepted: %#v", profile)
+			}
+		})
 	}
 }
 
@@ -83,8 +132,11 @@ func TestLiveRetrievalProfileMigrationPreservesProductionProjection(t *testing.T
 			t.Fatal(err)
 		}
 		worker, err := NewProjectionWorker(store, productionCounter, ProjectionWorkerOptions{
-			TenantID:  tenantID,
-			Profile:   RetrievalProfile{ID: productionSpec.ID, BaseURL: productionSpec.BaseURL, Model: productionSpec.Model, Dimensions: productionSpec.Dimensions},
+			TenantID: tenantID,
+			Profile: RetrievalProfile{
+				ID: productionSpec.ID, BaseURL: productionSpec.BaseURL, Model: productionSpec.Model,
+				Dimensions: productionSpec.Dimensions, ProjectionClass: productionSpec.ProjectionClass,
+			},
 			BatchSize: 256,
 		})
 		if err != nil {
@@ -105,8 +157,11 @@ func TestLiveRetrievalProfileMigrationPreservesProductionProjection(t *testing.T
 
 	for _, tenantID := range tenantIDs {
 		worker, err := NewProjectionWorker(store, migrationCounter, ProjectionWorkerOptions{
-			TenantID:  tenantID,
-			Profile:   RetrievalProfile{ID: migrationSpec.ID, BaseURL: migrationSpec.BaseURL, Model: migrationSpec.Model, Dimensions: migrationSpec.Dimensions},
+			TenantID: tenantID,
+			Profile: RetrievalProfile{
+				ID: migrationSpec.ID, BaseURL: migrationSpec.BaseURL, Model: migrationSpec.Model,
+				Dimensions: migrationSpec.Dimensions, ProjectionClass: migrationSpec.ProjectionClass,
+			},
 			BatchSize: 256,
 		})
 		if err != nil {
@@ -135,13 +190,15 @@ FROM memory_vector_documents`, productionSpec.ID, migrationSpec.ID).Scan(&produc
 	}
 	query := "production release command"
 	productionCoordinator, err := NewRetrievalCoordinator(store, productionCounter, RetrievalProfile{
-		ID: productionSpec.ID, BaseURL: productionSpec.BaseURL, Model: productionSpec.Model, Dimensions: productionSpec.Dimensions,
+		ID: productionSpec.ID, BaseURL: productionSpec.BaseURL, Model: productionSpec.Model,
+		Dimensions: productionSpec.Dimensions, ProjectionClass: productionSpec.ProjectionClass,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	migrationCoordinator, err := NewRetrievalCoordinator(store, migrationCounter, RetrievalProfile{
-		ID: migrationSpec.ID, BaseURL: migrationSpec.BaseURL, Model: migrationSpec.Model, Dimensions: migrationSpec.Dimensions,
+		ID: migrationSpec.ID, BaseURL: migrationSpec.BaseURL, Model: migrationSpec.Model,
+		Dimensions: migrationSpec.Dimensions, ProjectionClass: migrationSpec.ProjectionClass,
 	})
 	if err != nil {
 		t.Fatal(err)
