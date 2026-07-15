@@ -36,8 +36,9 @@ rejected       evidence showed the hypothesis should not continue
 - Status: `supported`
 - Candidate: PostgreSQL plus pgvector is sufficient for the native deployment; Redis, Neo4j, Qdrant, and Elasticsearch are not default dependencies.
 - Existing evidence: backend lifecycle, B01-B10, 200-record, 1,000-record, deletion, ARM64, and AMD64 tests support the retrieval substrate.
-- Existing operational evidence: the opt-in schema-15 scale profile seeded 10,000 governed memories, ran 8 concurrent readers with concurrent deletion, measured search p50/p95 at 17/210 ms on this machine, and recovered after terminating one PostgreSQL backend connection.
-- Evidence needed: formation, sealed quality cases, long-running operation, and larger calibrated deployment profiles.
+- Existing operational evidence: the opt-in schema-15 scale profile seeded 10,000 governed memories, ran 8 concurrent readers with concurrent deletion, measured search p50/p95 at 17/210 ms on this machine, and recovered after terminating one PostgreSQL backend connection. W12 then qualified the named `server-qualification-v1` profile with 550,000 governed memories, 100,000 current lexical and vector rows, 1,000,000 retained projection events, 1,000 concurrent deletions, competing tenant workers, zero final lag, zero scope leakage, and a 2.71 GB database on the reference M4 Pro machine. Current-authority snapshot bootstrap embedded 100,000 current facts rather than replaying obsolete history.
+- Evidence artifact: `docs/evidence/2026-07-15-server-qualification-scale-profile.md`.
+- Evidence needed: formation and sealed quality cases, long-duration growth and retention, scoped HNSW recall tuning, dimensional migration under backlog, and HA/PITR deployment profiles.
 - Falsifier: a required constitutional behavior cannot be implemented reliably or within calibrated profiles without another default service.
 - Decision gate: after the second evidence batch and first operational profile.
 
@@ -147,15 +148,15 @@ No ranking algorithm or weight is accepted before ablation.
 
 ### H-012: PostgreSQL transactional outbox
 
-- Status: `supported` for the current self-hosted profile
+- Status: `supported` for the current self-hosted and named server-qualification profiles
 - Candidate: authoritative transactions enqueue projection and provider work through PostgreSQL, with idempotent workers and no default Redis dependency.
 - Reason: aligns memory state and projection jobs without introducing a second required service.
-- Existing evidence: W11 created 1,000 governed facts and projection events in a disposable PostgreSQL 18 cluster, processed a bounded 128-event batch, retained cursor position across provider failure, replayed the full event stream from cursor zero without duplicate vectors, stopped PostgreSQL with `immediate` while embedding was in flight, recovered through the same runtime pool, and proved concurrent deletion wins over late embedding. A separate tenant completed direct SiliconFlow projection and vector retrieval after restart with two real `BAAI/bge-m3` requests.
-- Evidence artifact: `docs/evidence/2026-07-15-projection-outbox-fault-profile.md`.
-- Current decision: PostgreSQL remains the default authority and transactional outbox; Redis is not a required deployment dependency for the measured developer-local and self-hosted profiles.
-- Evidence needed: sustained server-scale backlog, multiple competing workers, retention pressure, and restart during a dimensionality migration.
+- Existing evidence: W11 created 1,000 governed facts and projection events in a disposable PostgreSQL 18 cluster, processed a bounded 128-event batch, retained cursor position across provider failure, replayed the full event stream from cursor zero without duplicate vectors, stopped PostgreSQL with `immediate` while embedding was in flight, recovered through the same runtime pool, and proved concurrent deletion wins over late embedding. W12 created 1,000,000 real trigger events across ten tenants, collapsed them into 100,000 current vector projections, then used two competing workers per tenant to consume 1,000 deletion events with exactly ten lock winners, ten `already_running` results, zero duplicate processing, and zero final lag. Separate W11 and W12 tenants completed direct SiliconFlow projection and retrieval probes.
+- Evidence artifact: `docs/evidence/2026-07-15-projection-outbox-fault-profile.md` and `docs/evidence/2026-07-15-server-qualification-scale-profile.md`.
+- Current decision: PostgreSQL remains the default authority and transactional outbox; Redis is not a required deployment dependency for the measured developer-local, self-hosted, and `server-qualification-v1` profiles.
+- Evidence needed: long-duration arrival pressure, event-retention pruning, restart during dimensionality migration, HA/PITR, and cross-region profiles.
 - Falsifier: queue contention or operational requirements exceed calibrated profiles and an external queue produces a clearly safer design.
-- Decision gate: passed for the current self-hosted profile; reopen for server-qualification or cross-region profiles.
+- Decision gate: passed for the current self-hosted and `server-qualification-v1` profiles; reopen for HA, cross-region, dimensional migration, or materially higher retention profiles.
 
 ### H-013: Row-level security defense in depth
 

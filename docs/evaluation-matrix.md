@@ -414,6 +414,38 @@ The case supports H-012 for the current self-hosted profile and keeps Redis
 optional. It does not qualify 100k/1M scale, sustained multi-worker throughput,
 HA, or PITR. See [the W11 evidence](evidence/2026-07-15-projection-outbox-fault-profile.md).
 
+## Server Qualification Scale Profile W12
+
+W12 starts a disposable PostgreSQL 18 cluster and creates 100,000 initial
+active facts plus 450,000 append-only governed revisions. The resulting
+550,000 governed memories preserve 100,000 current facts and 450,000
+superseded facts while real triggers create exactly 1,000,000 projection
+events. A current-authority snapshot embeds 100,000 current facts rather than
+replaying the full history, then competing workers consume 1,000 concurrent
+deletion events.
+
+| Gate | Result |
+|---|---:|
+| Governed / active / superseded | `550,000 / 100,000 / 450,000` |
+| Projection events before / after delete tail | `1,000,000 / 1,001,000` |
+| Lexical / vector rows before deletion | `100,000 / 100,000` |
+| Snapshot embedding requests | `100,000` |
+| Active / lexical / vector rows after deletion | `99,000 / 99,000 / 99,000` |
+| Competing workers | `10` winners / `10` already running |
+| Final lag / scope leaks / deleted residue | `0 / 0 / 0` |
+| Query samples and P50/P95/P99 | `1,000`, `8/234/266 ms` |
+| Database size | `2,710,910,655 bytes` |
+| Direct provider requests | `2` |
+
+The 1,000 queries all returned the expected current memory during concurrent
+deletion, but the result is not 550 successful ANN deliveries. Of 550 requested
+vector queries, 138 remained effective vector results and 412 used the audited
+exact lexical fallback under highly selective tenant and continuity scopes.
+W12 therefore supports the named operational profile and its degradation
+contract; scoped server-scale HNSW recall remains a separate qualification.
+Lexical remains the default. See
+[the W12 evidence](evidence/2026-07-15-server-qualification-scale-profile.md).
+
 ## LongMemEval Original Sample
 
 The committed original-data evidence uses six frozen records from the official

@@ -1,0 +1,106 @@
+{
+  "run_id": "w12-server-qualification-scale-profile-20260715-v2",
+  "implementation_revision": "c41edfa423de0ccda7b52262942aef3f1f14d101",
+  "case_version": "2",
+  "case_sha256": "1c67881c73546e88f2b8effa7252773ca38e7b0af315bc6e22f83e4937a9a90f",
+  "raw_log_sha256": "8854564d5e2ae4ee7f6f5c6447917ea436df474a6c5733b026013e0af8a4cd2f",
+  "environment": {
+    "os": "Darwin 27.0 arm64",
+    "cpu": "Apple M4 Pro",
+    "memory_bytes": 51539607552,
+    "storage": "local NVMe",
+    "go": "go1.26.5 darwin/arm64",
+    "postgresql": "18.4",
+    "pgvector": "0.8.5",
+    "embedding_route": "direct SiliconFlow",
+    "embedding_model": "BAAI/bge-m3"
+  },
+  "authority": {
+    "tenants": 10,
+    "continuities": 100,
+    "initial_active_memories": 100000,
+    "governed_revisions": 450000,
+    "governed_memories": 550000,
+    "active_before_delete": 100000,
+    "superseded_memories": 450000,
+    "active_after_delete": 99000
+  },
+  "projections": {
+    "events_before_tail": 1000000,
+    "events_final": 1001000,
+    "lexical_rows_before_delete": 100000,
+    "vector_rows_before_delete": 100000,
+    "snapshot_embedding_requests": 100000,
+    "lexical_rows_after_delete": 99000,
+    "vector_rows_after_delete": 99000,
+    "final_lag": 0
+  },
+  "queries": {
+    "clients": 50,
+    "samples": 1000,
+    "requested_lexical": 450,
+    "requested_vector": 550,
+    "effective_vector": 138,
+    "controlled_vector_to_lexical_fallback": 412,
+    "degraded_total": 412,
+    "correct_target_results": 1000,
+    "cross_tenant_leaks": 0,
+    "cross_continuity_leaks": 0,
+    "p50_ms": 8,
+    "p95_ms": 234,
+    "p99_ms": 266
+  },
+  "workers": {
+    "competitors_per_tenant": 2,
+    "already_running": 10,
+    "processed_tail_events": 1000,
+    "cursor_monotonic": true
+  },
+  "durations_ms": {
+    "authority_seed": 10699,
+    "history_generation": 102709,
+    "lexical_rebuild": 11301,
+    "vector_snapshot": 317345,
+    "tail_catchup": 18431,
+    "delete_and_query": 19381,
+    "test_total": 465350
+  },
+  "database_size_bytes": 2710910655,
+  "real_provider_requests": 2,
+  "hard_gates": {
+    "pass": true,
+    "tenant_lag_exact_across_global_id_gaps": true,
+    "snapshot_collapsed_history_to_current_authority": true,
+    "snapshot_and_tail_reached_zero_lag": true,
+    "deleted_authority_lexical_and_vector_residue": 0,
+    "scope_leakage": 0,
+    "competing_workers_preserved_single_processing": true,
+    "latency_within_profile": true,
+    "database_size_within_profile": true,
+    "direct_provider_projection_and_retrieval": true
+  },
+  "preserved_attempts": [
+    {
+      "attempt": 1,
+      "classification": "implementation",
+      "implementation_revision": "1119d6e",
+      "raw_log_sha256": "a557fc6d745cb80136556955e70b85bf3131034c7b5e7b6f25c36b81e59c2dd2",
+      "result": "failed before seeding because Store.Migrate reused the raw DSN and forwarded pgxpool-only pool_max_conns to PostgreSQL",
+      "fix_revision": "c41edfa423de0ccda7b52262942aef3f1f14d101"
+    }
+  ],
+  "measured_limitations": [
+    "412 of 550 requested vector queries used the exact lexical fallback under the highly selective tenant and continuity scopes",
+    "the run qualifies correct fallback and isolation, not server-scale semantic recall or ANN tuning",
+    "scale vectors are deterministic operational fixtures; only the two-request post-scale probe used the real embedding provider"
+  ],
+  "non_claims": [
+    "not a one million vector row qualification",
+    "not an HA, failover, replication, PITR, or cross-region qualification",
+    "not an unlimited event-retention qualification",
+    "not a dimensional migration under backlog qualification",
+    "not a memory formation quality or benchmark superiority claim",
+    "not a semantic-default switch",
+    "not a signing or final release acceptance"
+  ]
+}
