@@ -171,6 +171,33 @@ The decision does not promote semantic retrieval to the default. The 412
 controlled vector fallbacks require a separate scoped HNSW recall/tuning
 qualification before Vermory claims server-scale semantic effectiveness.
 
+## Protected Delivery
+
+Head `9b9c0616e6595963dd3a196f5a16406542af4747` passed protected CI run
+[`29407243728`](https://github.com/jstar0/Vermory/actions/runs/29407243728),
+job `87325577789`, in `4m33s`. The workflow completed the PostgreSQL suite,
+runtime and Reality race sets, vet, module-drift check, release build, OpenClaw
+check/package, four-platform GoReleaser snapshot, artifact upload, and clean
+diff gate.
+
+Artifact `8339654995`
+(`vermory-pr-snapshot-c45a6ae1cf5b12b06f076ef1ac452851dcd28518`) is
+20,990,790 bytes with GitHub digest
+`sha256:cbd94db4587906a745c892e60c3c1e2ed72c1332304a0a57c617d9d002159882`.
+The independently downloaded transport ZIP had the same SHA-256. Its four
+archive checksums passed, every Go archive contained exactly `vermory`,
+`LICENSE`, `README.md`, and `README.zh-CN.md`, and every binary reported the
+expected GOOS/GOARCH with `CGO_ENABLED=0`, `-trimpath=true`, and
+`vcs.modified=false`. The OpenClaw `0.1.0` package contained 12 expected
+entries. The downloaded Darwin arm64 binary executed `version` and
+`retrieval-snapshot-rebuild --help`.
+
+The artifact revision is GitHub's verified synthetic merge commit
+`c45a6ae1cf5b12b06f076ef1ac452851dcd28518`; its second parent is the tested
+head `9b9c0616e6595963dd3a196f5a16406542af4747`. At verification time Draft PR 1
+was `OPEN`, `CLEAN`, `MERGEABLE`, and required `test=SUCCESS`. No tag or GitHub
+Release existed.
+
 ## Non-Claims
 
 - This is not a one-million-vector-row qualification.

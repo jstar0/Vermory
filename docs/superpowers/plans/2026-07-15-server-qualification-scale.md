@@ -59,6 +59,6 @@ worker. Lag counts pending tenant rows rather than global event-ID distance.
 - [x] Update the evaluation matrix, hypothesis register, and scoped READMEs.
 - [x] Run full serial PostgreSQL suite, CI race set, vet, tidy drift, OpenClaw,
       release snapshot, and diff checks.
-- [ ] Commit and push clean changes to the Draft PR.
-- [ ] Record protected CI and independently verify the uploaded artifact.
-- [ ] Keep the overall Vermory goal active after W12.
+- [x] Commit and push clean changes to the Draft PR.
+- [x] Record protected CI and independently verify the uploaded artifact.
+- [x] Keep the overall Vermory goal active after W12.
