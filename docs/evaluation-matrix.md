@@ -519,6 +519,34 @@ judge. It is not official GPT-4o LongMemEval accuracy, not a model ranking, and
 not withheld or externally sealed evidence. See
 [the W15 evidence](evidence/2026-07-15-longmemeval-s-full-reader-qa.md).
 
+## PostgreSQL HA And PITR Qualification
+
+W16 executes the frozen `I03-postgresql-ha-pitr` operations trajectory against
+dedicated PostgreSQL 18.4 clusters. This is a deterministic platform and
+database qualification, not a model evaluation; the Web Chat path uses the
+mock provider because LSN, RLS, row, deletion, and credential gates are checked
+directly.
+
+| Gate | Result |
+|---|---:|
+| primary/standby system identifiers equal | pass |
+| standby replay reached primary flush LSN | `0/5000000` = `0/5000000` |
+| transition operation rows | `0` |
+| pre-failover / post-promotion rows | `1 / 1` |
+| unchanged handler/runtime/auth pools | pass |
+| PITR target LSN | `0/402ACE0` |
+| T2/restored authority fingerprint equal | pass |
+| T3 deletion/revocation and T4 fact excluded | pass |
+| rebuilt active lexical projections | `3` |
+| historical token rejected after re-governance | HTTP `401` |
+| new operator token accepted | pass |
+| restored RLS policies / tenant FKs | `19 / 36` |
+
+The final report preserves three implementation failures plus the intentionally
+injected transition outage. Same-host timings are not SLOs, and the run does
+not claim cross-host HA, leader election, split-brain prevention, or a database
+proxy. See [the W16 evidence](evidence/2026-07-16-postgresql-ha-pitr.md).
+
 ## Duojie Core Matrix Findings
 
 Tested models:

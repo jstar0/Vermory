@@ -52,8 +52,8 @@ Grant the runtime boundary through the CLI:
 
 The grant command:
 
-- grants CRUD access only to the 12 tenant-bearing continuity tables;
-- grants the observation sequence needed by conversation writes;
+- grants CRUD access only to the served tenant-bearing continuity and retrieval tables;
+- grants the observation and projection-event sequences needed by runtime writes;
 - grants `EXECUTE` on `vermory_auth.authenticate_token(text, bytea)`;
 - does not grant direct reads of `vermory_auth.api_tokens`;
 - removes direct access to legacy project/source/capsule/WCEF tables;
@@ -170,6 +170,12 @@ bridge_events
 bridge_memory_effects
 conversation_links
 source_match_decisions
+source_formation_runs
+source_formation_items
+memory_projection_events
+memory_projection_cursors
+memory_vector_documents
+memory_retrieval_runs
 ```
 
 Using the runtime role, a missing tenant setting sees zero rows:
@@ -249,6 +255,54 @@ PostgreSQL roles and passwords are cluster-level objects and may require separat
 The projection rebuild runs in one transaction and inserts only active governed memories. Deleted and superseded content must remain absent from exact and related recall after rebuild. Source-match audit is authoritative rather than a search projection; forgetting a referenced memory redacts its fact text from source fields, candidate snapshots, provider output, and reason text while preserving structural decision metadata.
 
 The reproducible local restore evidence is recorded in [PostgreSQL Operations And Recovery Evidence](../evidence/2026-07-14-postgresql-operations-recovery.md).
+
+## Streaming Failover And Exact-LSN PITR
+
+Logical dump/restore and physical HA/PITR solve different failures. A production deployment may connect the restricted runtime role to an externally managed primary/standby pair with a read-write target requirement:
+
+```bash
+export VERMORY_RUNTIME_DATABASE_URL='postgresql://vermory_runtime:<password>@db-a.example:5432,db-b.example:5432/vermory?target_session_attrs=read-write&connect_timeout=2'
+```
+
+Vermory relies on PostgreSQL and the deployment's HA layer for fencing, leader selection, routing, replication-slot management, and split-brain prevention. Vermory does not promote a standby or decide which node is authoritative in production.
+
+Before a planned or emergency promotion:
+
+1. record the primary flush LSN with `SELECT pg_current_wal_flush_lsn()`;
+2. require the standby replay LSN from `SELECT pg_last_wal_replay_lsn()` to reach the accepted recovery boundary;
+3. fence or stop the old primary through the deployment's database control plane;
+4. promote the selected standby with the managed HA system or `pg_ctl promote`;
+5. require `pg_is_in_recovery() = false` and `transaction_read_only = off`;
+6. verify that an interrupted request produced no successful receipt or committed operation row;
+7. verify the existing Vermory process reconnects through the read-write multi-host connection and persists a new authenticated request exactly once.
+
+Do not expose both an unfenced old primary and a promoted standby as writable endpoints. `target_session_attrs=read-write` selects a writable server; it is not a fencing or consensus mechanism.
+
+For exact-LSN recovery, take a physical base backup and continuously archive every required WAL segment. Restore the base into a fresh, isolated data directory, then set an explicit boundary:
+
+```text
+restore_command = 'cp /secure/wal-archive/%f %p'
+recovery_target_lsn = '<recorded-target-lsn>'
+recovery_target_timeline = 'current'
+recovery_target_inclusive = on
+recovery_target_action = promote
+```
+
+The restored instance must remain quarantined. A successful PostgreSQL startup is not service acceptance. Before traffic resumes:
+
+1. verify the target LSN and compare authoritative counts or a frozen authority fingerprint;
+2. verify facts created after the target are absent and facts deleted after the target are historically active again;
+3. reset any enabled vector profile generations and rebuild lexical projection state from restored active authority;
+4. rerun runtime-role, RLS, tenant-aware foreign-key, exact recall, and paraphrased recall checks;
+5. revoke every historical token that must not be active in current production;
+6. verify each old raw token receives `401`;
+7. issue replacement tokens and verify authenticated access;
+8. replay legitimate post-target deletions, corrections, and policy changes according to the incident plan;
+9. enable external traffic only after historical state has been reconciled with current governance requirements.
+
+The current `database rebuild-projections` command rebuilds the lexical search projection. Deployments that enabled semantic profiles must also reset and rebuild those profile-specific vector/cursor projections before enabling `vector` mode.
+
+The deterministic same-host qualification, exact LSN, authority fingerprint, failure ledger, projection checks, and credential re-governance results are recorded in [PostgreSQL HA And PITR Qualification Evidence](../evidence/2026-07-16-postgresql-ha-pitr.md).
 
 ## Shutdown And Removal
 

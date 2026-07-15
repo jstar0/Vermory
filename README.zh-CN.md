@@ -52,10 +52,10 @@ Experiment 0 已完成，当前仓库已经具备：
 - 确定性的 `fixture-lock.json` 与冻结后变更检测；
 - `public` 和 `withheld_local` 证据等级，并拒绝把本地可读目录伪装成 sealed；
 - 外部 sealed evaluator 的 Ed25519 attestation 验签能力；
-- 9 个覆盖 workspace、conversation、Global Defaults、删除、source injection、durable bridge、OpenClaw 日常事务连续性、authenticated multi-tenant RLS 与 PostgreSQL 运维恢复的公开冻结案例；
+- 10 个覆盖 workspace、conversation、Global Defaults、删除、source injection、durable bridge、OpenClaw 日常事务连续性、authenticated multi-tenant RLS、PostgreSQL 逻辑恢复与物理 HA/PITR 的公开冻结案例；
 - JSON 和 Markdown 实验报告。
 
-仓库同时已经包含 workspace、conversation、Global Defaults、durable bridge、显式可信来源修订、按稳定事实 key 治理的 source candidate、可信来源无 key 时的 provider 闭集目标匹配、OpenClaw external-turn lifecycle、authenticated multi-tenant HTTP profile、原生 PostgreSQL 恢复、可选 active-only pgvector runtime、可并行构建和测量切换的版本化语义投影，以及 PostgreSQL transactional outbox 故障资格。来源变化可以先形成候选而不改变 AI 当前上下文；拒绝候选不会改动当前事实，接受候选则原子替代仍然有效的同 key 目标。可信来源只有精确内容和 revision、没有内部 key 时，provider 只能从当前 scope 的闭合集合中选一个现有 key 或 abstain；Vermory 会验证并审计结果，仍然要求操作者明确接受。真实 Grok MCP 任务已经在投影重建后只消费被接受的新事实，并把结果回写为 proposed。语义检索 profile 共享 PostgreSQL 权威事实，但拥有独立 cursor、vector、audit、reset/rebuild 与 promotion decision；当前实测 v2 仍保留为 candidate，lexical 和 v1 默认均未被擅自切换。W11 disposable-cluster 运行进一步证明 1000 条 backlog 的有界消费、provider 重试、at-least-once replay、embedding 进行中的 PostgreSQL immediate restart、同一 pool 恢复、删除压过晚到结果，以及重启后的直接 provider 恢复，因此当前 self-hosted profile 不要求 Redis。W12 又在 `server-qualification-v1` 下完成 55 万条 governed memory、10 万条当前 lexical/vector、100 万条历史 projection event、1000 条并发删除、租户内竞争 worker、最终 lag 与 scope leakage 均为 0，以及真实 provider 的 post-scale projection/query probe；current-authority bootstrap 只嵌入当前事实，不重放过时历史。1000 次 scoped query 全部返回正确当前事实，但 550 次 vector 请求中有 412 次受控回退 lexical，因此这是规模运行与降级合同资格，不是 10 万向量下的语义召回质量宣称。认证 profile 使用服务端发行且只保存 digest 的 token、角色路由、非 owner PostgreSQL runtime identity、tenant-aware foreign keys，以及覆盖当前 continuity graph 的 RLS。恢复证据覆盖迁移重放、原生 dump/restore、投影重建、runtime role 重建和有界数据库中断恢复。Pull Request CI 会在干净 Ubuntu runner 上启动 PostgreSQL 18，并自动执行数据库 Go 测试、关键 runtime race、release build 和 OpenClaw 安装/检查/打包链路。每份证据只对实际执行过的客户端、模型、故障条件和确定性硬门负责，任何单一切片都不被当成“整个平台已经完成”的证明。
+仓库同时已经包含 workspace、conversation、Global Defaults、durable bridge、显式可信来源修订、按稳定事实 key 治理的 source candidate、可信来源无 key 时的 provider 闭集目标匹配、OpenClaw external-turn lifecycle、authenticated multi-tenant HTTP profile、原生 PostgreSQL 恢复、可选 active-only pgvector runtime、可并行构建和测量切换的版本化语义投影，以及 PostgreSQL transactional outbox 故障资格。来源变化可以先形成候选而不改变 AI 当前上下文；拒绝候选不会改动当前事实，接受候选则原子替代仍然有效的同 key 目标。可信来源只有精确内容和 revision、没有内部 key 时，provider 只能从当前 scope 的闭合集合中选一个现有 key 或 abstain；Vermory 会验证并审计结果，仍然要求操作者明确接受。真实 Grok MCP 任务已经在投影重建后只消费被接受的新事实，并把结果回写为 proposed。语义检索 profile 共享 PostgreSQL 权威事实，但拥有独立 cursor、vector、audit、reset/rebuild 与 promotion decision；当前实测 v2 仍保留为 candidate，lexical 和 v1 默认均未被擅自切换。W11 disposable-cluster 运行进一步证明 1000 条 backlog 的有界消费、provider 重试、at-least-once replay、embedding 进行中的 PostgreSQL immediate restart、同一 pool 恢复、删除压过晚到结果，以及重启后的直接 provider 恢复，因此当前 self-hosted profile 不要求 Redis。W12 又在 `server-qualification-v1` 下完成 55 万条 governed memory、10 万条当前 lexical/vector、100 万条历史 projection event、1000 条并发删除、租户内竞争 worker、最终 lag 与 scope leakage 均为 0，以及真实 provider 的 post-scale projection/query probe；current-authority bootstrap 只嵌入当前事实，不重放过时历史。1000 次 scoped query 全部返回正确当前事实，但 550 次 vector 请求中有 412 次受控回退 lexical，因此这是规模运行与降级合同资格，不是 10 万向量下的语义召回质量宣称。认证 profile 使用服务端发行且只保存 digest 的 token、角色路由、非 owner PostgreSQL runtime identity、tenant-aware foreign keys，以及覆盖当前 continuity graph 的 RLS。恢复证据覆盖迁移重放、原生 dump/restore、投影重建、runtime role 重建、有界数据库中断恢复、PostgreSQL 18 streaming standby 提升，以及带恢复后凭据治理的精确 LSN PITR。Pull Request CI 会在干净 Ubuntu runner 上启动 PostgreSQL 18，并自动执行数据库 Go 测试、关键 runtime race、release build 和 OpenClaw 安装/检查/打包链路。每份证据只对实际执行过的客户端、模型、故障条件和确定性硬门负责，任何单一切片都不被当成“整个平台已经完成”的证明。
 
 后续 audit 归因确认：W12 的所有 vector 降级都发生在并发删除事件使
 projection 暂时存在 lag 的窗口，failure code 均为 `projection_lag`；另一个
@@ -79,6 +79,17 @@ W15 随后把固定的 K10 ranking 交给真实 reader，完成 1000 条隔离�
 条仅 Vermory 正确、`90` 条都错误。该负结果被原样保留，不切换 lexical
 默认值，也不用于模型排名。详见
 [LongMemEval-S 全量 Reader QA 实证](docs/evidence/2026-07-15-longmemeval-s-full-reader-qa.md)。
+
+W16 随后完成了一条专用 PostgreSQL 18 物理恢复轨迹：streaming standby
+追到 primary flush LSN 后，专用 primary 被 immediate stop；过渡期 Web Chat
+请求返回零 receipt、零行，原 handler/runtime/auth pools 在 standby promotion
+后恢复。另一条 PITR 恢复精确停在 `0/402ACE0`，恢复 authority fingerprint
+与 T2 完全相同，排除了更晚的删除/撤销与 fact C；随后从恢复 authority
+重建 3 条 active lexical projection，证明历史 token 已复活，再次撤销并
+验证旧 token 返回 `401`，最后新 operator token 才获准访问。运行保留了
+setup 与 archive command 失败；这是 same-host 资格，不是跨机 HA、自动故障
+转移或 SLO。详见
+[PostgreSQL HA/PITR 实证](docs/evidence/2026-07-16-postgresql-ha-pitr.md)。
 
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
@@ -195,7 +206,7 @@ PATH="/opt/homebrew/opt/node@24/bin:$PATH" \
 
 loopback 部署、OpenClaw trust 配置、runtime inspection、确认/纠正/删除、显式 link、故障语义、隔离状态重放和卸载步骤见 [OpenClaw 运行接入指南](docs/integrations/openclaw-runtime.md)。
 
-authenticated 部署、token 生命周期、runtime role 授权、TLS 规则、RLS 验证、备份、恢复、投影重建与撤销边界见[身份授权与 PostgreSQL RLS 指南](docs/integrations/identity-authorization-rls.md)。[身份授权实证](docs/evidence/2026-07-14-identity-authorization-rls.md)包含确定性租户隔离硬门和真实 OpenClaw/Grok 认证回放；[PostgreSQL 运维恢复实证](docs/evidence/2026-07-14-postgresql-operations-recovery.md)记录原生 dump/restore、投影丢失与重建、数据库中断恢复。
+authenticated 部署、token 生命周期、runtime role 授权、TLS 规则、RLS 验证、备份、恢复、投影重建与撤销边界见[身份授权与 PostgreSQL RLS 指南](docs/integrations/identity-authorization-rls.md)。[身份授权实证](docs/evidence/2026-07-14-identity-authorization-rls.md)包含确定性租户隔离硬门和真实 OpenClaw/Grok 认证回放；[PostgreSQL 运维恢复实证](docs/evidence/2026-07-14-postgresql-operations-recovery.md)记录原生 dump/restore、投影丢失与重建、数据库中断恢复；[PostgreSQL HA/PITR 实证](docs/evidence/2026-07-16-postgresql-ha-pitr.md)记录 streaming standby 提升、精确 LSN 恢复、历史状态隔离、投影重建和凭据再治理。
 
 ## 开发原则
 

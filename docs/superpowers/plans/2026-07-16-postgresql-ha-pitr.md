@@ -549,7 +549,7 @@ git commit -m "test: prove exact LSN point in time recovery"
 - Consumes: Tasks 1-5, implementation revision, dedicated JSData profile root, and report writer.
 - Produces: one failure-preserving real profile report, operator runbook updates, and committed non-secret evidence.
 
-- [ ] **Step 1: Build the exact evidence binary and run the combined profile**
+- [x] **Step 1: Build the exact evidence binary and run the combined profile**
 
 Use a dedicated root and stable run ID:
 
@@ -565,7 +565,7 @@ go test -count=1 ./internal/operationsprofile -run 'TestPostgreSQLHAPITRProfile'
 Do not rerun to erase a failure. If the run fails, retain its report and assign
 a new run ID only after the defect is fixed.
 
-- [ ] **Step 2: Audit the raw profile without exposing logs**
+- [x] **Step 2: Audit the raw profile without exposing logs**
 
 Check:
 
@@ -587,7 +587,7 @@ all clusters stopped
 Only inspect PostgreSQL logs through filtered error/status lines. Do not commit
 logs or raw profile directories.
 
-- [ ] **Step 3: Write evidence and operator guidance**
+- [x] **Step 3: Write evidence and operator guidance**
 
 The evidence must state:
 
@@ -603,7 +603,7 @@ The runbook must show multi-host DSN syntax, standby promotion checks, exact-LSN
 recovery, projection rebuild, token revocation/reissue, and safe traffic
 reenablement order without including real DSNs.
 
-- [ ] **Step 4: Verify and commit evidence**
+- [x] **Step 4: Verify and commit evidence**
 
 ```bash
 jq empty docs/evidence/snapshots/2026-07-16-postgresql-ha-pitr.json
