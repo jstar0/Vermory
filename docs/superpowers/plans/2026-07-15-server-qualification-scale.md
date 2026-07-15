@@ -21,7 +21,8 @@ worker. Lag counts pending tenant rows rather than global event-ID distance.
 ## Task 1: Freeze W12
 
 - [x] Commit the versioned case manifest, README, design, and this checklist.
-- [x] Validate manifest arithmetic and preserve its SHA-256 in the evidence.
+- [x] Validate manifest arithmetic.
+- [ ] Preserve the final manifest SHA-256 in the evidence.
 
 ## Task 2: Correct Multi-Tenant Lag
 
@@ -43,7 +44,8 @@ worker. Lag counts pending tenant rows rather than global event-ID distance.
 
 - [ ] Start a disposable PostgreSQL 18 cluster.
 - [ ] Seed 100,000 governed active facts across 10 tenants and 100 continuities.
-- [ ] Generate 1,000,000 real trigger events from ten authority versions.
+- [ ] Create 450,000 append-only governed revisions and verify 100,000 active,
+      450,000 superseded, and 1,000,000 real trigger events.
 - [ ] Rebuild 100,000 lexical documents from current authority.
 - [ ] Run ten concurrent snapshot bootstraps for 100,000 deterministic vectors.
 - [ ] Run 50 clients, 1,000 queries, 1,000 deletes, and competing tail workers.

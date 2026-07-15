@@ -40,14 +40,16 @@ The existing 10k profile is useful but cannot simply be multiplied:
 - 10 tenants;
 - 10 continuities per tenant;
 - 1,000 active facts per continuity;
-- 10 authority versions per fact;
 - 100,000 current active facts;
+- 450,000 append-only governed revisions;
+- 450,000 superseded facts and 550,000 total governed facts;
 - 1,000,000 durable projection events;
 - 100,000 current lexical documents;
 - 100,000 current vectors for the active v1 profile;
 - 50 concurrent query clients and 1,000 total queries;
 - 1,000 concurrent deletions;
-- two competing tail workers per tenant.
+- two competing tail workers per tenant;
+- an explicit pgx pool maximum of 64 connections.
 
 The calibrated limits are in the frozen case manifest. They are deliberately
 generous relative to the measured 10k self-hosted profile. Changing a limit
@@ -95,11 +97,15 @@ one pool connection for the operation.
 The opt-in W12 harness uses a disposable PostgreSQL 18 cluster under `/tmp`.
 It never resets the developer's shared database.
 
-Authority seeding uses the runtime observation/governance transaction path in
-bounded transactions. Additional synthetic versions update governed authority
-under tenant context so the production trigger creates real event history.
-After the final version, the disposable lexical projection is rebuilt from
-current authority.
+Initial authority seeding uses the runtime observation/governance transaction
+path in bounded transactions. Synthetic history then creates new source-update
+observations and new active governed revisions with `supersedes_memory_id`, and
+marks the previous revision superseded in the same tenant-scoped transaction.
+Four complete revision rounds plus one 50,000-record partial round create
+450,000 revisions. Each revision produces one active and one absent projection
+event, so the 100,000 initial events plus 900,000 revision events total exactly
+1,000,000. After the final revision, the disposable lexical projection is
+rebuilt from current authority.
 
 Scale vectors use a deterministic 1024-dimension embedder keyed by stable
 record markers. This avoids 100,000 billable provider calls while exercising
@@ -109,7 +115,8 @@ direct SiliconFlow projection/query probe after the scale gates.
 
 ## Hard Gates
 
-- authority, lexical, event, and vector counts match the manifest;
+- authority, active, superseded, lexical, event, and vector counts match the
+  manifest;
 - every tenant's lag is exact despite interleaved global event IDs;
 - snapshot embedding requests do not exceed current active fact count;
 - no proposed, superseded, deleted, redacted, cross-tenant, or cross-continuity

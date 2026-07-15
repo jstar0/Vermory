@@ -5,7 +5,9 @@ a universal production claim and it does not use synthetic records to claim
 memory quality.
 
 The profile creates 100,000 active governed facts across 10 tenants and 100
-continuities, then generates ten authority versions per fact for 1,000,000
+continuities, then creates 450,000 append-only governed revisions. The final
+authority contains 100,000 active and 450,000 superseded facts. Initial active
+writes plus revision activation and supersession produce exactly 1,000,000
 durable projection events. It verifies that tenant lag is counted from actual
 pending rows rather than global identity gaps. A current-authority snapshot
 bootstrap builds 100,000 active lexical and vector projections without
