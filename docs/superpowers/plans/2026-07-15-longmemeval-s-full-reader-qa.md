@@ -685,7 +685,7 @@ git commit -m "docs: qualify full LongMemEval reader QA"
 - Modify: `docs/superpowers/plans/2026-07-15-longmemeval-s-full-reader-qa.md`
 - Modify: Draft PR 1 body
 
-- [ ] **Step 1: Run all local gates**
+- [x] **Step 1: Run all local gates**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
