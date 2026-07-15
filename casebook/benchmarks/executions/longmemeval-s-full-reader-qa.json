@@ -34,7 +34,7 @@
       "class": "custom_model_judge"
     }
   ],
-  "run_id": "longmemeval-s-full-reader-qa-grok-20260715-v1",
+  "run_id": "longmemeval-s-full-reader-qa-grok-20260715-v2",
   "conditions": [
     "plain_token_overlap_k10",
     "vermory_lexical_k10"

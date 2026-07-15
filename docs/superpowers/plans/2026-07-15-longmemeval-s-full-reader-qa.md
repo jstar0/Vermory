@@ -164,7 +164,8 @@ git commit -m "feat: define full reader QA evidence"
 **Interfaces:**
 - Produces: `provider.TokenUsage`.
 - Extends: `provider.GenerateResponse` with `Usage *TokenUsage`.
-- Changes: Grok invocation to `--max-turns 1` and `--tools ""`.
+- Changes: Grok invocation to `--max-turns 1` and a verified zero-tool
+  allowlist/denylist boundary.
 
 - [x] **Step 1: Write failing normalized-usage tests**
 
@@ -185,7 +186,8 @@ Test Grok raw JSON containing:
 and OpenAI-compatible raw JSON containing prompt/completion totals plus cached
 and reasoning detail. Require exact normalized fields. Add an argument-capture
 test requiring `--max-turns 1`, `--no-memory`, `--disable-web-search`,
-`--no-plan`, `--no-subagents`, and an empty `--tools` value.
+`--no-plan`, `--no-subagents`, `--tools todo_write`, and
+`--disallowed-tools todo_write,update_goal,search_tool,use_tool,CallMcpTool,Agent`.
 
 - [x] **Step 2: Verify RED**
 
@@ -622,12 +624,18 @@ redaction-safe inspection summary.
 Use formal run ID:
 
 ```text
-longmemeval-s-full-reader-qa-grok-20260715-v1
+longmemeval-s-full-reader-qa-grok-20260715-v2
 ```
 
 Run against the pinned source and W14 JSONL. Capture wall time, max RSS, raw log
 SHA-256, checkpoint counts, attempt/failure counts, and provider usage totals.
 Do not stop the complete run for individual provider failures.
+
+The discarded `v1` prequalification run used an empty Grok tool allowlist and
+was stopped after an observed `update_goal` path proved that boundary
+ineffective. Preserve that failed-run log and partial artifacts outside the
+formal `v2` artifact root. Before starting `v2`, require debug probes for both
+formal models to report `tool_count=0`.
 
 - [ ] **Step 4: Run custom judge and finalize**
 

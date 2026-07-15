@@ -57,7 +57,10 @@ func (p *GrokCLI) Generate(ctx context.Context, req GenerateRequest) (GenerateRe
 		"--no-plan",
 		"--no-subagents",
 		"--max-turns", "1",
-		"--tools", "",
+		// Grok 0.2.101 treats an empty allowlist as unset. Allow then deny one
+		// recognized tool so the filter is active, and remove its always-on tools.
+		"--tools", "todo_write",
+		"--disallowed-tools", "todo_write,update_goal,search_tool,use_tool,CallMcpTool,Agent",
 		"--permission-mode", "dontAsk",
 		"--output-format", "json",
 	}

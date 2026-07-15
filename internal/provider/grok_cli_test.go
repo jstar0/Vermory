@@ -75,7 +75,8 @@ printf '%%s\n' '{"text":"grok response","usage":{"input_tokens":2718,"cache_read
 	lines := strings.Split(strings.TrimSpace(string(arguments)), "\n")
 	var promptPath string
 	foundMaxTurns := false
-	foundEmptyTools := false
+	foundToolAllowlist := false
+	foundToolDenylist := false
 	foundJSONSchema := false
 	for index, line := range lines {
 		if line == "--prompt-file" && index+1 < len(lines) {
@@ -88,10 +89,16 @@ printf '%%s\n' '{"text":"grok response","usage":{"input_tokens":2718,"cache_read
 			foundMaxTurns = true
 		}
 		if line == "--tools" {
-			if index+1 >= len(lines) || lines[index+1] != "" {
-				t.Fatalf("expected empty Grok tools, got %q", strings.Join(lines, " "))
+			if index+1 >= len(lines) || lines[index+1] != "todo_write" {
+				t.Fatalf("expected Grok no-tool allowlist sentinel, got %q", strings.Join(lines, " "))
 			}
-			foundEmptyTools = true
+			foundToolAllowlist = true
+		}
+		if line == "--disallowed-tools" {
+			if index+1 >= len(lines) || lines[index+1] != "todo_write,update_goal,search_tool,use_tool,CallMcpTool,Agent" {
+				t.Fatalf("expected complete Grok tool denylist, got %q", strings.Join(lines, " "))
+			}
+			foundToolDenylist = true
 		}
 		if line == "--json-schema" {
 			if index+1 >= len(lines) || !json.Valid([]byte(lines[index+1])) {
@@ -103,8 +110,8 @@ printf '%%s\n' '{"text":"grok response","usage":{"input_tokens":2718,"cache_read
 	if !foundMaxTurns {
 		t.Fatalf("expected --max-turns in Grok arguments: %q", strings.Join(lines, " "))
 	}
-	if !foundEmptyTools {
-		t.Fatalf("expected empty --tools in Grok arguments: %q", strings.Join(lines, " "))
+	if !foundToolAllowlist || !foundToolDenylist {
+		t.Fatalf("expected no-tool allowlist and denylist in Grok arguments: %q", strings.Join(lines, " "))
 	}
 	if !foundJSONSchema {
 		t.Fatalf("expected --json-schema in Grok arguments: %q", strings.Join(lines, " "))
@@ -117,6 +124,7 @@ printf '%%s\n' '{"text":"grok response","usage":{"input_tokens":2718,"cache_read
 		"--no-subagents",
 		"--max-turns",
 		"--tools",
+		"--disallowed-tools",
 		"--permission-mode",
 		"dontAsk",
 		"--output-format",

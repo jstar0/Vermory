@@ -203,9 +203,22 @@ hooks = []
 ```
 
 Every call also uses no memory, no web search, no plan mode, no subagents, no
-tools, one isolated turn, and no resumed session. User-level plugins, skills,
-MCP servers, project instructions, or previous Grok sessions cannot contribute
-to the answer.
+tools, one isolated turn, and no resumed session. Grok CLI `0.2.101` treats an
+empty `--tools` value as an unset allowlist, so an empty value is forbidden. The
+runner activates filtering with `--tools todo_write`, then removes
+`todo_write`, `update_goal`, `search_tool`, `use_tool`, `CallMcpTool`, and `Agent` through
+`--disallowed-tools`. A debug isolation probe for each formal model must report
+`tool_count=0` before the dataset run starts. User-level plugins, skills, MCP
+servers, project instructions, or previous Grok sessions cannot contribute to
+the answer.
+
+The rejected prequalification run ID
+`longmemeval-s-full-reader-qa-grok-20260715-v1` used an empty tool allowlist.
+During judge execution, Grok attempted an `update_goal` path, proving that the
+flag did not establish the frozen no-tools boundary. Its partial artifacts and
+logs remain outside the formal artifact root and cannot contribute to W15
+scores. The corrected formal run ID is
+`longmemeval-s-full-reader-qa-grok-20260715-v2`.
 
 Reader raw artifacts retain model usage and request identity when the provider
 returns them. Reports aggregate input, cached-input, output, reasoning, and
@@ -416,6 +429,8 @@ W15 fails the qualification if any of these occur:
 - aggregate hashes change after a zero-new-call resume;
 - reports call the custom Grok judge an official LongMemEval judge;
 - reports rank the tested models or switch a production retrieval default.
+- a formal Grok model isolation probe reports any advertised tool or a raw
+  provider result records a tool-call stop reason.
 
 QA quality metrics are evidence, not arbitrary hard pass thresholds. Source
 integrity, input fidelity, pairing, isolation, failure retention, and resume
