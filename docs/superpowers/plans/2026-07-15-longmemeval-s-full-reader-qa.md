@@ -43,7 +43,7 @@
 - Extends: `benchmark.ExecutionManifest` with `Reader`, `Judge`, and `RetrievalInput`.
 - Produces: `benchmark.ValidateLongMemEvalQAExecution(Qualification, ExecutionManifest) error`.
 
-- [ ] **Step 1: Write failing model-provenance and retrieval-input tests**
+- [x] **Step 1: Write failing model-provenance and retrieval-input tests**
 
 Add tests with these required shapes:
 
@@ -80,7 +80,7 @@ class, missing retrieval SHA/run/revision, a reader scorer class, an official
 judge class whose model is not exactly `gpt-4o-2024-08-06`, condition drift,
 and any JSON fields named `api_key`, `token`, `authorization`, or `secret`.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 go test ./internal/benchmark -run 'TestValidateLongMemEvalQAExecution|TestExecutionModel' -count=1
@@ -88,7 +88,7 @@ go test ./internal/benchmark -run 'TestValidateLongMemEvalQAExecution|TestExecut
 
 Expected: FAIL because the types and validator do not exist.
 
-- [ ] **Step 3: Implement typed non-secret provenance**
+- [x] **Step 3: Implement typed non-secret provenance**
 
 Add:
 
@@ -117,7 +117,7 @@ type RetrievalExecutionInput struct {
 full-QA fields, validates both model configs, requires K=10 and the two exact
 condition names, and keeps official/custom judge provenance distinct.
 
-- [ ] **Step 4: Freeze the QA qualification and execution manifests**
+- [x] **Step 4: Freeze the QA qualification and execution manifests**
 
 The QA qualification uses the same dataset bytes but pins:
 
@@ -136,7 +136,7 @@ The execution manifest freezes the Global Constraints values, reader
 `grok-composer-2.5-fast`, judge `grok-4.5`, worker counts, timeouts, attempts,
 K10, deterministic metrics, custom judge, and explicit non-claims.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 ```bash
 go test ./internal/benchmark -run 'TestValidateLongMemEvalQAExecution|TestExecution' -count=1

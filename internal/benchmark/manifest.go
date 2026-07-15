@@ -96,30 +96,52 @@ type ExecutionScorer struct {
 	Class ScorerClass `json:"class"`
 }
 
+type ExecutionModelConfig struct {
+	Provider        string      `json:"provider"`
+	Model           string      `json:"model"`
+	Interface       string      `json:"interface"`
+	ScorerClass     ScorerClass `json:"scorer_class,omitempty"`
+	MaxOutputTokens int         `json:"max_output_tokens"`
+	TimeoutSeconds  int         `json:"timeout_seconds"`
+	Workers         int         `json:"workers"`
+	MaxAttempts     int         `json:"max_attempts"`
+}
+
+type RetrievalExecutionInput struct {
+	Path                   string `json:"path"`
+	SHA256                 string `json:"sha256"`
+	RunID                  string `json:"run_id"`
+	ImplementationRevision string `json:"implementation_revision"`
+	K                      int    `json:"k"`
+}
+
 type ExecutionManifest struct {
-	SchemaVersion             string            `json:"schema_version"`
-	Benchmark                 string            `json:"benchmark"`
-	QualificationPath         string            `json:"qualification_path"`
-	DatasetSHA256             string            `json:"dataset_sha256"`
-	EvaluationTarget          EvaluationTarget  `json:"evaluation_target"`
-	ExecutionScope            ExecutionScope    `json:"execution_scope"`
-	ClaimScope                ClaimScope        `json:"claim_scope"`
-	SelectionMode             SelectionMode     `json:"selection_mode,omitempty"`
-	RecordSetSHA256           string            `json:"record_set_sha256,omitempty"`
-	ExpectedSessionCount      int               `json:"expected_session_count,omitempty"`
-	ExpectedTurnCount         int               `json:"expected_turn_count,omitempty"`
-	ExpectedScoredRecordCount int               `json:"expected_scored_record_count,omitempty"`
-	SamplingRule              string            `json:"sampling_rule,omitempty"`
-	FixturePath               string            `json:"fixture_path,omitempty"`
-	FixtureSHA256             string            `json:"fixture_sha256,omitempty"`
-	SelectedRecordIDs         []string          `json:"selected_record_ids,omitempty"`
-	HardFactual               bool              `json:"hard_factual"`
-	Scorers                   []ExecutionScorer `json:"scorers,omitempty"`
-	RunID                     string            `json:"run_id,omitempty"`
-	ImplementationRev         string            `json:"implementation_revision,omitempty"`
-	Conditions                []string          `json:"conditions,omitempty"`
-	Artifacts                 map[string]string `json:"artifacts,omitempty"`
-	NonClaims                 []string          `json:"non_claims,omitempty"`
+	SchemaVersion             string                   `json:"schema_version"`
+	Benchmark                 string                   `json:"benchmark"`
+	QualificationPath         string                   `json:"qualification_path"`
+	DatasetSHA256             string                   `json:"dataset_sha256"`
+	EvaluationTarget          EvaluationTarget         `json:"evaluation_target"`
+	ExecutionScope            ExecutionScope           `json:"execution_scope"`
+	ClaimScope                ClaimScope               `json:"claim_scope"`
+	SelectionMode             SelectionMode            `json:"selection_mode,omitempty"`
+	RecordSetSHA256           string                   `json:"record_set_sha256,omitempty"`
+	ExpectedSessionCount      int                      `json:"expected_session_count,omitempty"`
+	ExpectedTurnCount         int                      `json:"expected_turn_count,omitempty"`
+	ExpectedScoredRecordCount int                      `json:"expected_scored_record_count,omitempty"`
+	SamplingRule              string                   `json:"sampling_rule,omitempty"`
+	FixturePath               string                   `json:"fixture_path,omitempty"`
+	FixtureSHA256             string                   `json:"fixture_sha256,omitempty"`
+	SelectedRecordIDs         []string                 `json:"selected_record_ids,omitempty"`
+	HardFactual               bool                     `json:"hard_factual"`
+	Scorers                   []ExecutionScorer        `json:"scorers,omitempty"`
+	RunID                     string                   `json:"run_id,omitempty"`
+	ImplementationRev         string                   `json:"implementation_revision,omitempty"`
+	Conditions                []string                 `json:"conditions,omitempty"`
+	Reader                    *ExecutionModelConfig    `json:"reader,omitempty"`
+	Judge                     *ExecutionModelConfig    `json:"judge,omitempty"`
+	RetrievalInput            *RetrievalExecutionInput `json:"retrieval_input,omitempty"`
+	Artifacts                 map[string]string        `json:"artifacts,omitempty"`
+	NonClaims                 []string                 `json:"non_claims,omitempty"`
 }
 
 var sha256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
