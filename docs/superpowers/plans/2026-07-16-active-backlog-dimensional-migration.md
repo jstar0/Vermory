@@ -751,7 +751,7 @@ git add docs/superpowers/plans/2026-07-16-active-backlog-dimensional-migration.m
 git commit -m "docs: close dimensional migration qualification"
 ```
 
-- [ ] **Step 3: Push the branch and wait for protected CI.**
+- [x] **Step 3: Push the branch and wait for protected CI.**
 
 ```bash
 git push origin agent/grok-cli-runtime
@@ -761,7 +761,7 @@ gh run watch --exit-status
 Require the protected `test` check to pass on the exact final checklist head.
 Do not reuse a prior artifact.
 
-- [ ] **Step 4: Independently verify the final GitHub artifact.**
+- [x] **Step 4: Independently verify the final GitHub artifact.**
 
 Download the raw Actions artifact ZIP and verify:
 
@@ -778,7 +778,7 @@ synthetic merge signature is valid
 synthetic merge second parent is the final checklist head
 ```
 
-- [ ] **Step 5: Verify final repository publication state.**
+- [x] **Step 5: Verify final repository publication state.**
 
 Require:
 
@@ -794,14 +794,14 @@ Releases 0
 worktree clean
 ```
 
-- [ ] **Step 6: Append one W17 delivery section to Draft PR 1.**
+- [x] **Step 6: Append one W17 delivery section to Draft PR 1.**
 
 Record only final immutable IDs, formal run ID and report hashes, CI run/job,
 artifact ID/name/size/digest, synthetic merge signature and second parent, PR
 state, zero tags/releases, and the remaining active-goal boundaries. Do not
 duplicate an existing W17 section and do not create a tag or Release.
 
-- [ ] **Step 7: Keep the overall Vermory goal active.**
+- [x] **Step 7: Keep the overall Vermory goal active.**
 
 W17 closes only active-backlog dimensional migration for the named
 1024-to-2560 profile. Remaining work includes genuine external sealed
