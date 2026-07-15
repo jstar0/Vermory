@@ -107,7 +107,7 @@ func TestExecuteReplaysBeforeOpeningDatabase(t *testing.T) {
 			{ID: "current", ScopeID: "workspace", Content: "Current fact.", Lifecycle: "active", ProvenanceCase: "101-example"},
 			{ID: "forbidden", ScopeID: "workspace", Content: "Forbidden distractor.", Lifecycle: "active", ProvenanceCase: "101-example"},
 		},
-		Queries: []Query{{ID: "q", ScopeID: "workspace", Text: "current", Limit: 2, RelevantRecordIDs: []string{"current"}, ForbiddenRecordIDs: []string{"forbidden"}, Cohorts: []string{"semantic"}}},
+		Queries: []Query{{ID: "q", ScopeID: "workspace", Text: "current", Limit: 2, RelevantRecordIDs: []string{"current"}, ForbiddenRecordIDs: []string{"forbidden"}, TaskExcludedRecordIDs: []string{"forbidden"}, Cohorts: []string{"semantic"}}},
 	}
 	payload, err := json.Marshal(corpus)
 	if err != nil {

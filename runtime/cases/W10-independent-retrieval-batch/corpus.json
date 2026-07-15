@@ -1,5 +1,5 @@
 {
-  "version": "1",
+  "version": "2",
   "name": "W10 independent retrieval batch",
   "scopes": [
     {"id":"w10-coder","tenant_id":"batch2-dev","line":"workspace","anchor":"/fixtures/w10/atlas-service"},
@@ -73,7 +73,7 @@
     {"id":"w10-shopping-budget","scope_id":"w10-shopping","text":"这次 replacement parts 的预算上限是多少？","limit":4,"relevant_record_ids":["w10-shopping-budget"],"forbidden_record_ids":["w10-other-chat-budget"],"cohorts":["chinese_semantic","numeric_constraint"]},
     {"id":"w10-shopping-delivery","scope_id":"w10-shopping","text":"Where and after what time should the replacement parts be delivered?","limit":5,"relevant_record_ids":["w10-shopping-delivery"],"forbidden_record_ids":["w10-other-chat-date"],"cohorts":["mixed_language","semantic_paraphrase"]},
     {"id":"w10-shopping-filter-size","scope_id":"w10-shopping","text":"Which compatible filter series should I order, and which series is wrong?","limit":5,"relevant_record_ids":["w10-shopping-size"],"forbidden_record_ids":["w10-home-model-old"],"cohorts":["multi_fact","numeric_constraint","semantic_paraphrase"]},
-    {"id":"w10-shopping-order-date","scope_id":"w10-shopping","text":"请问最晚哪天前下单？","limit":4,"relevant_record_ids":["w10-shopping-date"],"forbidden_record_ids":["w10-other-chat-date","w10-shopping-budget"],"cohorts":["date","chinese_semantic"]},
+    {"id":"w10-shopping-order-date","scope_id":"w10-shopping","text":"请问最晚哪天前下单？","limit":4,"relevant_record_ids":["w10-shopping-date"],"forbidden_record_ids":["w10-other-chat-date"],"cohorts":["date","chinese_semantic"]},
     {"id":"w10-cross-tenant-code","scope_id":"w10-coder","text":"DEPLOY_409 release lock worker error","limit":5,"relevant_record_ids":["w10-coder-error"],"forbidden_record_ids":["w10-other-command","w10-other-region","w10-coder-secret-deleted"],"cohorts":["continuity_isolation","error_code","mixed_language"]},
     {"id":"w10-cross-tenant-release","scope_id":"w10-coder","text":"Atlas production release command and region","limit":6,"relevant_record_ids":["w10-coder-command","w10-coder-region"],"forbidden_record_ids":["w10-other-command","w10-other-region","w10-coder-command-old","w10-coder-proposed"],"cohorts":["continuity_isolation","multi_fact","technical_command"]}
   ]

@@ -118,6 +118,17 @@ func TestValidateCorpusRejectsInvalidReferencesAndLifecycles(t *testing.T) {
 		{name: "overlapping expected ids", mutate: func(c *Corpus) { c.Queries[0].ForbiddenRecordIDs = []string{"current"} }, want: "both relevant and forbidden"},
 		{name: "non-active relevant", mutate: func(c *Corpus) { c.Queries[0].RelevantRecordIDs = []string{"old"} }, want: "must be active"},
 		{name: "unknown forbidden", mutate: func(c *Corpus) { c.Queries[0].ForbiddenRecordIDs = []string{"missing"} }, want: "unknown forbidden"},
+		{
+			name: "same-scope active distractor marked forbidden",
+			mutate: func(c *Corpus) {
+				c.Records = append(c.Records, Record{
+					ID: "distractor", ScopeID: "workspace-a", Content: "Unrelated active fact.",
+					Lifecycle: "active", ProvenanceCase: "101-example",
+				})
+				c.Queries[0].ForbiddenRecordIDs = []string{"old", "distractor"}
+			},
+			want: "same-scope active distractor",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -256,6 +267,7 @@ func cloneCorpusForTest(corpus Corpus) Corpus {
 	for index := range clone.Queries {
 		clone.Queries[index].RelevantRecordIDs = append([]string(nil), clone.Queries[index].RelevantRecordIDs...)
 		clone.Queries[index].ForbiddenRecordIDs = append([]string(nil), clone.Queries[index].ForbiddenRecordIDs...)
+		clone.Queries[index].TaskExcludedRecordIDs = append([]string(nil), clone.Queries[index].TaskExcludedRecordIDs...)
 		clone.Queries[index].Cohorts = append([]string(nil), clone.Queries[index].Cohorts...)
 	}
 	return clone

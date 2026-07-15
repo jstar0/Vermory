@@ -39,13 +39,14 @@ type Record struct {
 }
 
 type Query struct {
-	ID                 string   `json:"id"`
-	ScopeID            string   `json:"scope_id"`
-	Text               string   `json:"text"`
-	Limit              int      `json:"limit"`
-	RelevantRecordIDs  []string `json:"relevant_record_ids"`
-	ForbiddenRecordIDs []string `json:"forbidden_record_ids"`
-	Cohorts            []string `json:"cohorts"`
+	ID                    string   `json:"id"`
+	ScopeID               string   `json:"scope_id"`
+	Text                  string   `json:"text"`
+	Limit                 int      `json:"limit"`
+	RelevantRecordIDs     []string `json:"relevant_record_ids"`
+	ForbiddenRecordIDs    []string `json:"forbidden_record_ids"`
+	TaskExcludedRecordIDs []string `json:"task_excluded_record_ids,omitempty"`
+	Cohorts               []string `json:"cohorts"`
 }
 
 func LoadCorpus(path string) (Corpus, error) {
@@ -178,12 +179,38 @@ func ValidateCorpus(root string, corpus Corpus) error {
 			}
 			relevant[recordID] = struct{}{}
 		}
+		taskExcluded := make(map[string]struct{}, len(query.TaskExcludedRecordIDs))
+		for _, recordID := range query.TaskExcludedRecordIDs {
+			record, exists := records[recordID]
+			if !exists {
+				return fmt.Errorf("query %q references unknown task-excluded record %q", query.ID, recordID)
+			}
+			if record.ScopeID != query.ScopeID || record.Lifecycle != "active" {
+				return fmt.Errorf("query %q task-excluded record %q must be active in the same scope", query.ID, recordID)
+			}
+			taskExcluded[recordID] = struct{}{}
+		}
+		forbidden := make(map[string]struct{}, len(query.ForbiddenRecordIDs))
 		for _, recordID := range query.ForbiddenRecordIDs {
-			if _, exists := records[recordID]; !exists {
+			record, exists := records[recordID]
+			if !exists {
 				return fmt.Errorf("query %q references unknown forbidden record %q", query.ID, recordID)
 			}
 			if _, overlap := relevant[recordID]; overlap {
 				return fmt.Errorf("query %q record %q is both relevant and forbidden", query.ID, recordID)
+			}
+			if record.ScopeID == query.ScopeID && record.Lifecycle == "active" {
+				if _, explicitlyExcluded := taskExcluded[recordID]; explicitlyExcluded {
+					forbidden[recordID] = struct{}{}
+					continue
+				}
+				return fmt.Errorf("query %q marks same-scope active distractor %q as forbidden", query.ID, recordID)
+			}
+			forbidden[recordID] = struct{}{}
+		}
+		for recordID := range taskExcluded {
+			if _, exists := forbidden[recordID]; !exists {
+				return fmt.Errorf("query %q task-excluded record %q must also be forbidden", query.ID, recordID)
 			}
 		}
 	}
@@ -200,6 +227,7 @@ func CorpusSHA256(corpus Corpus) (string, error) {
 	for index := range canonical.Queries {
 		canonical.Queries[index].RelevantRecordIDs = sortedStrings(canonical.Queries[index].RelevantRecordIDs)
 		canonical.Queries[index].ForbiddenRecordIDs = sortedStrings(canonical.Queries[index].ForbiddenRecordIDs)
+		canonical.Queries[index].TaskExcludedRecordIDs = sortedStrings(canonical.Queries[index].TaskExcludedRecordIDs)
 		canonical.Queries[index].Cohorts = sortedStrings(canonical.Queries[index].Cohorts)
 	}
 	sort.Slice(canonical.Queries, func(i, j int) bool { return canonical.Queries[i].ID < canonical.Queries[j].ID })

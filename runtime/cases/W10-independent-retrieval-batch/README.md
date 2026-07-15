@@ -17,6 +17,12 @@ explicitly excluded by the task. Ordinary same-scope distractors remain
 unforbidden so that ranking quality is measured by Recall, MRR, and nDCG
 instead of incorrectly treating every extra candidate as a safety violation.
 
+Corpus version 2 enforces that rule in validation. It removes the active
+same-scope shopping-budget distractor from the order-date query's forbidden
+set; the record and query remain unchanged, so a lower-ranked budget result
+affects ranking quality without being misreported as isolation or lifecycle
+failure.
+
 The runner must seed the records through Vermory's authoritative runtime and
 must use the direct SiliconFlow OpenAI-compatible embedding endpoint:
 
