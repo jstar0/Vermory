@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"vermory/internal/benchmark"
@@ -113,5 +114,45 @@ func TestBenchmarkEvidenceRejectsMissingFrozenFixture(t *testing.T) {
 	}}, root)
 	if err == nil {
 		t.Fatal("expected missing frozen fixture to be rejected")
+	}
+}
+
+func TestBenchmarkCoverageValidatesFullQAWithoutRequiringRawRetrievalInGit(t *testing.T) {
+	root, err := projectRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	execution, err := benchmark.LoadExecution(filepath.Join(root, "casebook/benchmarks/executions/longmemeval-s-full-reader-qa.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	execution.QualificationPath = filepath.Join(root, execution.QualificationPath)
+	execution.RetrievalInput.Path = "runtime-only-retrieval-results.jsonl"
+	executionPath := filepath.Join(t.TempDir(), "full-qa-execution.json")
+	writeExecution := func() {
+		data, err := json.Marshal(execution)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(executionPath, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeExecution()
+	count, err := countOriginalExecutionEvidence([]casebook.BenchmarkMapEntry{{
+		Benchmark:                 domain.BenchmarkName("LongMemEval"),
+		OriginalExecutionEvidence: []string{executionPath},
+	}}, root)
+	if err != nil || count != 1 {
+		t.Fatalf("full QA evidence was not accepted: count=%d err=%v", count, err)
+	}
+
+	execution.Reader.Workers = 0
+	writeExecution()
+	if _, err := countOriginalExecutionEvidence([]casebook.BenchmarkMapEntry{{
+		Benchmark:                 domain.BenchmarkName("LongMemEval"),
+		OriginalExecutionEvidence: []string{executionPath},
+	}}, root); err == nil || !strings.Contains(err.Error(), "reader workers") {
+		t.Fatalf("expected QA-specific reader validation, got %v", err)
 	}
 }

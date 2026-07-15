@@ -473,7 +473,7 @@ git commit -m "feat: judge LongMemEval reader responses"
 - Produces: `app.FinalizeLongMemEvalQA(opts LongMemEvalQAOptions) (LongMemEvalQAReport, error)`.
 - Produces: sorted reader/judge JSONL, scores, failure ledger, report, and final execution manifest.
 
-- [ ] **Step 1: Write failing aggregate tests**
+- [x] **Step 1: Write failing aggregate tests**
 
 Use a fixture containing all terminal states. Assert condition totals,
 completion/failure counts, deterministic means, overall and task-averaged judge
@@ -484,13 +484,13 @@ failure attribution. `source_lifecycle_candidate` remains an auxiliary flag.
 Require report bytes to remain identical across shuffled checkpoint load order.
 Finalization fails unless all 1,000 checkpoints exist.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 go test ./internal/app -run 'TestFinalizeLongMemEvalQA|TestAggregateLongMemEvalQA' -count=1
 ```
 
-- [ ] **Step 3: Implement finalization**
+- [x] **Step 3: Implement finalization**
 
 Sort checkpoints by record ID then condition and write artifacts atomically.
 The failure ledger includes every reader/judge terminal failure and every
@@ -502,7 +502,7 @@ Validate the final execution manifest through
 Benchmark coverage accepts the full QA execution without requiring the sample
 fixture or raw W14 JSONL inside Git.
 
-- [ ] **Step 4: Verify deterministic hashes and commit**
+- [x] **Step 4: Verify deterministic hashes and commit**
 
 ```bash
 go test ./internal/app -run 'TestFinalizeLongMemEvalQA|TestAggregateLongMemEvalQA|TestBenchmarkCoverage' -count=1

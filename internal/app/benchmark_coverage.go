@@ -171,7 +171,11 @@ func countOriginalExecutionEvidence(entries []casebook.BenchmarkMapEntry, root s
 			if err != nil {
 				return 0, fmt.Errorf("benchmark %s original execution qualification: %w", entry.Benchmark, err)
 			}
-			if err := benchmark.ValidateExecution(qualification, execution); err != nil {
+			validate := benchmark.ValidateExecution
+			if execution.EvaluationTarget == benchmark.EvaluationTargetQA && execution.ExecutionScope == benchmark.ExecutionScopeFull {
+				validate = benchmark.ValidateLongMemEvalQAExecution
+			}
+			if err := validate(qualification, execution); err != nil {
 				return 0, fmt.Errorf("benchmark %s original execution evidence: %w", entry.Benchmark, err)
 			}
 			if execution.ExecutionScope == benchmark.ExecutionScopeSample {
