@@ -304,7 +304,7 @@ git commit -m "feat: replay frozen LongMemEval rankings"
 - Produces: `app.RunLongMemEvalQAReader(ctx context.Context, opts LongMemEvalQAOptions) (LongMemEvalQAReaderSummary, error)`.
 - Produces: atomic `longmemeval-qa-checkpoint/v1` files.
 
-- [ ] **Step 1: Write failing checkpoint contract tests**
+- [x] **Step 1: Write failing checkpoint contract tests**
 
 Define checkpoint validation around these identifiers:
 
@@ -340,7 +340,7 @@ type LongMemEvalQACheckpoint struct {
 Prove same-directory temp plus rename, no partial JSON after injected write
 failure, strict mismatch rejection, and valid terminal checkpoints accepted.
 
-- [ ] **Step 2: Write failing worker-pool tests**
+- [x] **Step 2: Write failing worker-pool tests**
 
 Use a blocking provider that records active calls. Require:
 
@@ -355,13 +355,13 @@ resume does not change checkpoint bytes
 condition-order parity is deterministic
 ```
 
-- [ ] **Step 3: Verify RED**
+- [x] **Step 3: Verify RED**
 
 ```bash
 go test ./internal/app -run 'TestLongMemEvalQACheckpoint|TestRunLongMemEvalQAReader' -count=1
 ```
 
-- [ ] **Step 4: Implement reader execution**
+- [x] **Step 4: Implement reader execution**
 
 Stream the source through `ScanLongMemEval`. For each record, build its two
 tasks and send them to a channel bounded by `2*workers`. A fixed worker pool
@@ -373,7 +373,7 @@ bounded to 1000 bytes. A completed non-empty response is terminal regardless of
 score. Return an error only for source/input/checkpoint contract failures;
 provider task failures remain evidence.
 
-- [ ] **Step 5: Run reader tests and commit**
+- [x] **Step 5: Run reader tests and commit**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 ./internal/app -count=1
