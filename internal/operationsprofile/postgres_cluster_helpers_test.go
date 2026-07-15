@@ -160,7 +160,7 @@ func renderPrimaryConfig(port int, archiveDir string) (string, error) {
 	if err := validateConfigInputs(port, archiveDir); err != nil {
 		return "", err
 	}
-	archiveCommand := fmt.Sprintf(`test ! -f "%s/%%f" && cp "%%p" "%s/%%f"`, archiveDir, archiveDir)
+	archiveCommand := fmt.Sprintf(`test -f "%s/%%f" || cp "%%p" "%s/%%f"`, archiveDir, archiveDir)
 	return strings.Join([]string{
 		"listen_addresses = '127.0.0.1'",
 		"port = " + strconv.Itoa(port),
@@ -312,6 +312,11 @@ func (h *clusterHarness) createStreamingStandby(t *testing.T, replicationUser st
 	appendFile(t, filepath.Join(h.Standby.DataDir, "postgresql.conf"), config)
 }
 
+func (h *clusterHarness) createPITRBase(t *testing.T, replicationUser string) {
+	t.Helper()
+	h.runTool(t, 120*time.Second, "pg_basebackup", "-D", h.PITRBase, "-h", "127.0.0.1", "-p", strconv.Itoa(h.Primary.Port), "-U", replicationUser, "-X", "stream", "--checkpoint=fast")
+}
+
 func (h *clusterHarness) startCluster(t *testing.T, cluster *postgresCluster) {
 	t.Helper()
 	h.runTool(t, 30*time.Second, "pg_ctl", "-D", cluster.DataDir, "-l", cluster.LogPath, "-w", "-t", "20", "start")
@@ -328,6 +333,53 @@ func (h *clusterHarness) stopCluster(t *testing.T, cluster *postgresCluster, mod
 		t.Errorf("stop dedicated %s cluster: %v: %s", cluster.Name, err, redactedTail(string(output), 2000))
 	}
 	cluster.ProcessUp = false
+}
+
+func (h *clusterHarness) promoteCluster(t *testing.T, cluster *postgresCluster) {
+	t.Helper()
+	if !cluster.ProcessUp {
+		t.Fatalf("cannot promote stopped %s cluster", cluster.Name)
+	}
+	h.runTool(t, 30*time.Second, "pg_ctl", "-D", cluster.DataDir, "-w", "-t", "20", "promote")
+	h.waitForQuery(t, *cluster, "SELECT pg_is_in_recovery()", "f", 20*time.Second)
+	h.waitForQuery(t, *cluster, "SELECT current_setting('transaction_read_only')", "off", 20*time.Second)
+}
+
+func (h *clusterHarness) currentFlushLSN(t *testing.T, cluster postgresCluster) string {
+	t.Helper()
+	return h.execSQL(t, cluster, "SELECT pg_current_wal_flush_lsn()")
+}
+
+func (h *clusterHarness) currentReplayLSN(t *testing.T, cluster postgresCluster) string {
+	t.Helper()
+	return h.execSQL(t, cluster, "SELECT pg_last_wal_replay_lsn()")
+}
+
+func (h *clusterHarness) waitForReplayLSN(t *testing.T, cluster postgresCluster, targetLSN string, timeout time.Duration) {
+	t.Helper()
+	if !regexp.MustCompile(`^[0-9A-F]+/[0-9A-F]+$`).MatchString(targetLSN) {
+		t.Fatalf("invalid replay target LSN %q", targetLSN)
+	}
+	h.waitForQuery(t, cluster, "SELECT COALESCE(pg_last_wal_replay_lsn() >= '"+targetLSN+"'::pg_lsn, false)", "t", timeout)
+}
+
+func (h *clusterHarness) forceArchiveCurrentSegment(t *testing.T) string {
+	t.Helper()
+	segment := h.execSQL(t, h.Primary, "SELECT pg_walfile_name(pg_current_wal_lsn())")
+	if !regexp.MustCompile(`^[0-9A-F]{24}$`).MatchString(segment) {
+		t.Fatalf("unexpected WAL segment name %q", segment)
+	}
+	h.execSQL(t, h.Primary, "SELECT pg_switch_wal()")
+	path := filepath.Join(h.WALArchive, segment)
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() && info.Size() > 0 {
+			return segment
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("WAL segment %s was not archived", segment)
+	return ""
 }
 
 func (h *clusterHarness) execSQL(t *testing.T, cluster postgresCluster, sql string) string {

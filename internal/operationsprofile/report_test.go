@@ -164,6 +164,15 @@ func TestValidateReportRejectsSecretShapedFieldsAndFailedHardGate(t *testing.T) 
 	}
 }
 
+func TestValidateReportRequiresUnchangedRuntimeObjects(t *testing.T) {
+	report := validReportFixture()
+	report.Failover.SameAuthPool = false
+	report.RequestFingerprint = reportRequestFingerprint(report)
+	if err := ValidateReport(report); err == nil || !strings.Contains(err.Error(), "failover evidence") {
+		t.Fatalf("expected changed auth pool rejection, got %v", err)
+	}
+}
+
 func validReportFixture() Report {
 	started := time.Date(2026, 7, 16, 8, 0, 0, 0, time.UTC)
 	return Report{
@@ -181,6 +190,7 @@ func validReportFixture() Report {
 			PrimaryFlushLSN: "0/30001A0", StandbyReplayLSN: "0/30001A0",
 			DetectionDurationMS: 1200, PromotionDurationMS: 900, ReconnectDurationMS: 1400,
 			PreFailoverRows: 1, TransitionRows: 0, PostPromotionRows: 1,
+			SameHandler: true, SameRuntimeStore: true, SameAuthPool: true,
 			SameRuntimePool: true, PromotedReadWrite: true,
 		},
 		PITR: PITRReport{

@@ -342,7 +342,7 @@ git commit -m "test: add dedicated PostgreSQL replication harness"
 - Consumes: Task 3 cluster harness, `runtime.OpenStore`, `runtime.OpenStoreWithOptions`, `authn.GrantRuntimeRole`, `authn.IssueToken`, `webchat.NewAuthenticatedHandler`, and `provider.Mock`.
 - Produces: `runHAFailoverPhase(t *testing.T, harness *clusterHarness, report *Report) targetState`, the `FailoverReport` section, and hard gates for replay catch-up, no false receipt, same-pool reconnect, RLS, and exact-once persistence.
 
-- [ ] **Step 1: Write the failing failover profile assertions**
+- [x] **Step 1: Write the failing failover profile assertions**
 
 The profile must build one handler and retain it:
 
@@ -370,7 +370,7 @@ i03-post-promotion
 The test must assert the handler, runtime store, and auth pool pointers remain
 the same before and after promotion.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 VERMORY_HA_PITR_PROFILE=1 \
@@ -381,7 +381,7 @@ go test -count=1 ./internal/operationsprofile -run 'TestPostgreSQLHAFailoverProf
 
 Expected: FAIL before the profile orchestration exists.
 
-- [ ] **Step 3: Implement the HA trajectory**
+- [x] **Step 3: Implement the HA trajectory**
 
 The test must:
 
@@ -414,7 +414,7 @@ func runHAFailoverPhase(t *testing.T, harness *clusterHarness, report *Report) t
 It returns the T2 target LSN, authority fingerprint, fact IDs, token-A public
 ID/raw value held only in process memory, and the completed PITR base path.
 
-- [ ] **Step 4: Verify GREEN and commit**
+- [x] **Step 4: Verify GREEN and commit**
 
 ```bash
 VERMORY_HA_PITR_PROFILE=1 \

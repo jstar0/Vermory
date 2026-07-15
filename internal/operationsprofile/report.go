@@ -53,6 +53,9 @@ type FailoverReport struct {
 	PreFailoverRows     int    `json:"pre_failover_rows"`
 	TransitionRows      int    `json:"transition_rows"`
 	PostPromotionRows   int    `json:"post_promotion_rows"`
+	SameHandler         bool   `json:"same_handler"`
+	SameRuntimeStore    bool   `json:"same_runtime_store"`
+	SameAuthPool        bool   `json:"same_auth_pool"`
 	SameRuntimePool     bool   `json:"same_runtime_pool"`
 	PromotedReadWrite   bool   `json:"promoted_read_write"`
 }
@@ -233,7 +236,9 @@ func ValidateReport(report Report) error {
 	if report.Topology.PrimarySystemID == "" || report.Topology.PrimarySystemID != report.Topology.StandbySystemID || report.Topology.PrimarySystemID != report.Topology.PromotedSystemID || report.Topology.PrimarySystemID != report.Topology.RestoredSystemID {
 		return errors.New("topology system identifiers do not match")
 	}
-	if report.Failover.PrimaryFlushLSN == "" || report.Failover.StandbyReplayLSN == "" || !report.Failover.SameRuntimePool || !report.Failover.PromotedReadWrite {
+	if report.Failover.PrimaryFlushLSN == "" || report.Failover.StandbyReplayLSN == "" ||
+		!report.Failover.SameHandler || !report.Failover.SameRuntimeStore || !report.Failover.SameAuthPool ||
+		!report.Failover.SameRuntimePool || !report.Failover.PromotedReadWrite {
 		return errors.New("failover evidence is incomplete")
 	}
 	if report.PITR.TargetLSN == "" || report.PITR.RestoredReplayLSN == "" || report.PITR.T2Fingerprint != report.PITR.RestoredFingerprint || !isLowerHex(report.PITR.T2Fingerprint, 64) || !isLowerHex(report.PITR.WALInventorySHA256, 64) || !report.PITR.HistoricalStateRestored || !report.PITR.ProjectionRebuilt {

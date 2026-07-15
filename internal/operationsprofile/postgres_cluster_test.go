@@ -87,6 +87,7 @@ func TestRenderPrimaryConfigUsesLoopbackAndDedicatedArchive(t *testing.T) {
 		"max_replication_slots = 4",
 		"archive_mode = on",
 		archive,
+		"test -f \"" + archive + "/%f\" || cp \"%p\" \"" + archive + "/%f\"",
 	} {
 		if !strings.Contains(config, required) {
 			t.Fatalf("primary config missing %q:\n%s", required, config)
