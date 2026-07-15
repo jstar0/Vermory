@@ -100,6 +100,10 @@ func (w *ProjectionWorker) RebuildCurrent(ctx context.Context) (ProjectionRebuil
 	if err != nil {
 		return ProjectionRebuildResult{}, err
 	}
+	projectionSQL, err := retrievalProjectionSQLForClass(w.options.Profile.ProjectionClass)
+	if err != nil {
+		return ProjectionRebuildResult{}, err
+	}
 	connection, err := w.store.pool.Acquire(tenantCtx)
 	if err != nil {
 		return ProjectionRebuildResult{}, fmt.Errorf("acquire projection rebuild connection: %w", err)
@@ -134,9 +138,7 @@ WHERE tenant_id = $1`, w.options.TenantID).Scan(&watermark); err != nil {
 		return ProjectionRebuildResult{}, fmt.Errorf("begin projection rebuild reset: %w", err)
 	}
 	defer tx.Rollback(tenantCtx)
-	if _, err := tx.Exec(tenantCtx, `
-DELETE FROM memory_vector_documents
-WHERE tenant_id = $1 AND profile_id = $2`, w.options.TenantID, w.options.Profile.ID); err != nil {
+	if _, err := tx.Exec(tenantCtx, projectionSQL.clearTenant, w.options.TenantID, w.options.Profile.ID); err != nil {
 		return ProjectionRebuildResult{}, fmt.Errorf("clear projection rebuild vectors: %w", err)
 	}
 	if _, err := tx.Exec(tenantCtx, `
@@ -176,25 +178,7 @@ ON CONFLICT (tenant_id, profile_id) DO UPDATE SET
 				return w.failRebuild(ctx, connection, result, "embedding_dimension_mismatch")
 			}
 			hash := sha256.Sum256([]byte(memory.Content))
-			mutation, err := connection.Exec(tenantCtx, `
-INSERT INTO memory_vector_documents (
-  profile_id, tenant_id, continuity_id, memory_id, content_sha256, embedding, updated_at
-)
-SELECT $1, memory.tenant_id, memory.continuity_id, memory.id, $5, $6::vector, now()
-FROM governed_memories memory
-WHERE memory.tenant_id = $2
-  AND memory.id = $3::uuid
-  AND memory.continuity_id = $4::uuid
-  AND memory.memory_kind = 'fact'
-  AND memory.lifecycle_status = 'active'
-  AND memory.content = $7
-  AND memory.updated_at = $8
-  AND memory.content <> '[redacted]'
-ON CONFLICT (profile_id, tenant_id, memory_id) DO UPDATE SET
-  continuity_id = EXCLUDED.continuity_id,
-  content_sha256 = EXCLUDED.content_sha256,
-  embedding = EXCLUDED.embedding,
-  updated_at = now()`,
+			mutation, err := connection.Exec(tenantCtx, projectionSQL.upsertSnapshot,
 				w.options.Profile.ID,
 				w.options.TenantID,
 				memory.MemoryID,
@@ -351,6 +335,10 @@ func (w *ProjectionWorker) Run(ctx context.Context) error {
 }
 
 func (w *ProjectionWorker) processEvent(ctx context.Context, connection *pgxpool.Conn, event ProjectionEvent) error {
+	projectionSQL, err := retrievalProjectionSQLForClass(w.options.Profile.ProjectionClass)
+	if err != nil {
+		return projectionRunError{code: "projection_write_error"}
+	}
 	before, err := loadProjectionMemory(ctx, connection, event.TenantID, event.MemoryID)
 	if err != nil {
 		return projectionRunError{code: "projection_read_error"}
@@ -380,23 +368,13 @@ func (w *ProjectionWorker) processEvent(ctx context.Context, connection *pgxpool
 		return projectionRunError{code: "authority_changed"}
 	}
 	if !shouldProject {
-		if _, err := tx.Exec(ctx, `
-DELETE FROM memory_vector_documents
-WHERE profile_id = $1 AND tenant_id = $2 AND memory_id = $3::uuid`,
+		if _, err := tx.Exec(ctx, projectionSQL.deleteMemory,
 			w.options.Profile.ID, event.TenantID, event.MemoryID); err != nil {
 			return projectionRunError{code: "projection_write_error"}
 		}
 	} else {
 		hash := sha256.Sum256([]byte(after.Content))
-		if _, err := tx.Exec(ctx, `
-INSERT INTO memory_vector_documents (
-  profile_id, tenant_id, continuity_id, memory_id, content_sha256, embedding, updated_at
-) VALUES ($1, $2, $3::uuid, $4::uuid, $5, $6::vector, now())
-ON CONFLICT (profile_id, tenant_id, memory_id) DO UPDATE SET
-  continuity_id = EXCLUDED.continuity_id,
-  content_sha256 = EXCLUDED.content_sha256,
-  embedding = EXCLUDED.embedding,
-  updated_at = now()`,
+		if _, err := tx.Exec(ctx, projectionSQL.upsertMemory,
 			w.options.Profile.ID,
 			event.TenantID,
 			after.ContinuityID,

@@ -22,15 +22,16 @@ type retrievalStatusQuerier interface {
 }
 
 func retrievalProjectionStatus(ctx context.Context, querier retrievalStatusQuerier, tenantID, profileID string) (ProjectionStatus, error) {
-	if !IsSupportedRetrievalProfileID(profileID) {
-		return ProjectionStatus{}, fmt.Errorf("unsupported retrieval profile")
+	projectionSQL, err := retrievalProjectionSQLForProfile(profileID)
+	if err != nil {
+		return ProjectionStatus{}, err
 	}
 	status := ProjectionStatus{
 		TenantID:  tenantID,
 		ProfileID: profileID,
 		Status:    "idle",
 	}
-	err := querier.QueryRow(ctx, `
+	err = querier.QueryRow(ctx, `
 SELECT last_event_id, status, attempt_count, last_error_code, last_attempt_at
 FROM memory_projection_cursors
 WHERE tenant_id = $1 AND profile_id = $2`, tenantID, profileID).Scan(
@@ -54,10 +55,7 @@ SELECT GREATEST(COALESCE((
         WHERE tenant_id = $1 AND event_id > $2)`, tenantID, status.LastEventID).Scan(&status.LatestEventID, &status.Lag); err != nil {
 		return ProjectionStatus{}, fmt.Errorf("read latest retrieval projection event: %w", err)
 	}
-	if err := querier.QueryRow(ctx, `
-SELECT count(*)
-FROM memory_vector_documents
-WHERE tenant_id = $1 AND profile_id = $2`, tenantID, profileID).Scan(&status.VectorCount); err != nil {
+	if err := querier.QueryRow(ctx, projectionSQL.count, tenantID, profileID).Scan(&status.VectorCount); err != nil {
 		return ProjectionStatus{}, fmt.Errorf("count retrieval vector documents: %w", err)
 	}
 	return status, nil
@@ -68,8 +66,9 @@ func (s *Store) ResetVectorProjection(ctx context.Context, tenantID, profileID s
 	if err != nil {
 		return err
 	}
-	if !IsSupportedRetrievalProfileID(profileID) {
-		return fmt.Errorf("unsupported retrieval profile")
+	projectionSQL, err := retrievalProjectionSQLForProfile(profileID)
+	if err != nil {
+		return err
 	}
 	connection, err := s.pool.Acquire(ctx)
 	if err != nil {
@@ -92,9 +91,7 @@ func (s *Store) ResetVectorProjection(ctx context.Context, tenantID, profileID s
 		return fmt.Errorf("begin vector projection reset: %w", err)
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, `
-DELETE FROM memory_vector_documents
-WHERE tenant_id = $1 AND profile_id = $2`, tenantID, profileID); err != nil {
+	if _, err := tx.Exec(ctx, projectionSQL.clearTenant, tenantID, profileID); err != nil {
 		return fmt.Errorf("clear vector projection: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
@@ -122,6 +119,10 @@ func (s *Store) searchActiveVectorMemory(ctx context.Context, tenantID string, c
 	if err != nil {
 		return nil, err
 	}
+	projectionSQL, err := retrievalProjectionSQLForProfile(profileID)
+	if err != nil {
+		return nil, err
+	}
 	candidateLimit := limit * 4
 	if candidateLimit < 20 {
 		candidateLimit = 20
@@ -129,39 +130,7 @@ func (s *Store) searchActiveVectorMemory(ctx context.Context, tenantID string, c
 	if candidateLimit > 100 {
 		candidateLimit = 100
 	}
-	rows, err := s.pool.Query(ctx, `
-WITH candidates AS (
-  SELECT document.memory_id, document.content_sha256,
-         document.embedding <=> $4::vector AS distance,
-         CASE origin.observation_kind
-           WHEN 'user_correction' THEN 4
-           WHEN 'user_confirmation' THEN 4
-           WHEN 'source_update' THEN 3
-           WHEN 'bridge_promote' THEN 2
-           ELSE 1
-         END AS authority_rank
-  FROM memory_vector_documents document
-  JOIN governed_memories memory
-    ON memory.tenant_id = $2 AND memory.id = document.memory_id
-  JOIN observations origin
-    ON origin.tenant_id = $2 AND origin.id = memory.origin_observation_id
-  WHERE document.profile_id = $1
-    AND document.tenant_id = $2
-    AND document.continuity_id = ANY($3::uuid[])
-  ORDER BY document.embedding <=> $4::vector, document.memory_id
-  LIMIT $5
-)
-SELECT memory.id::text, memory.content
-FROM candidates candidate
-JOIN governed_memories memory
-  ON memory.tenant_id = $2 AND memory.id = candidate.memory_id
-WHERE memory.continuity_id = ANY($3::uuid[])
-  AND memory.memory_kind = 'fact'
-  AND memory.lifecycle_status = 'active'
-  AND memory.content <> '[redacted]'
-  AND encode(digest(convert_to(memory.content, 'UTF8'), 'sha256'), 'hex') = candidate.content_sha256
-ORDER BY candidate.distance, candidate.authority_rank DESC, memory.id
-LIMIT $6`, profileID, tenantID, continuityIDs, retrievalVectorLiteral(queryVector), candidateLimit, limit)
+	rows, err := s.pool.Query(ctx, projectionSQL.search, profileID, tenantID, continuityIDs, retrievalVectorLiteral(queryVector), candidateLimit, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search active vector memory: %w", err)
 	}

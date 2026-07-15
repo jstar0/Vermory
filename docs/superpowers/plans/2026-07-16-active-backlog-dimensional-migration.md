@@ -286,7 +286,7 @@ git commit -m "feat: add dimensional projection classes"
 - Produces: class-specific fixed SQL for count, reset, search, upsert, delete,
   snapshot rebuild, and authority-change handling.
 
-- [ ] **Step 1: Add failing store tests for class isolation.**
+- [x] **Step 1: Add failing store tests for class isolation.**
 
 Seed one tenant and one active memory. Insert deterministic 1024 and 512
 vectors through the real store/worker paths. Require:
@@ -299,7 +299,7 @@ vectors through the real store/worker paths. Require:
 - the same operation ID under two profile-specific retrieval fingerprints is
   not treated as the same audit request.
 
-- [ ] **Step 2: Add failing worker tests for 512 upsert, delete, rebuild, and races.**
+- [x] **Step 2: Add failing worker tests for 512 upsert, delete, rebuild, and races.**
 
 Use deterministic embedders returning exact dimensions. Require:
 
@@ -313,7 +313,7 @@ Use deterministic embedders returning exact dimensions. Require:
   `authority_changed` and leaves no stale 512 row;
 - incumbent and candidate advisory locks are independent for the same tenant.
 
-- [ ] **Step 3: Run the focused tests and observe RED.**
+- [x] **Step 3: Run the focused tests and observe RED.**
 
 Run:
 
@@ -325,7 +325,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 
 Expected: failure because all SQL still targets `memory_vector_documents`.
 
-- [ ] **Step 4: Add a private fixed SQL selector.**
+- [x] **Step 4: Add a private fixed SQL selector.**
 
 Use a closed helper that returns predeclared SQL strings or a private struct of
 queries for `ProjectionClass1024` and `ProjectionClass512`. It must return an
@@ -343,13 +343,13 @@ snapshot clear
 snapshot upsert
 ```
 
-- [ ] **Step 5: Refactor store and worker operations to the selected query set.**
+- [x] **Step 5: Refactor store and worker operations to the selected query set.**
 
 Keep lifecycle, tenant, continuity, content hash, `updated_at`, advisory lock,
 cursor, and audit semantics unchanged. The only behavioral change is selecting
 the qualified physical vector class.
 
-- [ ] **Step 6: Run focused, race, and existing profile migration tests.**
+- [x] **Step 6: Run focused, race, and existing profile migration tests.**
 
 Run:
 
@@ -366,7 +366,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 Expected: PASS; the live provider test may skip unless its explicit environment
 is present.
 
-- [ ] **Step 7: Commit the runtime routing.**
+- [x] **Step 7: Commit the runtime routing.**
 
 ```bash
 git add internal/runtime/retrieval_store.go \
