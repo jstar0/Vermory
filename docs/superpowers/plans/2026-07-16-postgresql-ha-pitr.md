@@ -648,7 +648,7 @@ git push origin agent/grok-cli-runtime
 Append W16 results, failures, non-claims, and evidence paths to Draft PR 1. Keep
 the PR Draft and do not create a tag or Release.
 
-- [ ] **Step 3: Independently verify evidence-head CI and artifact**
+- [x] **Step 3: Independently verify evidence-head CI and artifact**
 
 Require:
 
@@ -665,7 +665,7 @@ zero tags
 zero Releases
 ```
 
-- [ ] **Step 4: Close W16 on a final protected checklist head**
+- [x] **Step 4: Close W16 on a final protected checklist head**
 
 Mark all W16 items, commit:
 
@@ -679,7 +679,7 @@ Require a second protected CI and independent artifact verification. Append
 only final immutable run, job, artifact, digest, merge, and PR-state IDs to the
 PR body so no third documentation commit is created.
 
-- [ ] **Step 5: Keep the overall platform goal active**
+- [x] **Step 5: Keep the overall platform goal active**
 
 W16 closes same-host PostgreSQL streaming failover and exact-LSN PITR only.
 The overall goal remains active for genuine external sealed evaluation,
