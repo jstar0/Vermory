@@ -209,10 +209,11 @@ than inferred.
 
 ### Deterministic scheduling
 
-The runner creates one task for every `(record_id, condition)` pair. A frozen
-seed hashes each task into a deterministic order so baseline and Vermory calls
-are interleaved rather than running all of one condition first. A bounded
-worker pool executes tasks concurrently.
+The runner streams records in official source order and creates one task for
+every `(record_id, condition)` pair. For each record, a frozen seed and record
+ID hash decide whether the plain or Vermory condition enters the queue first.
+This balances condition order without loading the 277 MB source into memory. A
+bounded worker pool executes tasks concurrently.
 
 Scheduling order cannot affect report order. Checkpoints and final results are
 sorted by record ID and condition before hashing and aggregation.
