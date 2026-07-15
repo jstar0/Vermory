@@ -21,11 +21,11 @@ unless the evidence identifies an actual query defect.
 ## Task 3: Correct Evidence
 
 - [x] Save both raw logs and normalized attribution evidence with hashes.
-- [ ] Correct W12 evidence, JSON, READMEs, evaluation matrix, hypothesis register, and Draft PR.
+- [x] Correct W12 evidence, JSON, READMEs, evaluation matrix, hypothesis register, and Draft PR.
 - [x] Preserve the rejected HNSW hypothesis and fixture failures as an explicit evidence trail.
 
 ## Task 4: Delivery
 
-- [ ] Run full PostgreSQL, race, vet, module, OpenClaw, and release gates.
-- [ ] Commit, push, update the Draft PR, and close protected CI/artifact verification.
-- [ ] Keep the overall Vermory goal active after W13.
+- [x] Run full PostgreSQL, race, vet, module, OpenClaw, and release gates.
+- [x] Commit, push, update the Draft PR, and close protected CI/artifact verification.
+- [x] Keep the overall Vermory goal active after W13.

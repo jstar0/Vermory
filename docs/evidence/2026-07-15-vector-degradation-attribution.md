@@ -125,6 +125,33 @@ hnsw.iterative_scan` change from entering production.
 - Include failure-code distributions in scale evidence instead of reporting only aggregate degradation.
 - Interpret W12's controlled fallbacks as concurrent projection-lag behavior, not server-scale ANN recall failure.
 
+## Protected Delivery
+
+Implementation head `b918584588343d9fc029b96459f52826ce031667` passed protected
+CI run [`29412393366`](https://github.com/jstar0/Vermory/actions/runs/29412393366),
+job `87342311436`. The required `test` job completed every PostgreSQL, race,
+vet, module, binary, OpenClaw, release-snapshot, package, and clean-diff step
+successfully.
+
+Artifact `8341752144`
+(`vermory-pr-snapshot-a409d5c8abfed5f9baec7bfe932f737606af9b55`) is
+20,992,109 bytes with GitHub digest
+`sha256:e2ff956335d5752e26d44400447851be73a677041d381ca90652bac8899f3c46`.
+The independently downloaded transport ZIP had the same SHA-256. All four
+archive checksums passed and every archive contained exactly `vermory`,
+`LICENSE`, `README.md`, and `README.zh-CN.md`.
+
+All four binaries reported the expected GOOS/GOARCH, `CGO_ENABLED=0`,
+`-trimpath=true`, and `vcs.modified=false`. The downloaded Darwin arm64 binary
+executed `version` and `retrieval-snapshot-rebuild --help`. The OpenClaw `0.1.0`
+package contained exactly 12 entries. GitHub's verified synthetic merge commit
+`a409d5c8abfed5f9baec7bfe932f737606af9b55` has implementation head `b918584`
+as its second parent.
+
+Draft PR 1 remained `OPEN`, `CLEAN`, `MERGEABLE`, and required
+`test=SUCCESS`. The repository had no tag or GitHub Release. The overall
+Vermory platform goal remains active after W13.
+
 ## Non-Claims
 
 - This does not establish general semantic quality or benchmark superiority.
