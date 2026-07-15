@@ -1,0 +1,40 @@
+{
+  "version": "1",
+  "id": "W13-scoped-hnsw-recall-profile",
+  "profile_name": "scoped-hnsw-recall-v1",
+  "source_profile": "W12-server-qualification-scale-profile",
+  "tenant_count": 10,
+  "continuities_per_tenant": 10,
+  "records_per_continuity": 1000,
+  "active_memory_count": 100000,
+  "query_client_count": 50,
+  "vector_queries_per_client": 11,
+  "requested_vector_queries": 550,
+  "snapshot_page_size": 500,
+  "pool_max_connections": 64,
+  "profile_id": "siliconflow-bge-m3-1024-v1",
+  "pgvector_minimum": "0.8.0",
+  "baseline": {
+    "implementation_revision": "c41edfa423de0ccda7b52262942aef3f1f14d101",
+    "effective_vector_queries": 138,
+    "controlled_lexical_fallbacks": 412,
+    "correct_target_results": 550,
+    "cross_scope_leaks": 0
+  },
+  "calibrated_limits": {
+    "vector_snapshot_seconds": 1800,
+    "query_p95_ms": 2000,
+    "query_p99_ms": 5000,
+    "database_size_gib": 20
+  },
+  "hard_gates": [
+    "all 550 requested vector queries remain effective vector results",
+    "all 550 queries return the exact expected current memory",
+    "controlled lexical fallback count is zero while the projection is current and the embedder succeeds",
+    "cross-tenant and cross-continuity leakage remain zero",
+    "deleted, superseded, proposed, redacted, and content-hash-mismatched memories remain ineligible",
+    "projection-lag, provider-outage, empty-projection, and vector-query-error paths still degrade to exact lexical delivery",
+    "query-local HNSW settings do not leak across pooled connections",
+    "p95, p99, vector snapshot duration, and database size remain within the frozen W12 operational limits"
+  ]
+}
