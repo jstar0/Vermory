@@ -47,12 +47,33 @@ func TestExecutionRejectsSampleBenchmarkWideClaim(t *testing.T) {
 }
 
 func TestExecutionRejectsIncompleteFullRun(t *testing.T) {
-	manifest := validExecution()
-	manifest.ExecutionScope = ExecutionScopeFull
-	manifest.ClaimScope = ClaimScopeBenchmarkWide
-	manifest.SelectedRecordIDs = []string{"only-one"}
-	if err := ValidateExecution(validQualification(), manifest); err == nil || !strings.Contains(err.Error(), "full execution selected 1 of 500 records") {
+	manifest := validFullRetrievalExecution()
+	manifest.SelectionMode = ""
+	if err := ValidateExecution(validQualification(), manifest); err == nil || !strings.Contains(err.Error(), "selection_mode") {
 		t.Fatalf("expected incomplete full-run rejection, got %v", err)
+	}
+}
+
+func TestExecutionAcceptsTargetSpecificQualifiedDatasetFull(t *testing.T) {
+	manifest := validFullRetrievalExecution()
+	if err := ValidateExecution(validQualification(), manifest); err != nil {
+		t.Fatalf("expected valid full retrieval execution, got %v", err)
+	}
+}
+
+func TestExecutionRejectsFullRunWithoutRecordSetDigest(t *testing.T) {
+	manifest := validFullRetrievalExecution()
+	manifest.RecordSetSHA256 = ""
+	if err := ValidateExecution(validQualification(), manifest); err == nil || !strings.Contains(err.Error(), "record_set_sha256") {
+		t.Fatalf("expected record-set rejection, got %v", err)
+	}
+}
+
+func TestExecutionRejectsBenchmarkWideRetrievalClaim(t *testing.T) {
+	manifest := validFullRetrievalExecution()
+	manifest.ClaimScope = ClaimScopeBenchmarkWide
+	if err := ValidateExecution(validQualification(), manifest); err == nil || !strings.Contains(err.Error(), "qualified_dataset_full") {
+		t.Fatalf("expected overclaim rejection, got %v", err)
 	}
 }
 
@@ -122,6 +143,7 @@ func validExecution() ExecutionManifest {
 		Benchmark:         "LongMemEval",
 		QualificationPath: "casebook/benchmarks/qualifications/longmemeval-cleaned-oracle.json",
 		DatasetSHA256:     "821a2034d219ab45846873dd14c14f12cfe7776e73527a483f9dac095d38620c",
+		EvaluationTarget:  EvaluationTargetQA,
 		ExecutionScope:    ExecutionScopeSample,
 		ClaimScope:        ClaimScopeDatasetSample,
 		SamplingRule:      "frozen factual records selected before provider execution",
@@ -136,4 +158,18 @@ func validExecution() ExecutionManifest {
 			{Name: "token_f1", Class: ScorerClassDeterministic},
 		},
 	}
+}
+
+func validFullRetrievalExecution() ExecutionManifest {
+	manifest := validExecution()
+	manifest.EvaluationTarget = EvaluationTargetRetrieval
+	manifest.ExecutionScope = ExecutionScopeFull
+	manifest.ClaimScope = ClaimScopeQualifiedDatasetFull
+	manifest.SelectionMode = SelectionModeAllRecords
+	manifest.RecordSetSHA256 = strings.Repeat("d", 64)
+	manifest.SamplingRule = ""
+	manifest.FixturePath = ""
+	manifest.FixtureSHA256 = ""
+	manifest.SelectedRecordIDs = nil
+	return manifest
 }

@@ -206,6 +206,7 @@ func prepareLongMemEvalBenchmarkTestFiles(t *testing.T) (benchmarkTestPaths, []b
 		Benchmark:         "LongMemEval",
 		QualificationPath: qualificationPath,
 		DatasetSHA256:     sha,
+		EvaluationTarget:  benchmark.EvaluationTargetQA,
 		ExecutionScope:    benchmark.ExecutionScopeSample,
 		ClaimScope:        benchmark.ClaimScopeDatasetSample,
 		SamplingRule:      "test fixture records frozen before provider execution",

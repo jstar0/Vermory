@@ -28,13 +28,25 @@ const (
 	ExecutionScopeFull   ExecutionScope = "full"
 )
 
+type EvaluationTarget string
+
+const (
+	EvaluationTargetQA        EvaluationTarget = "qa"
+	EvaluationTargetRetrieval EvaluationTarget = "retrieval"
+)
+
 type ClaimScope string
 
 const (
-	ClaimScopeMappingOnly   ClaimScope = "mapping_only"
-	ClaimScopeDatasetSample ClaimScope = "dataset_sample"
-	ClaimScopeBenchmarkWide ClaimScope = "benchmark_wide"
+	ClaimScopeMappingOnly          ClaimScope = "mapping_only"
+	ClaimScopeDatasetSample        ClaimScope = "dataset_sample"
+	ClaimScopeQualifiedDatasetFull ClaimScope = "qualified_dataset_full"
+	ClaimScopeBenchmarkWide        ClaimScope = "benchmark_wide"
 )
+
+type SelectionMode string
+
+const SelectionModeAllRecords SelectionMode = "all_records"
 
 type ScorerClass string
 
@@ -89,8 +101,11 @@ type ExecutionManifest struct {
 	Benchmark         string            `json:"benchmark"`
 	QualificationPath string            `json:"qualification_path"`
 	DatasetSHA256     string            `json:"dataset_sha256"`
+	EvaluationTarget  EvaluationTarget  `json:"evaluation_target"`
 	ExecutionScope    ExecutionScope    `json:"execution_scope"`
 	ClaimScope        ClaimScope        `json:"claim_scope"`
+	SelectionMode     SelectionMode     `json:"selection_mode,omitempty"`
+	RecordSetSHA256   string            `json:"record_set_sha256,omitempty"`
 	SamplingRule      string            `json:"sampling_rule,omitempty"`
 	FixturePath       string            `json:"fixture_path,omitempty"`
 	FixtureSHA256     string            `json:"fixture_sha256,omitempty"`
@@ -213,6 +228,9 @@ func ValidateExecution(qualification Qualification, manifest ExecutionManifest) 
 	if strings.TrimSpace(manifest.QualificationPath) == "" {
 		return fmt.Errorf("qualification_path is required")
 	}
+	if manifest.EvaluationTarget != EvaluationTargetQA && manifest.EvaluationTarget != EvaluationTargetRetrieval {
+		return fmt.Errorf("evaluation_target must be qa or retrieval")
+	}
 
 	switch manifest.ExecutionScope {
 	case ExecutionScopeSample:
@@ -228,12 +246,22 @@ func ValidateExecution(qualification Qualification, manifest ExecutionManifest) 
 		if manifest.ClaimScope != ClaimScopeDatasetSample {
 			return fmt.Errorf("sample execution claim_scope must be dataset_sample")
 		}
-	case ExecutionScopeFull:
-		if len(manifest.SelectedRecordIDs) != qualification.Dataset.RecordCount {
-			return fmt.Errorf("full execution selected %d of %d records", len(manifest.SelectedRecordIDs), qualification.Dataset.RecordCount)
+		if manifest.SelectionMode != "" || manifest.RecordSetSHA256 != "" {
+			return fmt.Errorf("sample execution cannot use full-dataset selection fields")
 		}
-		if manifest.ClaimScope != ClaimScopeBenchmarkWide {
-			return fmt.Errorf("full execution claim_scope must be benchmark_wide")
+	case ExecutionScopeFull:
+		if manifest.SelectionMode != SelectionModeAllRecords {
+			return fmt.Errorf("full execution selection_mode must be all_records")
+		}
+		if !sha256Pattern.MatchString(manifest.RecordSetSHA256) {
+			return fmt.Errorf("full execution record_set_sha256 must be lowercase SHA-256")
+		}
+		if manifest.ClaimScope != ClaimScopeQualifiedDatasetFull {
+			return fmt.Errorf("full execution claim_scope must be qualified_dataset_full")
+		}
+		if strings.TrimSpace(manifest.SamplingRule) != "" || strings.TrimSpace(manifest.FixturePath) != "" ||
+			strings.TrimSpace(manifest.FixtureSHA256) != "" || len(manifest.SelectedRecordIDs) != 0 {
+			return fmt.Errorf("full execution cannot use sample selection fields")
 		}
 	default:
 		return fmt.Errorf("execution_scope must be sample or full")

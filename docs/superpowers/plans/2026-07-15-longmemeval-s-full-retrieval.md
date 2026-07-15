@@ -39,7 +39,7 @@
 - Produces: `benchmark.SelectionModeAllRecords`.
 - Extends: `benchmark.ExecutionManifest` with `EvaluationTarget`, `SelectionMode`, and `RecordSetSHA256`.
 
-- [ ] **Step 1: Write failing full-execution validation tests**
+- [x] **Step 1: Write failing full-execution validation tests**
 
 Add tests equivalent to:
 
@@ -82,7 +82,7 @@ func TestExecutionRejectsBenchmarkWideRetrievalClaim(t *testing.T) {
 Also prove that the existing oracle sample remains valid after adding
 `evaluation_target=qa`.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -92,7 +92,7 @@ go test ./internal/benchmark -run 'TestExecution' -count=1
 
 Expected: FAIL because the new enum values and manifest fields do not exist.
 
-- [ ] **Step 3: Implement the contract**
+- [x] **Step 3: Implement the contract**
 
 Add these exact public values:
 
@@ -115,7 +115,7 @@ require `selection_mode=all_records`, a lowercase SHA-256
 `claim_scope=qualified_dataset_full`. Reject `benchmark_wide` until a later
 schema proves the complete upstream task and scorer contract.
 
-- [ ] **Step 4: Freeze the official manifests**
+- [x] **Step 4: Freeze the official manifests**
 
 The S qualification must contain:
 
@@ -140,7 +140,7 @@ The full execution must freeze both conditions, all-record selection, the
 record-set digest, upstream-compatible deterministic scorers, and explicit
 non-claims from the design.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 Run:
 
