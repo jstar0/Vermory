@@ -416,12 +416,12 @@ pnpm -C integrations/openclaw pack --dry-run
 git diff --check
 ```
 
-- [ ] **Step 2: Complete checklist, commit, and push**
+- [x] **Step 2: Complete checklist, commit, and push**
 
 Require no unchecked W14 items, commit the final evidence/checklist, push
 `agent/grok-cli-runtime`, and update Draft PR 1 without changing it from Draft.
 
-- [ ] **Step 3: Verify protected CI and the new artifact independently**
+- [x] **Step 3: Verify protected CI and the new artifact independently**
 
 Download the new transport ZIP through the GitHub API, match the GitHub digest,
 verify all archive checksums and exact entries, inspect all four binary build
