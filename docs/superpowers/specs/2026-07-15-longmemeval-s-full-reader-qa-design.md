@@ -398,9 +398,10 @@ W15 fails the qualification if any of these occur:
 - any source occurrence key or raw session ID fails exact positional mapping;
 - a condition receives an occurrence not present in its W14 ranking;
 - K differs between conditions or from the frozen manifest;
-- any model-facing request contains answer text, answer session labels,
-  question type, expected score, tenant ID, continuity ID, memory ID, source
-  ref, or judge result;
+- any model-facing request injects the reference-answer field or answer text
+  outside the selected official session content, or contains answer-session
+  labels, question type, expected score, tenant ID, continuity ID, memory ID,
+  source ref, or judge result;
 - conditions use different reader providers, models, prompts, timeouts, retry
   policies, or K values;
 - fewer or more than 1,000 reader tasks are represented by checkpoints;
