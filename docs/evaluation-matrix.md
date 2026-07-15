@@ -346,8 +346,8 @@ See [the scoped evidence](evidence/2026-07-14-production-retrieval-runtime.md).
 
 ## Independent Retrieval Batch W10
 
-W10 is the second independent retrieval-quality batch. The current v5 replay
-uses a fresh PostgreSQL 18 database, schema 15, 39 governed records across six
+W10 is the second independent retrieval-quality batch. The qualified v5 replay
+used corpus version 1 with a fresh PostgreSQL 18 database, schema 15, 39 governed records across six
 scopes and four tenants, 18 queries, and 102 direct SiliconFlow `BAAI/bge-m3`
 embedding requests. All
 retrieval records were seeded through the authoritative runtime and all vector
@@ -364,6 +364,32 @@ forbidden/ineligible results, and rebuild equivalence. A same-identity replay
 returned `replayed=true`. The batch strengthens the case for an opt-in semantic
 projection but again provides no independent RRF gain; H-009 remains
 `testing/measured` and lexical remains the default. See [the W10 evidence](evidence/2026-07-15-independent-retrieval-batch.md).
+
+W10 corpus version 2 subsequently corrected one scoring label: an active
+same-scope shopping-budget distractor was removed from the order-date query's
+zero-tolerance forbidden set. No record, query text, relevant set, or returned
+order changed. The validator now requires any same-scope active forbidden fact
+to be explicitly listed in `task_excluded_record_ids`.
+
+## Retrieval Profile Migration Decision H-011
+
+The production profile comparison seeded W10 once into PostgreSQL authority,
+built both registered SiliconFlow profiles from the same durable projection
+events, ran all 18 queries through the production coordinator, reset and
+rebuilt each profile, and repeated the queries. The formal full-revision run
+and two supporting runs all produced the same quality values and decision.
+
+| Profile | Hit@1 | Recall@K | MRR | nDCG@K | Formal P95 | Hard gates | Rebuild |
+|---|---:|---:|---:|---:|---:|---|---|
+| `siliconflow-bge-m3-1024-v1` | 1.0000 | 1.0000 | 1.0000 | 0.9919 | 118.283 ms | PASS | equivalent |
+| `siliconflow-bge-large-zh-1024-v2` | 0.8889 | 1.0000 | 0.9352 | 0.9416 | 125.794 ms | PASS | equivalent |
+
+Both profiles kept 30 active vectors, zero cursor lag, zero forbidden or
+ineligible results, zero degradation, and 36 successful profile-specific audit
+rows. The candidate exceeded the frozen MRR and nDCG regression limits, so the
+decision is `keep_candidate`; v1 remains active/default. This supports the
+versioned-generation mechanism, not a general embedding-model ranking. See
+[the decision evidence](evidence/2026-07-15-retrieval-profile-promotion-decision.md).
 
 ## LongMemEval Original Sample
 

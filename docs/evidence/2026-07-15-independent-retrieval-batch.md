@@ -77,6 +77,19 @@ dedicated-database execution contract, forbidden hard-gate fix, and duplicate
 metric fix were committed before the qualified W10 run. The discarded reports
 remain local diagnostic artifacts and are not used as evidence.
 
+## Corpus Revision Note
+
+The qualified v5 report remains evidence for the exact corpus version 1 bytes
+and SHA-256 recorded above. The later profile-migration comparison found one
+scoring-label defect: the order-date query marked the active same-scope
+shopping-budget record as zero-tolerance forbidden. Corpus version 2 removes
+only that label and adds a validator requiring explicit
+`task_excluded_record_ids` before an active same-scope fact can be forbidden.
+The v5 bge-m3 result did not return the budget record inside the query limit, so
+its metrics and hard-gate outcome are unchanged; future W10 executions use
+version 2 and its new SHA-256. See the
+[profile promotion decision](2026-07-15-retrieval-profile-promotion-decision.md).
+
 ## Non-Claims
 
 - This is not a full benchmark score or a sealed evaluation.

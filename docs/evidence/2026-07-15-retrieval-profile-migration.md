@@ -2,7 +2,7 @@
 
 Date: 2026-07-15
 
-Status: completed as a parallel projection migration rehearsal
+Status: completed as a parallel projection migration rehearsal; measured cutover decision recorded separately
 
 ## Contract
 
@@ -64,6 +64,10 @@ two different embedding models.
 - Profile-specific retrieval fingerprints prevent a v1/v2 audit replay from being treated as the same profile.
 - The candidate worker's in-flight embedding completion is rejected after authority deletion and a retry does not restore the candidate vector row.
 - The default CLI/runtime profile remains `siliconflow-bge-m3-1024-v1`.
+
+The follow-up W10 production comparison froze promotion thresholds and retained
+v2 as a candidate after repeatable quality regression. See
+[the promotion decision](2026-07-15-retrieval-profile-promotion-decision.md).
 
 ## Non-Claims
 

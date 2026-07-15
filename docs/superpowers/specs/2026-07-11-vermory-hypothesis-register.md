@@ -118,7 +118,7 @@ Exact state names and transition edges are not frozen.
 - Current interpretation: the pgvector candidate path is production-path integrated but remains opt-in. W08 and the independent W10 batch both show a large semantic-retrieval improvement over lexical on their frozen corpora, while the current RRF formula matches vector quality and adds latency rather than demonstrating an independent gain. Lexical remains the default.
 - Evidence artifact: `docs/evidence/2026-07-15-independent-retrieval-batch.md` and its report snapshot record a fresh PostgreSQL 18 run over 39 governed records, 18 queries, 102 direct SiliconFlow `BAAI/bge-m3` requests, zero forbidden/ineligible results, and rebuild equivalence.
 - Existing source-authority evidence: lexical workspace/conversation and vector retrieval now apply the same explicit origin tie-break; PostgreSQL tests prove an explicit user correction wins an equal-relevance source update without bypassing lifecycle or scope controls.
-- Evidence needed: calibrated quality/latency thresholds, authority behavior on a broader conflict corpus, embedding migration rollback, and optional rerank comparison on a sealed or externally held corpus.
+- Evidence needed: authority behavior on a broader conflict corpus, scale/backlog qualification, and optional rerank comparison on a sealed or externally held corpus. Calibrated profile thresholds, migration rollback, and the first explicit candidate decision are now recorded under H-011.
 - Falsifier: a simpler measured strategy matches quality, task success, cost, and failure behavior; or the candidate strategy cannot meet calibrated latency.
 - Decision gate: after a second independent retrieval batch, calibrated latency/quality thresholds, and a production outage/fallback slice.
 
@@ -135,14 +135,15 @@ No ranking algorithm or weight is accepted before ablation.
 
 ### H-011: Versioned semantic projection generations
 
-- Status: `testing`
+- Status: `supported` (generation mechanism); v2 remains `candidate`
 - Candidate: embeddings are stored by model and projection generation so old and candidate models can coexist during migration.
 - Reason: avoids coupling authoritative memory to one embedding model and supports measured cutover.
-- Existing evidence: migration 15 registers active v1 and candidate v2 profiles with independent cursors and vector rows. A real SiliconFlow run rebuilt `BAAI/bge-m3` and `BAAI/bge-large-zh-v1.5` side by side with 31 requests each, 30 rows each, zero cursor lag, unchanged v1 row count, and required-fact retrieval through both profiles.
-- Evidence artifact: `docs/evidence/2026-07-15-retrieval-profile-migration.md`.
-- Evidence needed: migration quality/latency comparison on the independent W10 batch and a decision on candidate promotion criteria.
+- Existing evidence: migration 15 registers active v1 and candidate v2 profiles with independent cursors and vector rows. The first rehearsal rebuilt `BAAI/bge-m3` and `BAAI/bge-large-zh-v1.5` side by side with 31 requests each, 30 rows each, zero cursor lag, unchanged v1 row count, and required-fact retrieval through both profiles. The W10 profile comparison then ran both registered profiles through the production worker, coordinator, audit, reset, and rebuild paths. Three corrected-corpus runs produced identical quality values and zero safety/lifecycle/degradation failures. v2 preserved Recall@K `1.0000` but regressed Hit@1 by `0.1111`, MRR by `0.0648`, and nDCG@K by `0.0503`, so the frozen promotion policy retained it as a candidate.
+- Evidence artifact: `docs/evidence/2026-07-15-retrieval-profile-migration.md` and `docs/evidence/2026-07-15-retrieval-profile-promotion-decision.md`.
+- Current decision: keep `siliconflow-bge-m3-1024-v1` active/default and `siliconflow-bge-large-zh-1024-v2` candidate. A future candidate requires a new corpus and recorded promotion decision.
+- Evidence needed: a separate projection class for dimensionality changes and scale/backlog/restart qualification; these are not required to support the current same-dimension generation mechanism.
 - Falsifier: a simpler rebuild-and-swap mechanism is operationally sufficient for calibrated deployment profiles.
-- Decision gate: after the first embedding migration rehearsal.
+- Decision gate: passed for the current 1024-dimensional profile class; reopen for a different dimensionality or storage class.
 
 ### H-012: PostgreSQL transactional outbox
 
