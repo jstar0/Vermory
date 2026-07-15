@@ -621,7 +621,7 @@ git commit -m "docs: record PostgreSQL HA and PITR evidence"
 - Modify: `docs/superpowers/plans/2026-07-16-postgresql-ha-pitr.md`
 - Modify: Draft PR 1 body
 
-- [ ] **Step 1: Run all local gates**
+- [x] **Step 1: Run all local gates**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
@@ -637,7 +637,7 @@ go run github.com/goreleaser/goreleaser/v2@v2.17.0 release --snapshot --clean --
 git diff --check
 ```
 
-- [ ] **Step 2: Commit the checked local-gate state and push the evidence head**
+- [x] **Step 2: Commit the checked local-gate state and push the evidence head**
 
 ```bash
 git add docs/superpowers/plans/2026-07-16-postgresql-ha-pitr.md
