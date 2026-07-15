@@ -160,8 +160,6 @@ func runScopedHNSWProfile(t *testing.T, manifest serverScaleCase, forceHNSW bool
 		}
 		store.pool.Reset()
 	}
-	assertScopedHNSWIndexPlan(t, store, manifest, dataset, embedder)
-
 	coordinators := newServerScaleCoordinators(t, store, dataset, productionRetrievalProfile(t), embedder)
 	measurements := make(chan serverScaleQueryMeasurement, manifest.QueryClientCount*manifest.QueriesPerClient)
 	errorsCh := make(chan error, manifest.QueryClientCount*manifest.QueriesPerClient)

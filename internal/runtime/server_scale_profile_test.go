@@ -87,6 +87,13 @@ type serverScaleQueryMeasurement struct {
 	Degraded  bool
 }
 
+type serverScaleRetrievalAuditCounts struct {
+	RequestedVector int
+	EffectiveVector int
+	ProjectionLag   int
+	OtherDegraded   int
+}
+
 func TestServerScaleCaseIsFrozen(t *testing.T) {
 	manifest := loadServerScaleCase(t)
 	if manifest.Version != "2" || manifest.ID != "W12-server-qualification-scale-profile" ||
@@ -313,6 +320,17 @@ func TestServerQualificationScaleProfile(t *testing.T) {
 	if effectiveVectorCount < manifest.QueryClientCount*2 {
 		t.Fatalf("post-snapshot vector coverage=%d want at least %d", effectiveVectorCount, manifest.QueryClientCount*2)
 	}
+	auditCounts := loadServerScaleRetrievalAuditCounts(t, store, dataset)
+	expectedVectorRequests := manifest.QueryClientCount * (2 + (manifest.QueriesPerClient-2)/2)
+	if auditCounts.RequestedVector != expectedVectorRequests ||
+		auditCounts.EffectiveVector != effectiveVectorCount ||
+		auditCounts.ProjectionLag != degradedCount || auditCounts.OtherDegraded != 0 {
+		t.Fatalf(
+			"retrieval audit requested/effective/projection_lag/other=%d/%d/%d/%d want %d/%d/%d/0",
+			auditCounts.RequestedVector, auditCounts.EffectiveVector, auditCounts.ProjectionLag,
+			auditCounts.OtherDegraded, expectedVectorRequests, effectiveVectorCount, degradedCount,
+		)
+	}
 
 	assertServerScaleAuthorityCounts(t, store, manifest, manifest.DeleteCount)
 	assertServerScaleEventCount(t, store, int64(manifest.ProjectionEventCount+manifest.DeleteCount))
@@ -350,6 +368,9 @@ func TestServerQualificationScaleProfile(t *testing.T) {
 		"query_p99_ms":                  p99.Microseconds() / 1000.0,
 		"degraded_queries":              degradedCount,
 		"effective_vector_queries":      effectiveVectorCount,
+		"requested_vector_queries":      auditCounts.RequestedVector,
+		"projection_lag_fallbacks":      auditCounts.ProjectionLag,
+		"other_degraded_queries":        auditCounts.OtherDegraded,
 		"competing_worker_results":      competingWorkerResults,
 		"authority_seed_ms":             seedDuration.Milliseconds(),
 		"history_generation_ms":         historyDuration.Milliseconds(),
@@ -923,6 +944,31 @@ func collectServerScaleMeasurements(
 	}
 	sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
 	return latencies, degraded, effectiveVector
+}
+
+func loadServerScaleRetrievalAuditCounts(
+	t *testing.T,
+	store *Store,
+	dataset serverScaleDataset,
+) serverScaleRetrievalAuditCounts {
+	t.Helper()
+	var counts serverScaleRetrievalAuditCounts
+	if err := store.pool.QueryRow(context.Background(), `
+SELECT count(*) FILTER (WHERE requested_mode = 'vector'),
+       count(*) FILTER (WHERE effective_mode = 'vector' AND NOT degraded),
+       count(*) FILTER (WHERE failure_code = 'projection_lag' AND degraded),
+       count(*) FILTER (WHERE degraded AND failure_code <> 'projection_lag')
+FROM memory_retrieval_runs
+WHERE tenant_id = ANY($1::text[])
+  AND operation_id LIKE 'w12-query-%'`, dataset.Tenants).Scan(
+		&counts.RequestedVector,
+		&counts.EffectiveVector,
+		&counts.ProjectionLag,
+		&counts.OtherDegraded,
+	); err != nil {
+		t.Fatal(err)
+	}
+	return counts
 }
 
 func percentileDuration(sorted []time.Duration, percentile int) time.Duration {
