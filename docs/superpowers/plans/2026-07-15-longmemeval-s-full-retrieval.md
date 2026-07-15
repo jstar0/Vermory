@@ -402,7 +402,7 @@ snapshots and hashes, not the 277 MB source or raw conversation content.
 - Modify: `docs/superpowers/plans/2026-07-15-longmemeval-s-full-retrieval.md`
 - Modify: Draft PR 1 body
 
-- [ ] **Step 1: Run all local gates**
+- [x] **Step 1: Run all local gates**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' go test -p 1 -count=1 ./...
@@ -429,7 +429,7 @@ metadata, execute Darwin arm64 `version` and
 `benchmark-longmemeval-retrieval --help`, verify the synthetic merge second
 parent, and require `OPEN / Draft / CLEAN / MERGEABLE / test=SUCCESS`.
 
-- [ ] **Step 4: Keep the platform goal active**
+- [x] **Step 4: Keep the platform goal active**
 
 W14 completion advances retrieval evidence only. Do not mark the overall goal
 complete. The next stage is full 500-record reader QA and judge execution,
