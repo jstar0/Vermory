@@ -2,9 +2,25 @@ package runtime
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 )
+
+func TestStoreMigrateAcceptsPoolConfiguration(t *testing.T) {
+	cluster := startDisposablePostgres18(t)
+	defer cluster.stop(t, "fast")
+
+	store, err := OpenStore(context.Background(), fmt.Sprintf("%s&pool_max_conns=2", cluster.databaseURL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestStoreResolveWorkspaceRequiresConfirmationForUnknownAnchor(t *testing.T) {
 	store := openTestStore(t)

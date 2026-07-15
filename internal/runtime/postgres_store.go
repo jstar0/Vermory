@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,7 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 )
 
@@ -129,10 +128,7 @@ func (s *Store) Close() {
 }
 
 func (s *Store) Migrate(ctx context.Context) error {
-	db, err := sql.Open("pgx", s.databaseURL)
-	if err != nil {
-		return fmt.Errorf("open migration database: %w", err)
-	}
+	db := stdlib.OpenDBFromPool(s.pool)
 	defer db.Close()
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("set migration dialect: %w", err)
