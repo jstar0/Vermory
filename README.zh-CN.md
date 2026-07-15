@@ -91,6 +91,16 @@ setup 与 archive command 失败；这是 same-host 资格，不是跨机 HA、�
 转移或 SLO。详见
 [PostgreSQL HA/PITR 实证](docs/evidence/2026-07-16-postgresql-ha-pitr.md)。
 
+W17 随后完成 active-backlog 维度迁移资格，但没有改变默认 profile。四个
+tenant 保持 20,000 条当前事实，active `vector_1024` 与 candidate
+`halfvec_2560` 同时消费 5,000 条修订、删除和新增 tail event。320 次 scoped
+incumbent query 全部成功且 cross-scope 结果为 0；PostgreSQL immediate restart
+没有提交 partial candidate row，也没有推进被中断 cursor；原有 pools 恢复后，
+两个物理类都收敛到 20,000 行且 lag 为 0；candidate reset/rebuild 不改变
+incumbent 与 authority。直连硅基流动 `Qwen/Qwen3-Embedding-4B` 用两次请求
+返回并实际使用 2,560 维。candidate 仍未 promotion，lexical 仍是默认。
+详见 [Active-Backlog 维度迁移实证](docs/evidence/2026-07-16-active-backlog-dimensional-migration.md)。
+
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
 ## 快速开始

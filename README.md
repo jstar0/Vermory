@@ -97,6 +97,18 @@ accepted. The run retained its setup and archive-command failures. It is
 same-host qualification, not cross-host HA, automatic failover, or an SLO. See
 [PostgreSQL HA And PITR Qualification Evidence](docs/evidence/2026-07-16-postgresql-ha-pitr.md).
 
+W17 then qualified an active-backlog dimensional migration without changing
+the default profile. Four tenants retained 20,000 current facts while the
+active `vector_1024` profile and candidate `halfvec_2560` profile consumed
+5,000 revision/delete/new-fact tail events. All 320 scoped incumbent queries
+succeeded with zero cross-scope result; an immediate PostgreSQL restart
+committed zero partial candidate row and advanced no interrupted cursor; the
+same pools recovered; both classes converged to 20,000 rows with zero lag; and
+candidate reset/rebuild left incumbent rows and authority unchanged. A direct
+SiliconFlow `Qwen/Qwen3-Embedding-4B` probe returned and used 2,560 dimensions
+in two requests. The candidate remains unpromoted and lexical remains default.
+See [Active-Backlog Dimensional Migration Evidence](docs/evidence/2026-07-16-active-backlog-dimensional-migration.md).
+
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
 ## Architecture Direction

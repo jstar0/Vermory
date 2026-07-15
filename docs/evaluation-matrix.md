@@ -395,6 +395,34 @@ decision is `keep_candidate`; v1 remains active/default. This supports the
 versioned-generation mechanism, not a general embedding-model ranking. See
 [the decision evidence](evidence/2026-07-15-retrieval-profile-promotion-decision.md).
 
+## Active-Backlog Dimensional Migration W17
+
+W17 qualifies a separate physical projection class while the existing active
+profile continues serving. PostgreSQL 18 held 20,000 current facts across four
+tenants. The active `vector_1024` profile and candidate `halfvec_2560` profile
+each converged to the same 20,000 eligible IDs after 2,000 revisions, 500
+deletions, 500 new facts, and exactly 5,000 tail events.
+
+| Gate | Result |
+|---|---:|
+| authority / lexical / incumbent / candidate | `20,000 / 20,000 / 20,000 / 20,000` |
+| final incumbent / candidate lag | `0 / 0` |
+| scoped incumbent queries | `320 / 320` successful |
+| cross-scope results | `0` |
+| query p50 / p95 / p99 | `12 / 20 / 30 ms` |
+| partial candidate rows after immediate restart | `0` |
+| interrupted cursor advance | `0` |
+| same pools recovered | `PASS` |
+| candidate reset isolated and rebuilt | `PASS` |
+| direct provider model / dimensions / requests | `Qwen3-Embedding-4B / 2560 / 2` |
+| hard gates | `12 / 12 PASS` |
+
+The candidate uses `halfvec(2560)` because pgvector 0.8.5 limits HNSW indexes
+on `vector` to 2,000 dimensions and supports `halfvec` through 4,000. This run
+qualifies mechanics and recovery for the named class; it does not rank models,
+measure half-precision quality, or promote the candidate. See
+[the W17 evidence](evidence/2026-07-16-active-backlog-dimensional-migration.md).
+
 ## Projection Outbox Fault Profile W11
 
 W11 starts a disposable PostgreSQL 18 cluster and exercises the production
