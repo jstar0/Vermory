@@ -81,9 +81,12 @@ type, abstention status, and both condition names. It requires exactly 500
 unique records and validates every ranked occurrence key against the source
 record's position and raw session ID.
 
-W15 uses the first ten ranked occurrences from each W14 condition. K=10 matches
-the normal bounded conversation-memory contract and the primary W14 report.
-Changing K after seeing QA results requires a new execution manifest and run ID.
+W15 uses the first up to ten ranked occurrences from each W14 condition. K=10
+is a maximum context depth, not a requirement to manufacture ten results when a
+retriever returned fewer. The W14 production lexical result for record
+`0f05491a` contains one ranked session; W15 preserves that one-session result
+without adding distractors or other source sessions. Changing K after seeing QA
+results requires a new execution manifest and run ID.
 
 ## Evidence Semantics
 
@@ -133,16 +136,18 @@ W15 executes exactly two paired conditions for every record.
 
 ### `plain_token_overlap_k10`
 
-The reader receives the semantic text of the first ten W14
-`plain_token_overlap` session occurrences in exact ranking order. The wrapper
-labels them as retrieved conversation memory. It does not claim governance or
-production delivery.
+The reader receives the semantic text of the first up to ten W14
+`plain_token_overlap` session occurrences in exact ranking order. The actual
+count is `min(K, ranking length)`. The wrapper labels them as retrieved
+conversation memory. It does not claim governance or production delivery.
 
 ### `vermory_lexical_k10`
 
-The reader receives the semantic text of the first ten W14 `vermory_lexical`
-session occurrences in exact ranking order. The wrapper matches Vermory's
-model-facing conversation contract:
+The reader receives the semantic text of the first up to ten W14
+`vermory_lexical` session occurrences in exact ranking order. The actual count
+is `min(K, ranking length)`, including the preserved one-session result for
+record `0f05491a`. The wrapper matches Vermory's model-facing conversation
+contract:
 
 ```text
 Governed memory:

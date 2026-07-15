@@ -238,10 +238,10 @@ git commit -m "feat: record provider usage for QA runs"
 
 **Interfaces:**
 - Produces: `app.LongMemEvalQATask`.
-- Produces: `app.LoadLongMemEvalQARetrieval(path string, input benchmark.RetrievalExecutionInput) (map[string]LongMemEvalRetrievalRecordResult, error)`.
+- Produces: `app.LoadLongMemEvalQARetrieval(path string, execution benchmark.ExecutionManifest) (map[string]LongMemEvalRetrievalRecordResult, error)`.
 - Produces: `app.BuildLongMemEvalQATasks(record benchmark.LongMemEvalRecord, retrieval LongMemEvalRetrievalRecordResult, k int) ([]LongMemEvalQATask, error)`.
 
-- [ ] **Step 1: Write failing playback-validation tests**
+- [x] **Step 1: Write failing playback-validation tests**
 
 Use a two-record fixture and JSONL. Prove exact SHA/run/revision/dataset and
 record-set match; exactly one retrieval row per record; exact two conditions;
@@ -249,21 +249,24 @@ occurrence position/raw-ID mapping; and duplicate distractor IDs at different
 positions. Reject unknown occurrence, wrong ID, duplicate record, missing
 condition, and K below ten.
 
-Require both tasks to contain the same question/system prompt, exactly ten
-selected sessions in W14 order, no `has_answer`, IDs, scorer metadata, or
-injected reference-answer field. Permit answer text naturally present inside
-selected source sessions.
+Require both tasks to contain the same question/system prompt and the first up
+to ten selected sessions in W14 order, with the actual count equal to
+`min(K, ranking length)`. Preserve the one-session W14 production lexical result
+for record `0f05491a` without filler. Include no `has_answer`, IDs, scorer
+metadata, or injected reference-answer field. Permit answer text naturally
+present inside selected source sessions.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 go test ./internal/app -run 'TestLoadLongMemEvalQARetrieval|TestBuildLongMemEvalQATasks' -count=1
 ```
 
-- [ ] **Step 3: Implement streaming JSONL validation and bounded context**
+- [x] **Step 3: Implement streaming JSONL validation and bounded context**
 
-Decode W14 JSONL line by line and retain only 500 small ranking records. Map
-occurrence positions directly to source sessions. Plain context uses
+Decode W14 JSONL line by line and retain only 500 small ranking records. Require
+at least one result per condition, but do not require a retriever to fill K.
+Map up to K occurrence positions directly to source sessions. Plain context uses
 `Retrieved conversation memory:`. Vermory context uses
 `runtime.BuildConversationContext(nil, memories, nil)` for byte-compatible
 production wrapping. Hash the system prompt and final context with SHA-256.
@@ -271,7 +274,7 @@ production wrapping. Hash the system prompt and final context with SHA-256.
 Task order within each record is selected by SHA-256 parity of
 `"longmemeval-w15-v1:" + record.QuestionID`.
 
-- [ ] **Step 4: Verify playback GREEN and commit**
+- [x] **Step 4: Verify playback GREEN and commit**
 
 ```bash
 go test ./internal/app -run 'TestLoadLongMemEvalQARetrieval|TestBuildLongMemEvalQATasks' -count=1
