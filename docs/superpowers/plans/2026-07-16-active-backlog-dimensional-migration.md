@@ -487,7 +487,7 @@ git commit -m "feat: operate dimensional projection classes"
 - Produces: deterministic miniature coverage, opt-in formal orchestration,
   atomic JSON/Markdown reports, attempt history, and replay protection.
 
-- [ ] **Step 1: Add failing report tests.**
+- [x] **Step 1: Add failing report tests.**
 
 Require normalized JSON and Markdown to include:
 
@@ -511,7 +511,7 @@ explicit non-claims
 Require atomic writes, byte-identical completed-run replay, and conflicting
 run-ID rejection.
 
-- [ ] **Step 2: Run report tests and observe RED.**
+- [x] **Step 2: Run report tests and observe RED.**
 
 Run:
 
@@ -521,13 +521,13 @@ go test -count=1 ./internal/runtime -run 'TestDimensionalMigrationReport'
 
 Expected: compile failure because the report types do not exist.
 
-- [ ] **Step 3: Implement deterministic report serialization.**
+- [x] **Step 3: Implement deterministic report serialization.**
 
 Use stable field ordering, sorted tenant/profile entries, RFC3339 timestamps,
 SHA-256 fingerprints, and temp-file-plus-rename writes. Never serialize DSNs,
 API keys, raw vectors, or provider bodies.
 
-- [ ] **Step 4: Add a miniature end-to-end profile test.**
+- [x] **Step 4: Add a miniature end-to-end profile test.**
 
 The default suite uses the shared test database with a reduced manifest:
 
@@ -548,7 +548,7 @@ incumbent queries, candidate tail convergence, class-equivalence assertions,
 candidate reset, and candidate rebuild. It does not start or stop PostgreSQL
 and does not call a real provider.
 
-- [ ] **Step 5: Add the opt-in dedicated-cluster profile.**
+- [x] **Step 5: Add the opt-in dedicated-cluster profile.**
 
 Run only when:
 
@@ -565,7 +565,7 @@ loopback-only TCP, `unix_socket_directories=''`, PostgreSQL 18 tool matching,
 test-owned process cleanup, dynamic ports, and retained logs. Do not modify the
 Homebrew service or shared test database.
 
-- [ ] **Step 6: Implement the frozen workload and hard gates.**
+- [x] **Step 6: Implement the frozen workload and hard gates.**
 
 The formal harness must:
 
@@ -582,7 +582,7 @@ The formal harness must:
 11. perform the direct 512-dimensional provider projection/query probe;
 12. write the completed normalized report and attempt history.
 
-- [ ] **Step 7: Run report, miniature, race, and full serial tests.**
+- [x] **Step 7: Run report, miniature, race, and full serial tests.**
 
 Run:
 
@@ -602,7 +602,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
 Expected: PASS; the formal profile remains skipped without all explicit opt-in
 variables.
 
-- [ ] **Step 8: Commit the harness.**
+- [x] **Step 8: Commit the harness.**
 
 ```bash
 git add internal/runtime/dimensional_migration_report.go \
