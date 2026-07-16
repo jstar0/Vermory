@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"vermory/internal/brand"
+
+	"github.com/spf13/cobra"
 )
 
 func TestVersionCommandUsesStableBuildMetadata(t *testing.T) {
@@ -244,6 +246,41 @@ func TestOperatorMemoryForgetHasNoFreeTextFlag(t *testing.T) {
 		}
 	}
 	t.Fatal("expected memory forget command")
+}
+
+func TestMemoryEligibilityCommandsRegistered(t *testing.T) {
+	root := newRootCommand()
+	for _, parent := range root.Commands() {
+		if parent.Name() != "memory" {
+			continue
+		}
+		commands := map[string]*cobra.Command{}
+		for _, child := range parent.Commands() {
+			commands[child.Name()] = child
+		}
+		setValidity := commands["set-validity"]
+		archive := commands["archive"]
+		if setValidity == nil || archive == nil {
+			t.Fatalf("memory eligibility commands missing: set-validity=%v archive=%v", setValidity != nil, archive != nil)
+		}
+		for _, flag := range []string{"continuity-id", "operation-id", "memory-id", "valid-from", "valid-until"} {
+			if setValidity.Flags().Lookup(flag) == nil {
+				t.Fatalf("set-validity is missing --%s", flag)
+			}
+		}
+		for _, flag := range []string{"continuity-id", "operation-id", "memory-id"} {
+			if archive.Flags().Lookup(flag) == nil {
+				t.Fatalf("archive is missing --%s", flag)
+			}
+		}
+		for _, command := range []*cobra.Command{setValidity, archive} {
+			if command.Flags().Lookup("content") != nil || command.Flags().Lookup("reason") != nil {
+				t.Fatalf("%s must not accept free text", command.Name())
+			}
+		}
+		return
+	}
+	t.Fatal("expected memory command")
 }
 
 func TestOperatorSourceRevisionCommandIsRegistered(t *testing.T) {

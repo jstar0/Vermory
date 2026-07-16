@@ -486,31 +486,31 @@ func (s *Store) SetMemoryValidity(context.Context, SetMemoryValidityRequest) (Me
 func (s *Store) ArchiveMemory(context.Context, ArchiveMemoryRequest) (MemoryEligibilityReceipt, error)
 ```
 
-- [ ] **Step 1: Add failing request-validation and receipt tests.**
+- [x] **Step 1: Add failing request-validation and receipt tests.**
 
 Reject blank IDs, invalid intervals, non-UTC input, same operation with
 different request, wrong continuity, cross-tenant target, deleted/superseded/
 rejected/archived validity changes, and unsupported archive transitions.
 
-- [ ] **Step 2: Add failing idempotency and content-free audit tests.**
+- [x] **Step 2: Add failing idempotency and content-free audit tests.**
 
 Equal replay returns the same persisted before/result values with
 `Replayed=true`. The audit row must not contain memory content, source content,
 provider output, DSN, or credentials.
 
-- [ ] **Step 3: Add failing archive projection tests.**
+- [x] **Step 3: Add failing archive projection tests.**
 
 Archive must atomically change lifecycle, remove lexical current projection,
 emit an absent outbox event, preserve authorized inspection content, and make
 rebuild keep it absent.
 
-- [ ] **Step 4: Add failing validity-extension and expiry tests.**
+- [x] **Step 4: Add failing validity-extension and expiry tests.**
 
 An expired active memory may be extended. A future memory may become current
 without mutation or worker execution. A correction creates an unbounded new
 revision by default and never inherits the old deadline.
 
-- [ ] **Step 5: Run governance tests and observe RED.**
+- [x] **Step 5: Run governance tests and observe RED.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
@@ -520,18 +520,18 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
 
 Expected: compile failure because operations and commands do not exist.
 
-- [ ] **Step 6: Implement row-locked store mutations and immutable receipts.**
+- [x] **Step 6: Implement row-locked store mutations and immutable receipts.**
 
 Use one transaction, tenant context, target `FOR UPDATE`, request fingerprint,
 insert-or-replay semantics, and exact rows-affected checks. Do not update
 validity or lifecycle before replay conflict is resolved.
 
-- [ ] **Step 7: Make forget participate in the same row-lock ordering.**
+- [x] **Step 7: Make forget participate in the same row-lock ordering.**
 
 `deleteMemoryTx` must lock the target before inspecting lifecycle/content. A
 late validity/archive operation cannot write after committed deletion.
 
-- [ ] **Step 8: Add the operator CLI surface.**
+- [x] **Step 8: Add the operator CLI surface.**
 
 Add:
 
@@ -548,7 +548,7 @@ vermory memory archive \
 
 The command prints structured JSON and never accepts raw content.
 
-- [ ] **Step 9: Run focused and full governance tests.**
+- [x] **Step 9: Run focused and full governance tests.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
@@ -560,7 +560,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit governance operations.**
+- [x] **Step 10: Commit governance operations.**
 
 ```bash
 git add internal/runtime/memory_eligibility_* internal/runtime/governance.go \

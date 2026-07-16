@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"vermory/internal/provider"
 	"vermory/internal/runtime"
@@ -463,7 +464,63 @@ func NewMemoryCommand() *cobra.Command {
 	forget.Flags().StringVar(&forgetMemoryID, "memory-id", "", "memory to redact")
 	markRequired(forget, "repo-root", "operation-id", "memory-id")
 
-	command.AddCommand(inspect, addSource, proposeSource, matchSource, inspectSourceMatch, formDocument, inspectSourceFormation, acceptCandidate, rejectCandidate, reviseSource, correct, forget)
+	var validityContinuityID, validityOperationID, validityMemoryID string
+	var validityFrom, validityUntil string
+	setValidity := &cobra.Command{
+		Use:   "set-validity",
+		Short: "Set or clear the current-use validity interval for one memory",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			validFrom, err := parseOptionalUTCEligibilityTime("--valid-from", validityFrom)
+			if err != nil {
+				return err
+			}
+			validUntil, err := parseOptionalUTCEligibilityTime("--valid-until", validityUntil)
+			if err != nil {
+				return err
+			}
+			return withMemoryEligibility(cmd.Context(), options, func(service *runtime.MemoryEligibilityService) error {
+				receipt, err := service.SetValidity(cmd.Context(), runtime.SetMemoryValidityRequest{
+					OperationID: validityOperationID, ContinuityID: validityContinuityID,
+					MemoryID: validityMemoryID, ValidFrom: validFrom, ValidUntil: validUntil,
+				})
+				if err != nil {
+					return err
+				}
+				return writeJSON(cmd, receipt)
+			})
+		},
+	}
+	setValidity.Flags().StringVar(&validityContinuityID, "continuity-id", "", "exact continuity identifier")
+	setValidity.Flags().StringVar(&validityOperationID, "operation-id", "", "idempotency key")
+	setValidity.Flags().StringVar(&validityMemoryID, "memory-id", "", "exact governed memory identifier")
+	setValidity.Flags().StringVar(&validityFrom, "valid-from", "", "inclusive UTC RFC3339 boundary")
+	setValidity.Flags().StringVar(&validityUntil, "valid-until", "", "exclusive UTC RFC3339 boundary")
+	markRequired(setValidity, "continuity-id", "operation-id", "memory-id")
+
+	var archiveContinuityID, archiveOperationID, archiveMemoryID string
+	archive := &cobra.Command{
+		Use:   "archive",
+		Short: "Remove one memory from current use while preserving authorized history",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return withMemoryEligibility(cmd.Context(), options, func(service *runtime.MemoryEligibilityService) error {
+				receipt, err := service.Archive(cmd.Context(), runtime.ArchiveMemoryRequest{
+					OperationID: archiveOperationID, ContinuityID: archiveContinuityID, MemoryID: archiveMemoryID,
+				})
+				if err != nil {
+					return err
+				}
+				return writeJSON(cmd, receipt)
+			})
+		},
+	}
+	archive.Flags().StringVar(&archiveContinuityID, "continuity-id", "", "exact continuity identifier")
+	archive.Flags().StringVar(&archiveOperationID, "operation-id", "", "idempotency key")
+	archive.Flags().StringVar(&archiveMemoryID, "memory-id", "", "exact governed memory identifier")
+	markRequired(archive, "continuity-id", "operation-id", "memory-id")
+
+	command.AddCommand(inspect, addSource, proposeSource, matchSource, inspectSourceMatch, formDocument, inspectSourceFormation, acceptCandidate, rejectCandidate, reviseSource, correct, forget, setValidity, archive)
 	return command
 }
 
@@ -749,6 +806,41 @@ func withGovernance(ctx context.Context, options connectionOptions, run func(*ru
 		return err
 	}
 	return run(runtime.NewGovernanceService(store, options.tenantID))
+}
+
+func withMemoryEligibility(ctx context.Context, options connectionOptions, run func(*runtime.MemoryEligibilityService) error) error {
+	if strings.TrimSpace(options.databaseURL) == "" {
+		return fmt.Errorf("--database-url is required")
+	}
+	if strings.TrimSpace(options.tenantID) == "" {
+		return fmt.Errorf("--tenant-id is required")
+	}
+	store, err := runtime.OpenStore(ctx, options.databaseURL)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx); err != nil {
+		return err
+	}
+	return run(runtime.NewMemoryEligibilityService(store, options.tenantID))
+}
+
+func parseOptionalUTCEligibilityTime(name, raw string) (*time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, raw)
+	if err != nil {
+		return nil, fmt.Errorf("%s must be RFC3339: %w", name, err)
+	}
+	_, offset := parsed.Zone()
+	if offset != 0 {
+		return nil, fmt.Errorf("%s must use UTC", name)
+	}
+	parsed = parsed.UTC()
+	return &parsed, nil
 }
 
 func withGlobalDefaults(ctx context.Context, options connectionOptions, run func(*runtime.GlobalDefaultsService) error) error {

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"vermory/internal/runtime"
 
@@ -150,6 +151,46 @@ func TestWorkspaceAndMemoryCommandsCompleteGovernedFlow(t *testing.T) {
 	}
 
 	assertNoActiveCheckoutFact(t, databaseURL, confirmed.ContinuityID)
+}
+
+func TestMemoryEligibilityCommands(t *testing.T) {
+	databaseURL := resetCommandStore(t)
+	store, err := runtime.OpenStore(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(store.Close)
+	continuityID, err := store.ConfirmWorkspaceBinding(context.Background(), "local", "/fixtures/cli-eligibility")
+	if err != nil {
+		t.Fatal(err)
+	}
+	seed, err := runtime.NewGovernanceService(store, "local").AddSource(context.Background(), "/fixtures/cli-eligibility", runtime.GovernanceWriteRequest{
+		OperationID: "cli-eligibility-seed", Content: "CLI eligibility memory", SourceRef: "fixture:cli-eligibility",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	validUntil := "2026-07-21T06:00:00Z"
+	set := runMemoryEligibilityJSONCommand(t, databaseURL,
+		"memory", "set-validity",
+		"--continuity-id", continuityID,
+		"--operation-id", "cli-set-validity",
+		"--memory-id", seed.Memory.MemoryID,
+		"--valid-until", validUntil,
+	)
+	if set.Action != "set_validity" || set.MemoryID != seed.Memory.MemoryID || set.ResultValidity.ValidUntil == nil || set.ResultValidity.ValidUntil.Format(time.RFC3339) != validUntil {
+		t.Fatalf("unexpected set-validity receipt: %#v", set)
+	}
+	archived := runMemoryEligibilityJSONCommand(t, databaseURL,
+		"memory", "archive",
+		"--continuity-id", continuityID,
+		"--operation-id", "cli-archive",
+		"--memory-id", seed.Memory.MemoryID,
+	)
+	if archived.Action != "archive" || archived.ResultState != runtime.MemoryEffectiveArchived {
+		t.Fatalf("unexpected archive receipt: %#v", archived)
+	}
 }
 
 func TestMemorySourceRevisionCommandKeepsIndependentFact(t *testing.T) {
@@ -955,6 +996,23 @@ func runBridgeJSONCommand(t *testing.T, databaseURL string, args ...string) comm
 		t.Fatal(err)
 	}
 	var receipt commandBridgeReceipt
+	if err := json.Unmarshal(output.Bytes(), &receipt); err != nil {
+		t.Fatal(err)
+	}
+	return receipt
+}
+
+func runMemoryEligibilityJSONCommand(t *testing.T, databaseURL string, args ...string) runtime.MemoryEligibilityReceipt {
+	t.Helper()
+	var output bytes.Buffer
+	root := newTestRoot()
+	root.SetOut(&output)
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs(append(args, "--database-url", databaseURL, "--tenant-id", "local"))
+	if err := root.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var receipt runtime.MemoryEligibilityReceipt
 	if err := json.Unmarshal(output.Bytes(), &receipt); err != nil {
 		t.Fatal(err)
 	}

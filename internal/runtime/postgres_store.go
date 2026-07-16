@@ -708,7 +708,8 @@ func deleteMemoryTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, memo
 	err := tx.QueryRow(ctx, `
 SELECT lifecycle_status, origin_observation_id::text, content
 FROM governed_memories memory
-WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid`, memoryID, tenantID, continuityID).Scan(&lifecycleStatus, &originObservationID, &memoryContent)
+WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid
+FOR UPDATE`, memoryID, tenantID, continuityID).Scan(&lifecycleStatus, &originObservationID, &memoryContent)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return fmt.Errorf("memory does not belong to this continuity")
 	}
