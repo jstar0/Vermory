@@ -1031,7 +1031,7 @@ git add docs/superpowers/plans/2026-07-16-projection-event-retention-pruning.md
 git commit -m "docs: close projection retention qualification"
 ```
 
-- [ ] **Step 4: Push the final checklist head and run protected CI.**
+- [x] **Step 4: Push the final checklist head and run protected CI.**
 
 ```bash
 git push origin agent/grok-cli-runtime
@@ -1041,14 +1041,14 @@ gh run list --branch agent/grok-cli-runtime --limit 10
 Wait for the run whose second parent/head corresponds to the final checklist
 revision. Do not treat an earlier green run as final evidence.
 
-- [ ] **Step 5: Download and independently verify the final artifact.**
+- [x] **Step 5: Download and independently verify the final artifact.**
 
 Verify artifact ID/name/size/SHA-256, embedded `git-info.txt`, synthetic merge
 parents, checksums, binary execution, and that the second parent equals the
 final checklist head. Record these values in the W18 evidence document if the
 workflow does not already preserve them.
 
-- [ ] **Step 6: Update Draft PR 1 exactly once.**
+- [x] **Step 6: Update Draft PR 1 exactly once.**
 
 Append one and only one section headed:
 
@@ -1060,7 +1060,7 @@ Include the final checklist revision, CI run/job, artifact identity/hash,
 synthetic merge, 14/14 gate result, provider tuple, and explicit remaining
 boundaries. Confirm the PR remains OPEN, Draft, CLEAN, and MERGEABLE.
 
-- [ ] **Step 7: Verify final repository state.**
+- [x] **Step 7: Verify final repository state.**
 
 ```bash
 git status --short --branch
