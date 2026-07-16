@@ -387,8 +387,8 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 		t.Fatalf("post-restore vector deletion changed authority: source=%s reset=%s", sourceFingerprint, resetFingerprint)
 	}
 	targetWorker := mustProjectionWorker(t, target, embedder, "ops-retrieval-tenant", 16)
-	if _, err := targetWorker.RunOnce(ctx); err != nil {
-		t.Fatal(err)
+	if rebuild, err := targetWorker.RebuildCurrent(ctx); err != nil || rebuild.Projected != 1 || rebuild.Lag != 0 {
+		t.Fatalf("incumbent rebuild after restore=%#v err=%v", rebuild, err)
 	}
 	rebuiltResult, err := targetCoordinator.Retrieve(ctx, RetrievalRequest{
 		OperationID:   "ops-retrieval-after-rebuild",

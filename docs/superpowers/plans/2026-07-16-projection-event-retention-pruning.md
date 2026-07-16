@@ -287,7 +287,7 @@ git commit -m "feat: add projection retention floor"
 ```go
 func ensureProjectionCursor(
     ctx context.Context,
-    querier retrievalCursorQuerier,
+    connection *pgxpool.Conn,
     tenantID string,
     profileID string,
 ) (rebuildRequired bool, err error)

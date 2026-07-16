@@ -24,6 +24,103 @@ type projectionTestEmbedder struct {
 	release chan struct{}
 }
 
+func TestProjectionWorkerRequiresRebuildBelowRetentionFloor(t *testing.T) {
+	store, tenantID, repoRoot, active := seedProjectionWorkerActive(t, "retention-worker-below-floor")
+	ctx := context.Background()
+	floor := latestProjectionEventID(t, store, tenantID)
+	setProjectionRetentionFloor(t, store, tenantID, floor)
+	if _, err := store.pool.Exec(ctx, `
+DELETE FROM memory_projection_events
+WHERE tenant_id = $1 AND event_id <= $2`, tenantID, floor); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.pool.Exec(ctx, `
+INSERT INTO memory_projection_cursors (tenant_id, profile_id, last_event_id, status)
+VALUES ($1, $2, 0, 'idle')`, tenantID, ProductionRetrievalProfileID); err != nil {
+		t.Fatal(err)
+	}
+	embedder := &projectionTestEmbedder{vector: testVector1024(0.25)}
+	worker := mustProjectionWorker(t, store, embedder, tenantID, 8)
+	result, err := worker.RunOnce(ctx)
+	if err == nil || result.FailureCode != ProjectionFailureRebuildRequired ||
+		result.Status != ProjectionStatusRebuildRequired || result.LastEventID != 0 || result.Lag != 0 {
+		t.Fatalf("worker silently skipped pruned history: result=%#v err=%v", result, err)
+	}
+	if embedder.calls.Load() != 0 {
+		t.Fatalf("worker embedded below the floor: calls=%d", embedder.calls.Load())
+	}
+	status, err := store.RetrievalProjectionStatus(ctx, tenantID, ProductionRetrievalProfileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.LastEventID != 0 || status.PrunedThroughEventID != floor ||
+		status.Status != ProjectionStatusRebuildRequired || status.LastErrorCode != ProjectionFailureRebuildRequired {
+		t.Fatalf("unexpected rebuild-required cursor: %#v", status)
+	}
+
+	rebuild, err := worker.RebuildCurrent(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rebuild.Watermark != floor || rebuild.LastEventID != floor || rebuild.Lag != 0 ||
+		rebuild.Status != "idle" || rebuild.Projected != 1 {
+		t.Fatalf("rebuild did not recover from the retention floor: %#v", rebuild)
+	}
+	if embedder.calls.Load() != 1 {
+		t.Fatalf("authority rebuild calls=%d want 1", embedder.calls.Load())
+	}
+	assertVectorPresence(t, store, active.Memory.MemoryID, true)
+
+	revised, err := NewGovernanceService(store, tenantID).ReviseSource(ctx, repoRoot, active.Memory.MemoryID, GovernanceWriteRequest{
+		OperationID: "retention-worker-after-rebuild",
+		MemoryKey:   "projection.current",
+		Content:     "Current projection fact after retention rebuild.",
+		SourceRef:   "fixture:retention-worker-after-rebuild",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tail, err := worker.RunOnce(ctx)
+	if err != nil || tail.Lag != 0 || tail.Status != "idle" {
+		t.Fatalf("worker did not drain the retained tail: result=%#v err=%v", tail, err)
+	}
+	assertVectorPresence(t, store, revised.Memory.MemoryID, true)
+}
+
+func TestProjectionWorkerCreatesFutureSubscriberAsRebuildRequired(t *testing.T) {
+	store, tenantID, _, _ := seedProjectionWorkerActive(t, "retention-worker-future")
+	ctx := context.Background()
+	floor := latestProjectionEventID(t, store, tenantID)
+	setProjectionRetentionFloor(t, store, tenantID, floor)
+	if _, err := store.pool.Exec(ctx, `DELETE FROM memory_projection_events WHERE tenant_id = $1`, tenantID); err != nil {
+		t.Fatal(err)
+	}
+	spec, ok := SupportedRetrievalProfile(MigrationRetrievalProfileID)
+	if !ok {
+		t.Fatal("future subscriber profile is not registered")
+	}
+	embedder := &projectionTestEmbedder{vector: testVector1024(0.5)}
+	worker, err := NewProjectionWorker(store, embedder, ProjectionWorkerOptions{
+		TenantID: tenantID,
+		Profile: RetrievalProfile{
+			ID: spec.ID, BaseURL: spec.BaseURL, Model: spec.Model,
+			Dimensions: spec.Dimensions, ProjectionClass: spec.ProjectionClass,
+		},
+		BatchSize: 8,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := worker.RunOnce(ctx)
+	if err == nil || result.FailureCode != ProjectionFailureRebuildRequired ||
+		result.LastEventID != floor || result.Status != ProjectionStatusRebuildRequired {
+		t.Fatalf("future subscriber pretended to consume pruned history: result=%#v err=%v", result, err)
+	}
+	if embedder.calls.Load() != 0 {
+		t.Fatalf("future subscriber embedded before rebuild: calls=%d", embedder.calls.Load())
+	}
+}
+
 func (e *projectionTestEmbedder) Embed(ctx context.Context, content string) ([]float32, error) {
 	e.calls.Add(1)
 	if e.started != nil {

@@ -247,6 +247,66 @@ func TestRetrievalCoordinatorVectorFallsBackByteExactlyWhenProjectionIsStale(t *
 	_ = memories
 }
 
+func TestRetrievalCoordinatorFallsBackForNonIdleProjectionStates(t *testing.T) {
+	for _, cursorStatus := range []string{"running", "failed"} {
+		t.Run(cursorStatus, func(t *testing.T) {
+			tenantID := "retrieval-state-" + cursorStatus
+			store, continuityID, memories := seedCoordinatorWorkspace(t, tenantID)
+			insertCurrentCursor(t, store, tenantID)
+			insertVectorDocument(t, store, tenantID, continuityID, memories[0].Memory.MemoryID, testVectorWithFirstValue(1))
+			if _, err := store.pool.Exec(context.Background(), `
+UPDATE memory_projection_cursors
+SET status = $3
+WHERE tenant_id = $1 AND profile_id = $2`, tenantID, ProductionRetrievalProfileID, cursorStatus); err != nil {
+				t.Fatal(err)
+			}
+			embedder := &projectionTestEmbedder{vector: testVectorWithFirstValue(1)}
+			coordinator := mustRetrievalCoordinator(t, store, embedder)
+			result, err := coordinator.Retrieve(context.Background(), RetrievalRequest{
+				OperationID: "retrieval-state-" + cursorStatus + "-op",
+				TenantID:    tenantID, ContinuityIDs: []string{continuityID},
+				Query: "rollback maintainers", Limit: 5, Mode: RetrievalVector,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Effective != RetrievalLexical || !result.Degraded || embedder.calls.Load() != 0 {
+				t.Fatalf("non-idle projection was queried: result=%#v calls=%d", result, embedder.calls.Load())
+			}
+			assertRetrievalAudit(t, store, tenantID, "retrieval-state-"+cursorStatus+"-op", RetrievalVector, RetrievalLexical, true, "projection_not_current")
+		})
+	}
+}
+
+func TestRetrievalCoordinatorFallsBackBelowRetentionFloor(t *testing.T) {
+	tenantID := "retrieval-state-rebuild-required"
+	store, continuityID, _ := seedCoordinatorWorkspace(t, tenantID)
+	floor := latestProjectionEventID(t, store, tenantID)
+	setProjectionRetentionFloor(t, store, tenantID, floor)
+	if _, err := store.pool.Exec(context.Background(), `DELETE FROM memory_projection_events WHERE tenant_id = $1`, tenantID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.pool.Exec(context.Background(), `
+INSERT INTO memory_projection_cursors (tenant_id, profile_id, last_event_id, status)
+VALUES ($1, $2, 0, 'idle')`, tenantID, ProductionRetrievalProfileID); err != nil {
+		t.Fatal(err)
+	}
+	embedder := &projectionTestEmbedder{vector: testVectorWithFirstValue(1)}
+	coordinator := mustRetrievalCoordinator(t, store, embedder)
+	result, err := coordinator.Retrieve(context.Background(), RetrievalRequest{
+		OperationID: "retrieval-state-rebuild-required-op",
+		TenantID:    tenantID, ContinuityIDs: []string{continuityID},
+		Query: "rollback maintainers", Limit: 5, Mode: RetrievalVector,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Effective != RetrievalLexical || !result.Degraded || embedder.calls.Load() != 0 {
+		t.Fatalf("below-floor projection was queried: result=%#v calls=%d", result, embedder.calls.Load())
+	}
+	assertRetrievalAudit(t, store, tenantID, "retrieval-state-rebuild-required-op", RetrievalVector, RetrievalLexical, true, ProjectionFailureRebuildRequired)
+}
+
 func TestRetrievalCoordinatorVectorFallsBackForProviderAndEmptyProjection(t *testing.T) {
 	store, continuityID, _ := seedCoordinatorWorkspace(t, "retrieval-fallback")
 	insertCurrentCursor(t, store, "retrieval-fallback")

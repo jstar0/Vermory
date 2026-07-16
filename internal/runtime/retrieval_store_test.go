@@ -158,8 +158,78 @@ VALUES ($1, $2, 99, 'idle')`, tenantID, ProductionRetrievalProfileID); err != ni
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.LastEventID != 0 || status.VectorCount != 0 || status.Status != "idle" {
+	if status.LastEventID != 0 || status.VectorCount != 0 ||
+		status.Status != ProjectionStatusRebuildRequired || !status.RebuildRequired ||
+		status.LastErrorCode != ProjectionFailureRebuildRequired {
 		t.Fatalf("unexpected reset status: %#v", status)
+	}
+	memories, err := store.SearchActiveMemory(ctx, tenantID, continuityID, "release-safe --locked", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(memories) != 1 || memories[0].ID != active.Memory.MemoryID {
+		t.Fatalf("reset changed authority or lexical state: %#v", memories)
+	}
+}
+
+func TestResetVectorProjectionAfterRetentionRequiresRebuildAndIsolatesProfiles(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	tenantID := "retrieval-reset-retention"
+	repoRoot := "/fixtures/retrieval-reset-retention"
+	governance := NewGovernanceService(store, tenantID)
+	if _, err := governance.ConfirmWorkspace(ctx, repoRoot); err != nil {
+		t.Fatal(err)
+	}
+	active, err := governance.AddSource(ctx, repoRoot, GovernanceWriteRequest{
+		OperationID: "retrieval-reset-retention-active",
+		MemoryKey:   "release.command", Content: "Run release-safe --locked.",
+		SourceRef: "fixture:retrieval-reset-retention",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	continuityID := mustWorkspaceContinuity(t, store, tenantID, repoRoot)
+	floor := latestProjectionEventID(t, store, tenantID)
+	setProjectionRetentionFloor(t, store, tenantID, floor)
+	if _, err := store.pool.Exec(ctx, `DELETE FROM memory_projection_events WHERE tenant_id = $1`, tenantID); err != nil {
+		t.Fatal(err)
+	}
+	for _, profileID := range []string{ProductionRetrievalProfileID, MigrationRetrievalProfileID} {
+		if _, err := store.pool.Exec(ctx, `
+INSERT INTO memory_vector_documents (
+  profile_id, tenant_id, continuity_id, memory_id, content_sha256, embedding
+)
+SELECT $1, $2, $3::uuid, $4::uuid,
+       encode(digest(convert_to(content, 'UTF8'), 'sha256'), 'hex'),
+       array_fill(0::real, ARRAY[1024])::vector
+FROM governed_memories
+WHERE tenant_id = $2 AND id = $4::uuid`, profileID, tenantID, continuityID, active.Memory.MemoryID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.pool.Exec(ctx, `
+INSERT INTO memory_projection_cursors (tenant_id, profile_id, last_event_id, status)
+VALUES ($1, $2, $3, 'idle')`, tenantID, profileID, floor); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.ResetVectorProjection(ctx, tenantID, ProductionRetrievalProfileID); err != nil {
+		t.Fatal(err)
+	}
+	status, err := store.RetrievalProjectionStatus(ctx, tenantID, ProductionRetrievalProfileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.LastEventID != floor || status.Status != ProjectionStatusRebuildRequired ||
+		status.LastErrorCode != ProjectionFailureRebuildRequired || status.VectorCount != 0 {
+		t.Fatalf("reset did not require rebuild at floor: %#v", status)
+	}
+	candidate, err := store.RetrievalProjectionStatus(ctx, tenantID, MigrationRetrievalProfileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if candidate.LastEventID != floor || candidate.Status != "idle" || candidate.VectorCount != 1 {
+		t.Fatalf("reset changed candidate profile: %#v", candidate)
 	}
 	memories, err := store.SearchActiveMemory(ctx, tenantID, continuityID, "release-safe --locked", 5)
 	if err != nil {

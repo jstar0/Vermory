@@ -142,8 +142,8 @@ func TestLiveRetrievalProfileMigrationPreservesProductionProjection(t *testing.T
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := worker.RunOnce(ctx); err != nil {
-			t.Fatalf("build production profile for %s: %v", tenantID, err)
+		if result, err := worker.RebuildCurrent(ctx); err != nil || result.Lag != 0 {
+			t.Fatalf("build production profile for %s: result=%#v err=%v", tenantID, result, err)
 		}
 	}
 
@@ -167,8 +167,8 @@ func TestLiveRetrievalProfileMigrationPreservesProductionProjection(t *testing.T
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := worker.RunOnce(ctx); err != nil {
-			t.Fatalf("build migration profile for %s: %v", tenantID, err)
+		if result, err := worker.RebuildCurrent(ctx); err != nil || result.Lag != 0 {
+			t.Fatalf("build migration profile for %s: result=%#v err=%v", tenantID, result, err)
 		}
 	}
 

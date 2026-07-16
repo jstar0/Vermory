@@ -250,7 +250,7 @@ WHERE tenant_id = $1 AND profile_id = $2 AND memory_id = $3::uuid`, manifest.Wor
 	if afterReset := productionAuthorityFingerprint(t, pool); afterReset != beforeAuthority {
 		t.Fatalf("vector reset changed authority: before=%s after=%s", beforeAuthority, afterReset)
 	}
-	runProductionWorkerCurrent(t, store, manifest.Workspace.TenantID, embedder, retrievalProfile(manifest))
+	rebuildProductionWorkerCurrent(t, store, manifest.Workspace.TenantID, embedder, retrievalProfile(manifest))
 	afterRebuild, err := coordinator.Retrieve(ctx, runtime.RetrievalRequest{
 		OperationID:   "w09-after-rebuild",
 		TenantID:      manifest.Workspace.TenantID,
@@ -415,6 +415,20 @@ func runProductionWorkerCurrent(t *testing.T, store *runtime.Store, tenantID str
 		}
 	}
 	t.Fatal("projection worker did not reach a current cursor")
+}
+
+func rebuildProductionWorkerCurrent(t *testing.T, store *runtime.Store, tenantID string, embedder runtime.Embedder, profile runtime.RetrievalProfile) {
+	t.Helper()
+	worker, err := runtime.NewProjectionWorker(store, embedder, runtime.ProjectionWorkerOptions{
+		TenantID: tenantID, Profile: profile, SnapshotPageSize: 256,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := worker.RebuildCurrent(context.Background())
+	if err != nil || result.Lag != 0 || result.Status != "idle" {
+		t.Fatalf("projection snapshot rebuild did not reach current: result=%#v err=%v", result, err)
+	}
 }
 
 type productionRetrievalEmbedder struct{}

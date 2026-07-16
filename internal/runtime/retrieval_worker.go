@@ -61,8 +61,17 @@ func (w *ProjectionWorker) RunOnce(ctx context.Context) (ProjectionRunResult, er
 		_, _ = connection.Exec(context.Background(), `SELECT pg_advisory_unlock($1, $2)`, lockKey1, lockKey2)
 	}()
 
-	if err := ensureProjectionCursor(tenantCtx, connection, w.options.TenantID, w.options.Profile.ID); err != nil {
+	rebuildRequired, err := ensureProjectionCursor(tenantCtx, connection, w.options.TenantID, w.options.Profile.ID)
+	if err != nil {
 		return ProjectionRunResult{}, err
+	}
+	if rebuildRequired {
+		status, statusErr := retrievalProjectionStatus(tenantCtx, connection, w.options.TenantID, w.options.Profile.ID)
+		if statusErr != nil {
+			return ProjectionRunResult{}, statusErr
+		}
+		return projectionResult(status, 0, ProjectionFailureRebuildRequired, false),
+			projectionRunError{code: ProjectionFailureRebuildRequired}
 	}
 	processed := 0
 	for processed < w.options.BatchSize {
@@ -128,9 +137,18 @@ func (w *ProjectionWorker) RebuildCurrent(ctx context.Context) (ProjectionRebuil
 
 	var watermark int64
 	if err := connection.QueryRow(tenantCtx, `
-SELECT COALESCE(max(event_id), 0)
-FROM memory_projection_events
-WHERE tenant_id = $1`, w.options.TenantID).Scan(&watermark); err != nil {
+	SELECT GREATEST(
+	  COALESCE((
+	    SELECT max(event_id)
+	    FROM memory_projection_events
+	    WHERE tenant_id = $1
+	  ), 0),
+	  COALESCE((
+	    SELECT pruned_through_event_id
+	    FROM memory_projection_retention
+	    WHERE tenant_id = $1
+	  ), 0)
+	)`, w.options.TenantID).Scan(&watermark); err != nil {
 		return ProjectionRebuildResult{}, fmt.Errorf("read projection rebuild watermark: %w", err)
 	}
 	tx, err := connection.Begin(tenantCtx)
@@ -421,18 +439,43 @@ WHERE tenant_id = $1 AND profile_id = $2`, w.options.TenantID, w.options.Profile
 	return projectionResult(status, processed, code, false), projectionRunError{code: code}
 }
 
-func ensureProjectionCursor(ctx context.Context, connection *pgxpool.Conn, tenantID, profileID string) error {
-	_, err := connection.Exec(ctx, `
-INSERT INTO memory_projection_cursors (tenant_id, profile_id, status, last_attempt_at)
-VALUES ($1, $2, 'running', now())
+func ensureProjectionCursor(ctx context.Context, connection *pgxpool.Conn, tenantID, profileID string) (bool, error) {
+	var rebuildRequired bool
+	err := connection.QueryRow(ctx, `
+INSERT INTO memory_projection_cursors (
+  tenant_id, profile_id, last_event_id, status, last_error_code, last_attempt_at
+)
+SELECT $1, $2, boundary.floor,
+       CASE WHEN boundary.floor > 0 THEN 'rebuild_required' ELSE 'running' END,
+       CASE WHEN boundary.floor > 0 THEN 'projection_rebuild_required' ELSE '' END,
+       now()
+FROM (
+  SELECT COALESCE((
+    SELECT pruned_through_event_id
+    FROM memory_projection_retention
+    WHERE tenant_id = $1
+  ), 0) AS floor
+) boundary
 ON CONFLICT (tenant_id, profile_id) DO UPDATE SET
-  status = 'running',
+  status = CASE
+    WHEN memory_projection_cursors.status = 'rebuild_required'
+      OR memory_projection_cursors.last_event_id < EXCLUDED.last_event_id
+    THEN 'rebuild_required'
+    ELSE 'running'
+  END,
+  last_error_code = CASE
+    WHEN memory_projection_cursors.status = 'rebuild_required'
+      OR memory_projection_cursors.last_event_id < EXCLUDED.last_event_id
+    THEN 'projection_rebuild_required'
+    ELSE ''
+  END,
   last_attempt_at = now(),
-  updated_at = now()`, tenantID, profileID)
+  updated_at = now()
+RETURNING status = 'rebuild_required'`, tenantID, profileID).Scan(&rebuildRequired)
 	if err != nil {
-		return fmt.Errorf("initialize projection cursor: %w", err)
+		return false, fmt.Errorf("initialize projection cursor: %w", err)
 	}
-	return nil
+	return rebuildRequired, nil
 }
 
 func nextProjectionEvent(ctx context.Context, connection *pgxpool.Conn, tenantID, profileID string) (ProjectionEvent, bool, error) {

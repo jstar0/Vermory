@@ -49,16 +49,17 @@ WHERE tenant_id = $1 AND profile_id = $2`, tenantID, profileID).Scan(
 		return ProjectionStatus{}, err
 	}
 	status.PrunedThroughEventID = retention.PrunedThroughEventID
-	status.RebuildRequired = status.Status == ProjectionStatusRebuildRequired
+	status.RebuildRequired = status.Status == ProjectionStatusRebuildRequired ||
+		status.LastEventID < status.PrunedThroughEventID
 	if err := querier.QueryRow(ctx, `
 SELECT GREATEST(COALESCE((
          SELECT max(event_id)
          FROM memory_projection_events
          WHERE tenant_id = $1
-       ), 0), $2),
+       ), 0), $2, $3),
        (SELECT count(*)
         FROM memory_projection_events
-        WHERE tenant_id = $1 AND event_id > $2)`, tenantID, status.LastEventID).Scan(&status.LatestEventID, &status.Lag); err != nil {
+        WHERE tenant_id = $1 AND event_id > $2)`, tenantID, status.LastEventID, status.PrunedThroughEventID).Scan(&status.LatestEventID, &status.Lag); err != nil {
 		return ProjectionStatus{}, fmt.Errorf("read latest retrieval projection event: %w", err)
 	}
 	if err := querier.QueryRow(ctx, projectionSQL.count, tenantID, profileID).Scan(&status.VectorCount); err != nil {
@@ -100,18 +101,27 @@ func (s *Store) ResetVectorProjection(ctx context.Context, tenantID, profileID s
 	if _, err := tx.Exec(ctx, projectionSQL.clearTenant, tenantID, profileID); err != nil {
 		return fmt.Errorf("clear vector projection: %w", err)
 	}
+	var floor int64
+	if err := tx.QueryRow(ctx, `
+SELECT COALESCE((
+  SELECT pruned_through_event_id
+  FROM memory_projection_retention
+  WHERE tenant_id = $1
+), 0)`, tenantID).Scan(&floor); err != nil {
+		return fmt.Errorf("read vector projection retention floor: %w", err)
+	}
 	if _, err := tx.Exec(ctx, `
 INSERT INTO memory_projection_cursors (
   tenant_id, profile_id, last_event_id, status, attempt_count,
   last_error_code, last_attempt_at, updated_at
-) VALUES ($1, $2, 0, 'idle', 0, '', NULL, now())
+) VALUES ($1, $2, $3, 'rebuild_required', 0, 'projection_rebuild_required', NULL, now())
 ON CONFLICT (tenant_id, profile_id) DO UPDATE SET
-  last_event_id = 0,
-  status = 'idle',
+  last_event_id = EXCLUDED.last_event_id,
+  status = 'rebuild_required',
   attempt_count = 0,
-  last_error_code = '',
+  last_error_code = 'projection_rebuild_required',
   last_attempt_at = NULL,
-  updated_at = now()`, tenantID, profileID); err != nil {
+  updated_at = now()`, tenantID, profileID, floor); err != nil {
 		return fmt.Errorf("reset vector projection cursor: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {

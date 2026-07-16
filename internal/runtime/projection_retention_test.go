@@ -77,3 +77,29 @@ func TestProjectionStatusReportsRetentionFloor(t *testing.T) {
 		}
 	}
 }
+
+func setProjectionRetentionFloor(t *testing.T, store *Store, tenantID string, floor int64) {
+	t.Helper()
+	if _, err := store.pool.Exec(context.Background(), `
+INSERT INTO memory_projection_retention (
+  tenant_id, pruned_through_event_id, last_pruned_at, updated_at
+) VALUES ($1, $2, now(), now())
+ON CONFLICT (tenant_id) DO UPDATE SET
+  pruned_through_event_id = EXCLUDED.pruned_through_event_id,
+  last_pruned_at = EXCLUDED.last_pruned_at,
+  updated_at = EXCLUDED.updated_at`, tenantID, floor); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func latestProjectionEventID(t *testing.T, store *Store, tenantID string) int64 {
+	t.Helper()
+	var eventID int64
+	if err := store.pool.QueryRow(context.Background(), `
+SELECT COALESCE(max(event_id), 0)
+FROM memory_projection_events
+WHERE tenant_id = $1`, tenantID).Scan(&eventID); err != nil {
+		t.Fatal(err)
+	}
+	return eventID
+}

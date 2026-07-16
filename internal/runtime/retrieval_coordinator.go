@@ -80,6 +80,10 @@ func (c *RetrievalCoordinator) Retrieve(ctx context.Context, request RetrievalRe
 	status, statusErr := c.store.RetrievalProjectionStatus(ctx, normalized.TenantID, c.profile.ID)
 	if statusErr != nil {
 		failureCode = "projection_unavailable"
+	} else if status.RebuildRequired {
+		failureCode = ProjectionFailureRebuildRequired
+	} else if status.Status != "idle" {
+		failureCode = "projection_not_current"
 	} else if status.Lag != 0 {
 		failureCode = "projection_lag"
 	} else {
