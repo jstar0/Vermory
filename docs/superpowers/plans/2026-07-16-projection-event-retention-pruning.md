@@ -158,7 +158,7 @@ fingerprints, and invalid prune results.
 Run:
 
 ```bash
-VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime \
   -run 'TestProjectionRetentionCaseIsFrozen|TestProjectionRetentionSchema|TestRetrievalMigrationUpDown'
 ```
@@ -247,7 +247,7 @@ expect 17.
 - [ ] **Step 6: Run migration and focused runtime tests.**
 
 ```bash
-VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime \
   -run 'TestProjectionRetentionCaseIsFrozen|TestProjectionRetentionSchema|TestProjectionRetentionDefaultsToZero|TestProjectionStatusReportsRetentionFloor|TestRetrievalMigrationUpDown|TestOperationsAcceptance'
 ```
@@ -313,7 +313,7 @@ Cover these independent behaviors:
 - [ ] **Step 2: Run worker tests and observe RED.**
 
 ```bash
-VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime \
   -run 'TestProjectionWorker.*Retention|TestProjectionWorker.*RebuildRequired'
 ```
@@ -347,7 +347,7 @@ rows, other profile cursor, and another tenant must remain byte-identical.
 - [ ] **Step 5: Run retrieval/reset tests and observe RED.**
 
 ```bash
-VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime \
   -run 'TestRetrievalCoordinator.*ProjectionState|TestResetVectorProjection.*Retention'
 ```
@@ -372,7 +372,7 @@ the cursor. It writes `last_event_id=floor`, `status=rebuild_required`, and
 - [ ] **Step 7: Run focused and regression tests.**
 
 ```bash
-VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime \
   -run 'TestProjectionWorker|TestRetrievalCoordinator|TestResetVectorProjection|TestRetrievalDimension|TestOperationsAcceptance'
 ```
@@ -461,7 +461,7 @@ writes one idempotent receipt and never lowers the floor.
 - [ ] **Step 3: Run prune tests and observe RED.**
 
 ```bash
-VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime \
   -run 'TestProjectionPrune'
 ```
@@ -504,7 +504,7 @@ the previous floor.
 - [ ] **Step 7: Run focused and package tests.**
 
 ```bash
-VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime -run 'TestProjectionPrune|TestProjectionRetention'
 ```
 
@@ -554,7 +554,7 @@ table and must reject missing retention-floor SELECT.
 - [ ] **Step 2: Run role tests and observe RED.**
 
 ```bash
-VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime \
   -run 'TestRuntimeRole|TestRLSMigration|TestTenantPool'
 ```
@@ -645,7 +645,7 @@ Expected: PASS and one retained injected failure record in test output.
 - [ ] **Step 8: Run CLI, RLS, role, and recovery regressions.**
 
 ```bash
-VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
   go test -p 1 -count=1 ./cmd/vermory ./internal/runtime \
   -run 'TestRetrievalPrune|TestRuntimeRole|TestRLSMigration|TestTenantPool|TestOperationsAcceptance'
 ```
@@ -834,7 +834,7 @@ profiles, one future subscriber, 10 retained events per tenant, and one
 interrupted prune. Exercise all fourteen gates with deterministic embedders.
 
 ```bash
-VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime \
   -run TestProjectionRetentionMiniatureProfile -v
 ```
@@ -891,7 +891,7 @@ passes its cursor. After catch-up, retention must reach the calibrated bound.
 - [ ] **Step 7: Run all deterministic W18 tests.**
 
 ```bash
-VERMORY_TEST_DATABASE_URL='postgresql:///vermory_test?host=/tmp' \
+VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
   go test -p 1 -count=1 ./internal/runtime \
   -run 'TestProjectionRetention|TestProjectionPrune|TestRetrievalCoordinator.*ProjectionState|TestResetVectorProjection.*Retention' -v
 ```
