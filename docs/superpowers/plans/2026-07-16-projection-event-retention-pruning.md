@@ -524,7 +524,10 @@ git commit -m "feat: prune projection events atomically"
 ### Task 5: Add Runtime Read-Only Boundary, RLS Proofs, CLI, And Restart Recovery
 
 **Files:**
+- Modify: `internal/authn/provision.go`
+- Modify: `internal/authn/postgres_test.go`
 - Modify: `internal/runtime/postgres_store.go`
+- Modify: `internal/runtime/tenant_context.go`
 - Modify: `internal/runtime/rls_migration_test.go`
 - Modify: `internal/runtime/tenant_pool_test.go`
 - Modify: `internal/runtime/operations_acceptance_test.go`
@@ -636,7 +639,7 @@ Run:
 ```bash
 VERMORY_W18_RESTART_TEST=1 \
 VERMORY_POSTGRES18_BIN='/opt/homebrew/opt/postgresql@18/bin' \
-VERMORY_W18_ROOT='/tmp/vermory-w18-restart-unique' \
+VERMORY_W18_ROOT="/tmp/vermory-w18-restart-$(date -u +%Y%m%dT%H%M%SZ)" \
   go test -p 1 -count=1 ./internal/runtime -run TestProjectionPruneRestartRollback -v
 ```
 
@@ -655,7 +658,8 @@ Expected: PASS.
 - [ ] **Step 9: Commit the operator boundary.**
 
 ```bash
-git add internal/runtime/postgres_store.go \
+git add internal/authn/provision.go internal/authn/postgres_test.go \
+  internal/runtime/postgres_store.go internal/runtime/tenant_context.go \
   internal/runtime/rls_migration_test.go internal/runtime/tenant_pool_test.go \
   internal/runtime/operations_acceptance_test.go \
   internal/runtime/projection_prune_restart_test.go \

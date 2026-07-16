@@ -107,6 +107,7 @@ func newRootCommand() *cobra.Command {
 	rootCmd.AddCommand(newRetrievalStatusCommand())
 	rootCmd.AddCommand(newRetrievalRebuildCommand())
 	rootCmd.AddCommand(newRetrievalSnapshotRebuildCommand())
+	rootCmd.AddCommand(newRetrievalPruneEventsCommand())
 
 	mcpStdioCmd := &cobra.Command{
 		Use:   "mcp-stdio",

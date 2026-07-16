@@ -335,6 +335,70 @@ func newRetrievalStatusCommand() *cobra.Command {
 	return command
 }
 
+type retrievalPruneEventsCommandOptions struct {
+	DatabaseURL      string
+	TenantID         string
+	OperationID      string
+	Before           string
+	RetainTailEvents int
+}
+
+func newRetrievalPruneEventsCommand() *cobra.Command {
+	options := retrievalPruneEventsCommandOptions{}
+	command := &cobra.Command{
+		Use:   "retrieval-prune-events",
+		Short: "Prune one tenant's acknowledged retrieval projection events",
+		Args:  cobra.NoArgs,
+		RunE: func(command *cobra.Command, args []string) error {
+			if strings.TrimSpace(options.DatabaseURL) == "" {
+				return fmt.Errorf("--database-url is required")
+			}
+			if strings.TrimSpace(options.TenantID) == "" {
+				return fmt.Errorf("--tenant-id is required")
+			}
+			if strings.TrimSpace(options.OperationID) == "" {
+				return fmt.Errorf("--operation-id is required")
+			}
+			before, err := time.Parse(time.RFC3339, strings.TrimSpace(options.Before))
+			if err != nil {
+				return fmt.Errorf("--before must be RFC3339")
+			}
+			if options.RetainTailEvents < 0 {
+				return fmt.Errorf("--retain-tail-events must be non-negative")
+			}
+			store, err := runtime.OpenStore(command.Context(), options.DatabaseURL)
+			if err != nil {
+				return fmt.Errorf("open projection prune store")
+			}
+			defer store.Close()
+			version, err := store.SchemaVersion(command.Context())
+			if err != nil {
+				return fmt.Errorf("read projection prune schema version")
+			}
+			if version != 17 {
+				return fmt.Errorf("projection pruning requires schema 17")
+			}
+			if err := store.ValidateProjectionPruneOperatorRole(command.Context()); err != nil {
+				return err
+			}
+			receipt, err := store.PruneProjectionEvents(command.Context(), options.TenantID, runtime.ProjectionPruneRequest{
+				OperationID: strings.TrimSpace(options.OperationID), Cutoff: before,
+				RetainTailEvents: options.RetainTailEvents,
+			})
+			if err != nil {
+				return err
+			}
+			return json.NewEncoder(command.OutOrStdout()).Encode(receipt)
+		},
+	}
+	command.Flags().StringVar(&options.DatabaseURL, "database-url", "", "operator PostgreSQL connection URL")
+	command.Flags().StringVar(&options.TenantID, "tenant-id", "", "tenant identifier")
+	command.Flags().StringVar(&options.OperationID, "operation-id", "", "stable prune operation identifier")
+	command.Flags().StringVar(&options.Before, "before", "", "prune events older than this RFC3339 timestamp")
+	command.Flags().IntVar(&options.RetainTailEvents, "retain-tail-events", 0, "newest tenant events to retain")
+	return command
+}
+
 func newRetrievalRebuildCommand() *cobra.Command {
 	var databaseURL, tenantID, profileID string
 	command := &cobra.Command{

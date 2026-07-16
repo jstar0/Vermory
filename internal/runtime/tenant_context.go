@@ -10,6 +10,7 @@ import (
 var (
 	ErrTenantContextRequired = errors.New("runtime tenant context is required")
 	ErrUnsafeRuntimeRole     = errors.New("database role is unsafe for authenticated runtime use")
+	ErrUnsafePruneRole       = errors.New("database role is unsafe for projection pruning")
 )
 
 type tenantContextKey struct{}

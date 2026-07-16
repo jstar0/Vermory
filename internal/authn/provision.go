@@ -13,7 +13,7 @@ import (
 
 var roleIdentifierPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]{0,62}$`)
 
-var servedTables = []string{
+var runtimeReadWriteTables = []string{
 	"continuity_spaces",
 	"continuity_bindings",
 	"conversation_bindings",
@@ -36,6 +36,10 @@ var servedTables = []string{
 	"memory_retrieval_runs",
 }
 
+var runtimeReadOnlyTables = []string{
+	"memory_projection_retention",
+}
+
 var forbiddenRuntimeTables = []string{
 	"vermory_auth.api_tokens",
 	"public.projects",
@@ -47,6 +51,7 @@ var forbiddenRuntimeTables = []string{
 	"public.packets",
 	"public.audit_logs",
 	"public.wcef_runs",
+	"public.memory_projection_prune_runs",
 }
 
 func GrantRuntimeRole(ctx context.Context, pool *pgxpool.Pool, roleName string) error {
@@ -91,9 +96,13 @@ WHERE r.rolname = $1
 	}
 	defer tx.Rollback(ctx)
 	roleSQL := pgx.Identifier{roleName}.Sanitize()
-	servedSQL := make([]string, 0, len(servedTables))
-	for _, table := range servedTables {
-		servedSQL = append(servedSQL, pgx.Identifier{"public", table}.Sanitize())
+	readWriteSQL := make([]string, 0, len(runtimeReadWriteTables))
+	for _, table := range runtimeReadWriteTables {
+		readWriteSQL = append(readWriteSQL, pgx.Identifier{"public", table}.Sanitize())
+	}
+	readOnlySQL := make([]string, 0, len(runtimeReadOnlyTables))
+	for _, table := range runtimeReadOnlyTables {
+		readOnlySQL = append(readOnlySQL, pgx.Identifier{"public", table}.Sanitize())
 	}
 	forbiddenSQL := make([]string, 0, len(forbiddenRuntimeTables))
 	for _, table := range forbiddenRuntimeTables {
@@ -102,7 +111,9 @@ WHERE r.rolname = $1
 	}
 	statements := []string{
 		"GRANT USAGE ON SCHEMA public, vermory_auth TO " + roleSQL,
-		"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE " + strings.Join(servedSQL, ", ") + " TO " + roleSQL,
+		"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE " + strings.Join(readWriteSQL, ", ") + " TO " + roleSQL,
+		"GRANT SELECT ON TABLE " + strings.Join(readOnlySQL, ", ") + " TO " + roleSQL,
+		"REVOKE INSERT, UPDATE, DELETE ON TABLE " + strings.Join(readOnlySQL, ", ") + " FROM " + roleSQL,
 		"GRANT USAGE, SELECT ON SEQUENCE public.observations_observation_seq_seq TO " + roleSQL,
 		"GRANT USAGE, SELECT ON SEQUENCE public.memory_projection_events_event_id_seq TO " + roleSQL,
 		"GRANT EXECUTE ON FUNCTION vermory_auth.authenticate_token(TEXT, BYTEA) TO " + roleSQL,
@@ -114,12 +125,29 @@ WHERE r.rolname = $1
 		}
 	}
 
+	for _, table := range runtimeReadOnlyTables {
+		var canRead, canMutate bool
+		if err := tx.QueryRow(ctx, `
+SELECT has_table_privilege($1, 'public.' || $2, 'SELECT'),
+       has_table_privilege($1, 'public.' || $2, 'INSERT')
+       OR has_table_privilege($1, 'public.' || $2, 'UPDATE')
+       OR has_table_privilege($1, 'public.' || $2, 'DELETE')`, roleName, table).Scan(&canRead, &canMutate); err != nil {
+			return fmt.Errorf("verify runtime read-only boundary: %w", err)
+		}
+		if !canRead || canMutate {
+			return invalidRequest("PostgreSQL role violates runtime read-only table boundary")
+		}
+	}
 	for _, table := range forbiddenRuntimeTables {
-		var canRead bool
-		if err := tx.QueryRow(ctx, `SELECT has_table_privilege($1, $2, 'SELECT')`, roleName, table).Scan(&canRead); err != nil {
+		var canUse bool
+		if err := tx.QueryRow(ctx, `
+SELECT has_table_privilege($1, $2, 'SELECT')
+    OR has_table_privilege($1, $2, 'INSERT')
+    OR has_table_privilege($1, $2, 'UPDATE')
+    OR has_table_privilege($1, $2, 'DELETE')`, roleName, table).Scan(&canUse); err != nil {
 			return fmt.Errorf("verify runtime role boundary: %w", err)
 		}
-		if canRead {
+		if canUse {
 			return invalidRequest("PostgreSQL role inherits forbidden table access")
 		}
 	}

@@ -141,6 +141,18 @@ func TestRuntimeRoleCanLookupButCannotReadAuthOrLegacyTables(t *testing.T) {
 			t.Fatalf("runtime role cannot use %s", table)
 		}
 	}
+	var canReadRetention, canMutateRetention, canUsePruneRuns bool
+	if err := pool.QueryRow(ctx, `
+SELECT has_table_privilege($1, 'public.memory_projection_retention', 'SELECT'),
+       has_table_privilege($1, 'public.memory_projection_retention', 'INSERT,UPDATE,DELETE'),
+       has_table_privilege($1, 'public.memory_projection_prune_runs', 'SELECT,INSERT,UPDATE,DELETE')`,
+		roleName,
+	).Scan(&canReadRetention, &canMutateRetention, &canUsePruneRuns); err != nil {
+		t.Fatal(err)
+	}
+	if !canReadRetention || canMutateRetention || canUsePruneRuns {
+		t.Fatalf("runtime retention privileges read/mutate/prune=%v/%v/%v", canReadRetention, canMutateRetention, canUsePruneRuns)
+	}
 
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
@@ -158,7 +170,10 @@ func TestRuntimeRoleCanLookupButCannotReadAuthOrLegacyTables(t *testing.T) {
 SELECT count(*) FROM vermory_auth.authenticate_token($1, $2)`, "does-not-exist", make([]byte, 32)).Scan(&lookupCount); err != nil {
 		t.Fatalf("runtime role cannot execute token lookup: %v", err)
 	}
-	for _, table := range []string{"vermory_auth.api_tokens", "projects", "sources", "claims", "capsules", "packets", "wcef_runs"} {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM memory_projection_retention`).Scan(&lookupCount); err != nil {
+		t.Fatalf("runtime role cannot read tenant-filtered retention floor: %v", err)
+	}
+	for _, table := range []string{"vermory_auth.api_tokens", "projects", "sources", "claims", "capsules", "packets", "wcef_runs", "memory_projection_prune_runs"} {
 		var ignored int
 		err := conn.QueryRow(ctx, "SELECT count(*) FROM "+table).Scan(&ignored)
 		if err == nil {

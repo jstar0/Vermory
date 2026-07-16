@@ -162,6 +162,21 @@ INSERT INTO memory_retrieval_runs (
 )`, tenantID, graph.continuityID, "retrieval-rls-run-"+tenantID, ProductionRetrievalProfileID); err != nil {
 			t.Fatal(err)
 		}
+		if _, err := admin.pool.Exec(ctx, `
+INSERT INTO memory_projection_retention (tenant_id, pruned_through_event_id)
+VALUES ($1, 0)`, tenantID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.pool.Exec(ctx, `
+INSERT INTO memory_projection_prune_runs (
+  tenant_id, operation_id, request_fingerprint, cutoff, retain_tail_events,
+  safe_cursor_event_id, previous_floor_event_id, new_floor_event_id,
+  deleted_events, result
+) VALUES ($1, $2, repeat('e', 64), now(), 0, 0, 0, 0, 0, 'noop')`,
+			tenantID, "retrieval-rls-prune-"+tenantID,
+		); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	roleName, runtimeURL := createTenantPoolRole(t, admin.pool, databaseURL, "retrieval_rls", "")
@@ -179,6 +194,7 @@ INSERT INTO memory_retrieval_runs (
 		"memory_vector_documents",
 		"memory_vector_documents_2560",
 		"memory_retrieval_runs",
+		"memory_projection_retention",
 	} {
 		if err := runtimeStore.pool.QueryRow(ctx, "SELECT count(*) FROM "+table).Scan(new(int)); err == nil {
 			t.Fatalf("%s did not fail closed without tenant context", table)
@@ -195,6 +211,21 @@ INSERT INTO memory_retrieval_runs (
 			if visible != tenantID {
 				t.Fatalf("%s tenant %s observed %q", table, tenantID, visible)
 			}
+		}
+	}
+	for _, tenantID := range []string{"retrieval-rls-a", "retrieval-rls-b"} {
+		tenantCtx, err := withTenantContext(ctx, tenantID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := runtimeStore.pool.Exec(tenantCtx, `
+UPDATE memory_projection_retention
+SET pruned_through_event_id = pruned_through_event_id + 1`); err == nil {
+			t.Fatalf("runtime role mutated retention floor for %s", tenantID)
+		}
+		if err := runtimeStore.pool.QueryRow(tenantCtx, `
+SELECT count(*) FROM memory_projection_prune_runs`).Scan(new(int)); err == nil {
+			t.Fatalf("runtime role read prune receipts for %s", tenantID)
 		}
 	}
 }
@@ -223,6 +254,8 @@ func TestIdentityRLSMigrationEnablesEveryServedTenantTable(t *testing.T) {
 		"memory_vector_documents",
 		"memory_vector_documents_2560",
 		"memory_retrieval_runs",
+		"memory_projection_retention",
+		"memory_projection_prune_runs",
 	}
 	for _, table := range tables {
 		var enabled bool

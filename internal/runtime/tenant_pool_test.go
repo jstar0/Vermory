@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -225,6 +226,9 @@ func TestRuntimeRoleValidationRejectsUnsafeIdentities(t *testing.T) {
 	if err := admin.ValidateRuntimeRole(ctx); err == nil {
 		t.Fatal("admin/table-owner identity passed runtime validation")
 	}
+	if err := admin.ValidateProjectionPruneOperatorRole(ctx); err != nil {
+		t.Fatalf("admin/table-owner identity failed prune validation: %v", err)
+	}
 
 	runtimeRole, runtimeURL := createTenantPoolRole(t, admin.pool, databaseURL, "valid", "")
 	if err := authn.GrantRuntimeRole(ctx, admin.pool, runtimeRole); err != nil {
@@ -237,6 +241,36 @@ func TestRuntimeRoleValidationRejectsUnsafeIdentities(t *testing.T) {
 	t.Cleanup(runtimeStore.Close)
 	if err := runtimeStore.ValidateRuntimeRole(ctx); err != nil {
 		t.Fatalf("restricted runtime role was rejected: %v", err)
+	}
+	if err := runtimeStore.ValidateProjectionPruneOperatorRole(ctx); !errors.Is(err, ErrUnsafePruneRole) {
+		t.Fatalf("restricted runtime role passed prune validation: %v", err)
+	}
+	if _, err := admin.pool.Exec(ctx, "REVOKE SELECT ON public.memory_projection_retention FROM "+pgx.Identifier{runtimeRole}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	if err := runtimeStore.ValidateRuntimeRole(ctx); err == nil {
+		t.Fatal("runtime identity without retention floor read access passed validation")
+	}
+	if err := authn.GrantRuntimeRole(ctx, admin.pool, runtimeRole); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.pool.Exec(ctx, "GRANT UPDATE ON public.memory_projection_retention TO "+pgx.Identifier{runtimeRole}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	if err := runtimeStore.ValidateRuntimeRole(ctx); err == nil {
+		t.Fatal("runtime identity with retention floor mutation passed validation")
+	}
+	if err := authn.GrantRuntimeRole(ctx, admin.pool, runtimeRole); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.pool.Exec(ctx, "GRANT SELECT ON public.memory_projection_prune_runs TO "+pgx.Identifier{runtimeRole}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	if err := runtimeStore.ValidateRuntimeRole(ctx); err == nil {
+		t.Fatal("runtime identity with prune receipt access passed validation")
+	}
+	if err := authn.GrantRuntimeRole(ctx, admin.pool, runtimeRole); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := admin.pool.Exec(ctx, "REVOKE ALL ON public.source_match_decisions FROM "+pgx.Identifier{runtimeRole}.Sanitize()); err != nil {
 		t.Fatal(err)

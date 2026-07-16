@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"vermory/internal/runtime"
 )
@@ -28,7 +29,7 @@ func TestRetrievalRuntimeCommandsAndSharedFlagsAreRegistered(t *testing.T) {
 			}
 		}
 	}
-	for _, name := range []string{"retrieval-worker", "retrieval-status", "retrieval-rebuild", "retrieval-snapshot-rebuild"} {
+	for _, name := range []string{"retrieval-worker", "retrieval-status", "retrieval-rebuild", "retrieval-snapshot-rebuild", "retrieval-prune-events"} {
 		if !commands[name] {
 			t.Fatalf("root command is missing %s", name)
 		}
@@ -53,7 +54,96 @@ func TestRetrievalRuntimeCommandsAndSharedFlagsAreRegistered(t *testing.T) {
 					t.Fatalf("%s is missing --%s", command.Name(), flag)
 				}
 			}
+		case "retrieval-prune-events":
+			for _, flag := range []string{"database-url", "tenant-id", "operation-id", "before", "retain-tail-events"} {
+				if command.Flags().Lookup(flag) == nil {
+					t.Fatalf("retrieval-prune-events is missing --%s", flag)
+				}
+			}
 		}
+	}
+}
+
+func TestRetrievalPruneEventsCommandWritesReceiptWithoutSecrets(t *testing.T) {
+	databaseURL := os.Getenv("VERMORY_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("VERMORY_TEST_DATABASE_URL is not set")
+	}
+	store, err := runtime.OpenStore(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Migrate(context.Background()); err != nil {
+		store.Close()
+		t.Fatal(err)
+	}
+	if err := store.ResetForTest(context.Background()); err != nil {
+		store.Close()
+		t.Fatal(err)
+	}
+	tenantID := "retrieval-prune-command"
+	governance := runtime.NewGovernanceService(store, tenantID)
+	if _, err := governance.ConfirmWorkspace(context.Background(), "/fixtures/retrieval-prune-command"); err != nil {
+		store.Close()
+		t.Fatal(err)
+	}
+	if _, err := governance.AddSource(context.Background(), "/fixtures/retrieval-prune-command", runtime.GovernanceWriteRequest{
+		OperationID: "retrieval-prune-command-source", MemoryKey: "prune.command.fact",
+		Content: "Projection prune command fact.", SourceRef: "fixture:retrieval-prune-command",
+	}); err != nil {
+		store.Close()
+		t.Fatal(err)
+	}
+	store.Close()
+
+	command := newRetrievalPruneEventsCommand()
+	var output bytes.Buffer
+	command.SetOut(&output)
+	command.SetErr(&bytes.Buffer{})
+	command.SetArgs([]string{
+		"--database-url", databaseURL,
+		"--tenant-id", tenantID,
+		"--operation-id", "retrieval-prune-command-operation",
+		"--before", time.Now().UTC().Add(time.Hour).Format(time.RFC3339),
+		"--retain-tail-events", "0",
+	})
+	if err := command.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	var receipt runtime.ProjectionPruneReceipt
+	if err := json.Unmarshal(output.Bytes(), &receipt); err != nil {
+		t.Fatalf("prune output is not JSON: %v\n%s", err, output.String())
+	}
+	if receipt.TenantID != tenantID || receipt.OperationID != "retrieval-prune-command-operation" ||
+		receipt.Result != "pruned" || receipt.DeletedEvents != 1 || receipt.Replayed {
+		t.Fatalf("unexpected prune command receipt: %#v", receipt)
+	}
+	if strings.Contains(output.String(), databaseURL) {
+		t.Fatalf("prune output leaked database URL: %s", output.String())
+	}
+}
+
+func TestRetrievalPruneEventsCommandRejectsInvalidInputWithoutLeakingDSN(t *testing.T) {
+	secretDSN := "postgresql://secret-user:secret-password@127.0.0.1:1/vermory?connect_timeout=1"
+	for name, args := range map[string][]string{
+		"missing tenant": {"--database-url", secretDSN, "--operation-id", "op", "--before", "2026-07-16T08:00:00Z"},
+		"invalid before": {"--database-url", secretDSN, "--tenant-id", "tenant", "--operation-id", "op", "--before", "not-a-time"},
+		"negative tail":  {"--database-url", secretDSN, "--tenant-id", "tenant", "--operation-id", "op", "--before", "2026-07-16T08:00:00Z", "--retain-tail-events", "-1"},
+		"connection":     {"--database-url", secretDSN, "--tenant-id", "tenant", "--operation-id", "op", "--before", "2026-07-16T08:00:00Z"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			command := newRetrievalPruneEventsCommand()
+			command.SetOut(&bytes.Buffer{})
+			command.SetErr(&bytes.Buffer{})
+			command.SetArgs(args)
+			err := command.Execute()
+			if err == nil {
+				t.Fatal("invalid prune command was accepted")
+			}
+			if strings.Contains(err.Error(), secretDSN) || strings.Contains(err.Error(), "secret-password") {
+				t.Fatalf("prune command leaked database credentials: %v", err)
+			}
+		})
 	}
 }
 
@@ -130,7 +220,9 @@ func TestRetrievalStatusAndRebuildCommandsUseTenantScopedJSON(t *testing.T) {
 	if err := json.Unmarshal(rebuildOutput.Bytes(), &rebuilt); err != nil {
 		t.Fatalf("rebuild output is not JSON: %v\n%s", err, rebuildOutput.String())
 	}
-	if rebuilt.LastEventID != 0 || rebuilt.VectorCount != 0 || rebuilt.Status != "idle" || rebuilt.Lag == 0 {
+	if rebuilt.LastEventID != 0 || rebuilt.VectorCount != 0 ||
+		rebuilt.Status != runtime.ProjectionStatusRebuildRequired || !rebuilt.RebuildRequired ||
+		rebuilt.LastErrorCode != runtime.ProjectionFailureRebuildRequired || rebuilt.Lag == 0 {
 		t.Fatalf("unexpected rebuilt status: %#v", rebuilt)
 	}
 	resolution, err := store.ResolveWorkspace(context.Background(), tenantID, runtime.WorkspaceAnchor{RepoRoot: "/fixtures/retrieval-command-json"})

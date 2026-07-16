@@ -216,7 +216,7 @@ WHERE rolname = current_user`).Scan(&canLogin, &superuser, &bypassRLS); err != n
 	if !canLogin || superuser || bypassRLS {
 		return ErrUnsafeRuntimeRole
 	}
-	tables := []string{
+	readWriteTables := []string{
 		"continuity_spaces", "continuity_bindings", "conversation_bindings", "observations",
 		"governed_memories", "memory_deliveries", "memory_search_documents", "conversation_turns",
 		"bridge_operations", "bridge_events", "bridge_memory_effects", "conversation_links",
@@ -224,14 +224,17 @@ WHERE rolname = current_user`).Scan(&canLogin, &superuser, &bypassRLS); err != n
 		"memory_projection_events", "memory_projection_cursors", "memory_vector_documents",
 		"memory_vector_documents_2560", "memory_retrieval_runs",
 	}
+	readOnlyTables := []string{"memory_projection_retention"}
+	ownedTableSet := append(append([]string(nil), readWriteTables...), readOnlyTables...)
+	ownedTableSet = append(ownedTableSet, "memory_projection_prune_runs")
 	var ownedTables int
 	if err := s.pool.QueryRow(validationCtx, `
 SELECT count(*)
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = 'public'
-  AND c.relname = ANY($1::text[])
-  AND c.relowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)`, tables).Scan(&ownedTables); err != nil {
+	  AND c.relname = ANY($1::text[])
+	  AND c.relowner = (SELECT oid FROM pg_roles WHERE rolname = current_user)`, ownedTableSet).Scan(&ownedTables); err != nil {
 		return fmt.Errorf("validate runtime table ownership: %w", err)
 	}
 	if ownedTables != 0 {
@@ -249,16 +252,31 @@ SELECT
 	  AND has_sequence_privilege(current_user, 'public.observations_observation_seq_seq', 'USAGE')
 	  AND has_sequence_privilege(current_user, 'public.memory_projection_events_event_id_seq', 'USAGE')
   AND has_function_privilege(current_user, 'vermory_auth.authenticate_token(text,bytea)', 'EXECUTE')
-FROM unnest($1::text[]) AS required(table_name)`, tables).Scan(&hasRequiredPrivileges); err != nil {
+FROM unnest($1::text[]) AS required(table_name)`, readWriteTables).Scan(&hasRequiredPrivileges); err != nil {
 		return fmt.Errorf("validate runtime required privileges: %w", err)
 	}
 	if !hasRequiredPrivileges {
+		return ErrUnsafeRuntimeRole
+	}
+	var hasReadOnlyBoundary bool
+	if err := s.pool.QueryRow(validationCtx, `
+SELECT COALESCE(bool_and(
+  has_table_privilege(current_user, 'public.' || required.table_name, 'SELECT')
+  AND NOT has_table_privilege(current_user, 'public.' || required.table_name, 'INSERT')
+  AND NOT has_table_privilege(current_user, 'public.' || required.table_name, 'UPDATE')
+  AND NOT has_table_privilege(current_user, 'public.' || required.table_name, 'DELETE')
+), false)
+FROM unnest($1::text[]) AS required(table_name)`, readOnlyTables).Scan(&hasReadOnlyBoundary); err != nil {
+		return fmt.Errorf("validate runtime read-only privileges: %w", err)
+	}
+	if !hasReadOnlyBoundary {
 		return ErrUnsafeRuntimeRole
 	}
 	forbiddenTables := []string{
 		"vermory_auth.api_tokens",
 		"public.projects", "public.sources", "public.source_versions", "public.claims",
 		"public.capsules", "public.capsule_claims", "public.packets", "public.audit_logs", "public.wcef_runs",
+		"public.memory_projection_prune_runs",
 	}
 	var hasForbiddenPrivileges bool
 	if err := s.pool.QueryRow(validationCtx, `
@@ -274,6 +292,29 @@ SELECT EXISTS (
 	}
 	if hasForbiddenPrivileges {
 		return ErrUnsafeRuntimeRole
+	}
+	return nil
+}
+
+func (s *Store) ValidateProjectionPruneOperatorRole(ctx context.Context) error {
+	validationCtx, err := withTenantContext(ctx, "__prune_validation__")
+	if err != nil {
+		return ErrUnsafePruneRole
+	}
+	var allowed bool
+	if err := s.pool.QueryRow(validationCtx, `
+SELECT has_table_privilege(current_user, 'public.memory_projection_events', 'SELECT')
+   AND has_table_privilege(current_user, 'public.memory_projection_events', 'DELETE')
+   AND has_table_privilege(current_user, 'public.memory_projection_cursors', 'SELECT')
+   AND has_table_privilege(current_user, 'public.memory_projection_retention', 'SELECT')
+   AND has_table_privilege(current_user, 'public.memory_projection_retention', 'INSERT')
+   AND has_table_privilege(current_user, 'public.memory_projection_retention', 'UPDATE')
+   AND has_table_privilege(current_user, 'public.memory_projection_prune_runs', 'SELECT')
+   AND has_table_privilege(current_user, 'public.memory_projection_prune_runs', 'INSERT')`).Scan(&allowed); err != nil {
+		return fmt.Errorf("validate projection prune database role: %w", err)
+	}
+	if !allowed {
+		return ErrUnsafePruneRole
 	}
 	return nil
 }
