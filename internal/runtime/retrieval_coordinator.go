@@ -47,6 +47,23 @@ func (c *RetrievalCoordinator) Retrieve(ctx context.Context, request RetrievalRe
 	if err != nil {
 		return RetrievalResult{}, err
 	}
+	if normalized.EligibilityAsOf.IsZero() {
+		existingAsOf, found, lookupErr := c.store.retrievalAuditEligibilityAsOf(
+			ctx, normalized.TenantID, normalized.OperationID,
+		)
+		if lookupErr != nil {
+			return RetrievalResult{}, lookupErr
+		}
+		if found {
+			normalized.EligibilityAsOf = existingAsOf
+		} else {
+			snapshot, snapshotErr := c.store.CurrentEligibilitySnapshot(ctx, normalized.TenantID)
+			if snapshotErr != nil {
+				return RetrievalResult{}, snapshotErr
+			}
+			normalized.EligibilityAsOf = snapshot.AsOf
+		}
+	}
 	scope, err := c.store.authorizeRetrievalScope(ctx, normalized.TenantID, primaryContinuityID, normalized.ContinuityIDs)
 	if err != nil {
 		return RetrievalResult{}, err
@@ -59,7 +76,10 @@ func (c *RetrievalCoordinator) Retrieve(ctx context.Context, request RetrievalRe
 	}
 	lexicalLatency := time.Since(lexicalStarted)
 	if normalized.Mode == RetrievalLexical {
-		return RetrievalResult{Memories: lexical, Effective: RetrievalLexical}, nil
+		return RetrievalResult{
+			Memories: lexical, Effective: RetrievalLexical,
+			EligibilityAsOf: normalized.EligibilityAsOf,
+		}, nil
 	}
 	if c.embedder == nil {
 		return RetrievalResult{}, fmt.Errorf("semantic retrieval is not configured")
@@ -95,7 +115,10 @@ func (c *RetrievalCoordinator) Retrieve(ctx context.Context, request RetrievalRe
 		} else if len(queryVector) != c.profile.Dimensions {
 			failureCode = "embedding_dimension_mismatch"
 		} else {
-			vectorMemories, err = c.store.searchActiveVectorMemory(ctx, normalized.TenantID, normalized.ContinuityIDs, queryVector, normalized.Limit, c.profile.ID)
+			vectorMemories, err = c.store.searchEligibleVectorMemoryAt(
+				ctx, normalized.TenantID, normalized.ContinuityIDs, queryVector,
+				normalized.Limit, c.profile.ID, normalized.EligibilityAsOf,
+			)
 			if err != nil {
 				failureCode = "vector_query_error"
 				vectorMemories = []Memory{}
@@ -133,23 +156,31 @@ func (c *RetrievalCoordinator) Retrieve(ctx context.Context, request RetrievalRe
 		FailureCode:         failureCode,
 		LexicalLatency:      lexicalLatency,
 		VectorLatency:       vectorLatency,
+		EligibilityAsOf:     normalized.EligibilityAsOf,
 	})
 	if err != nil {
 		return RetrievalResult{}, err
 	}
 	return RetrievalResult{
-		Memories:  delivered,
-		Effective: effective,
-		Degraded:  degraded,
-		AuditID:   auditID,
+		Memories:        delivered,
+		Effective:       effective,
+		Degraded:        degraded,
+		AuditID:         auditID,
+		EligibilityAsOf: normalized.EligibilityAsOf,
 	}, nil
 }
 
 func (c *RetrievalCoordinator) lexical(ctx context.Context, request RetrievalRequest, scope retrievalScope) ([]Memory, error) {
 	if scope.Line == "workspace" {
-		return c.store.SearchActiveMemory(ctx, request.TenantID, scope.PrimaryContinuityID, request.Query, request.Limit)
+		return c.store.SearchEligibleMemoryAt(
+			ctx, request.TenantID, scope.PrimaryContinuityID,
+			request.Query, request.Limit, request.EligibilityAsOf,
+		)
 	}
-	return c.store.SearchActiveConversationMemory(ctx, request.TenantID, scope.PrimaryContinuityID, request.Query, request.Limit)
+	return c.store.SearchEligibleConversationMemoryAt(
+		ctx, request.TenantID, scope.PrimaryContinuityID,
+		request.Query, request.Limit, request.EligibilityAsOf,
+	)
 }
 
 type retrievalAuditInput struct {
@@ -170,25 +201,28 @@ type retrievalAuditInput struct {
 	FailureCode         string
 	LexicalLatency      time.Duration
 	VectorLatency       time.Duration
+	EligibilityAsOf     time.Time
 }
 
 func retrievalRequestFingerprint(request RetrievalRequest, profileID string) (string, string, error) {
 	queryDigest := sha256.Sum256([]byte(request.Query))
 	querySHA256 := hex.EncodeToString(queryDigest[:])
 	payload := struct {
-		TenantID      string        `json:"tenant_id"`
-		ContinuityIDs []string      `json:"continuity_ids"`
-		QuerySHA256   string        `json:"query_sha256"`
-		Limit         int           `json:"limit"`
-		Mode          RetrievalMode `json:"mode"`
-		ProfileID     string        `json:"profile_id"`
+		TenantID        string        `json:"tenant_id"`
+		ContinuityIDs   []string      `json:"continuity_ids"`
+		QuerySHA256     string        `json:"query_sha256"`
+		Limit           int           `json:"limit"`
+		Mode            RetrievalMode `json:"mode"`
+		ProfileID       string        `json:"profile_id"`
+		EligibilityAsOf string        `json:"eligibility_as_of"`
 	}{
-		TenantID:      request.TenantID,
-		ContinuityIDs: request.ContinuityIDs,
-		QuerySHA256:   querySHA256,
-		Limit:         request.Limit,
-		Mode:          request.Mode,
-		ProfileID:     profileID,
+		TenantID:        request.TenantID,
+		ContinuityIDs:   request.ContinuityIDs,
+		QuerySHA256:     querySHA256,
+		Limit:           request.Limit,
+		Mode:            request.Mode,
+		ProfileID:       profileID,
+		EligibilityAsOf: request.EligibilityAsOf.UTC().Format(time.RFC3339Nano),
 	}
 	canonical, err := json.Marshal(payload)
 	if err != nil {

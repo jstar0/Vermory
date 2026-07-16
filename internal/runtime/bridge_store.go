@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -68,7 +69,11 @@ func (s *Store) PromoteConversationMemory(ctx context.Context, tenantID, operati
 		return BridgeReceipt{}, err
 	}
 	if !replayed {
-		memories, err := loadSelectedActiveMemoriesTx(ctx, tx, tenantID, sourceContinuityID, memoryIDs)
+		snapshot, err := currentEligibilitySnapshotTx(ctx, tx)
+		if err != nil {
+			return BridgeReceipt{}, err
+		}
+		memories, err := loadSelectedEligibleMemoriesTx(ctx, tx, tenantID, sourceContinuityID, memoryIDs, snapshot.AsOf)
 		if err != nil {
 			return BridgeReceipt{}, err
 		}
@@ -124,15 +129,6 @@ func (s *Store) ExportWorkspaceMemory(ctx context.Context, tenantID, operationID
 		return BridgeReceipt{}, fmt.Errorf("begin bridge export: %w", err)
 	}
 	defer tx.Rollback(ctx)
-	memories, err := loadSelectedActiveMemoriesTx(ctx, tx, tenantID, sourceContinuityID, memoryIDs)
-	if err != nil {
-		return BridgeReceipt{}, err
-	}
-	lines := make([]string, 0, len(memories))
-	for _, memory := range memories {
-		lines = append(lines, "- "+memory.Content)
-	}
-	body := strings.TrimSpace(title) + "\n\n" + strings.Join(lines, "\n")
 	operation, replayed, err := createBridgeOperationTx(ctx, tx, bridgeLedgerInput{
 		TenantID:           tenantID,
 		OperationID:        operationID,
@@ -142,12 +138,28 @@ func (s *Store) ExportWorkspaceMemory(ctx context.Context, tenantID, operationID
 		SourceAnchor:       sourceAnchor,
 		TargetProfile:      targetProfile,
 		Title:              title,
-		ExportBody:         body,
 	})
 	if err != nil {
 		return BridgeReceipt{}, err
 	}
 	if !replayed {
+		snapshot, err := currentEligibilitySnapshotTx(ctx, tx)
+		if err != nil {
+			return BridgeReceipt{}, err
+		}
+		memories, err := loadSelectedEligibleMemoriesTx(ctx, tx, tenantID, sourceContinuityID, memoryIDs, snapshot.AsOf)
+		if err != nil {
+			return BridgeReceipt{}, err
+		}
+		lines := make([]string, 0, len(memories))
+		for _, memory := range memories {
+			lines = append(lines, "- "+memory.Content)
+		}
+		body := strings.TrimSpace(title) + "\n\n" + strings.Join(lines, "\n")
+		if _, err := tx.Exec(ctx, `
+UPDATE bridge_operations SET export_body = $1 WHERE id = $2::uuid`, body, operation.ID); err != nil {
+			return BridgeReceipt{}, fmt.Errorf("store bridge export body: %w", err)
+		}
 		for index, memory := range memories {
 			if _, err := tx.Exec(ctx, `
 INSERT INTO bridge_memory_effects (
@@ -500,7 +512,7 @@ SELECT EXISTS (
 	return nil
 }
 
-func loadSelectedActiveMemoriesTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID string, memoryIDs []string) ([]selectedBridgeMemory, error) {
+func loadSelectedEligibleMemoriesTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID string, memoryIDs []string, asOf time.Time) ([]selectedBridgeMemory, error) {
 	memories := make([]selectedBridgeMemory, 0, len(memoryIDs))
 	for _, memoryID := range memoryIDs {
 		var memory selectedBridgeMemory
@@ -508,16 +520,16 @@ func loadSelectedActiveMemoriesTx(ctx context.Context, tx pgx.Tx, tenantID, cont
 SELECT id::text, content
 FROM governed_memories
 WHERE id = $1::uuid AND tenant_id = $2 AND continuity_id = $3::uuid
-  AND lifecycle_status = 'active'
-FOR SHARE`, memoryID, tenantID, continuityID).Scan(&memory.ID, &memory.Content)
+	AND memory_is_eligible(lifecycle_status, content, valid_from, valid_until, $4)
+FOR SHARE`, memoryID, tenantID, continuityID, asOf).Scan(&memory.ID, &memory.Content)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("memory %s must be active in the selected source continuity", memoryID)
+			return nil, fmt.Errorf("memory %s must be active and currently eligible in the selected source continuity", memoryID)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("load selected bridge memory: %w", err)
 		}
 		if memory.Content == "" || memory.Content == "[redacted]" {
-			return nil, fmt.Errorf("memory %s must contain active semantic content", memoryID)
+			return nil, fmt.Errorf("memory %s must contain active eligible semantic content", memoryID)
 		}
 		memories = append(memories, memory)
 	}

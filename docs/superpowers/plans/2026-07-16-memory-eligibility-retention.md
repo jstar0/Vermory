@@ -352,19 +352,19 @@ git commit -m "feat: add memory eligibility authority"
 - Consumes: schema function `memory_is_eligible` and `EligibilitySnapshot`.
 - Produces: at-time internal store methods and `RetrievalRequest.EligibilityAsOf`.
 
-- [ ] **Step 1: Add failing half-open-boundary tests for lexical workspace and conversation search.**
+- [x] **Step 1: Add failing half-open-boundary tests for lexical workspace and conversation search.**
 
 Seed current, scheduled, exact-boundary expired, archived, superseded, deleted,
 and unrelated control memories. Assert only current rows return, including
 linked-conversation search.
 
-- [ ] **Step 2: Add failing request-snapshot tests for context assembly.**
+- [x] **Step 2: Add failing request-snapshot tests for context assembly.**
 
 Use a controllable store test hook or transaction barrier to cross a validity
 boundary between Global Defaults and memory lookup. Assert the completed
 delivery uses one `eligibility_as_of`, not two wall-clock decisions.
 
-- [ ] **Step 3: Add failing production lexical/vector/shadow tests.**
+- [x] **Step 3: Add failing production lexical/vector/shadow tests.**
 
 Require:
 
@@ -374,13 +374,13 @@ Require:
 - retrieval audit stores the timestamp;
 - request replay with a different timestamp or query conflicts.
 
-- [ ] **Step 4: Add failing bridge and source-current tests.**
+- [x] **Step 4: Add failing bridge and source-current tests.**
 
 Expired/archived source memory cannot be promoted, linked delivery cannot
 surface it, export cannot include it, and current source candidate/match sets
 exclude it. Authorized inspection still sees permitted historical content.
 
-- [ ] **Step 5: Run focused tests and observe RED.**
+- [x] **Step 5: Run focused tests and observe RED.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
@@ -391,26 +391,26 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
 Expected: expired/future/archive controls leak because current SQL checks only
 `lifecycle_status = 'active'`.
 
-- [ ] **Step 6: Add at-time store methods and preserve compatibility wrappers.**
+- [x] **Step 6: Add at-time store methods and preserve compatibility wrappers.**
 
 Normal wrappers obtain a current database snapshot when no larger operation
 already owns one. Context services obtain one snapshot first, then pass it to
 Global Defaults, memory search/retrieval, bridge selection, delivery creation,
 and audit insertion.
 
-- [ ] **Step 7: Update every serving SQL path to use `memory_is_eligible`.**
+- [x] **Step 7: Update every serving SQL path to use `memory_is_eligible`.**
 
 Do not replace it with scattered `now()` expressions. Preserve existing
 scope, source-authority, exact-match, ranking, and limit behavior.
 
-- [ ] **Step 8: Preserve projection storage for natural activation.**
+- [x] **Step 8: Preserve projection storage for natural activation.**
 
 The worker and rebuild still project active non-redacted facts regardless of
 temporal eligibility. Vector and lexical serving joins apply validity. Archive
 and forget continue to produce/remove absent state through lifecycle/content
 changes.
 
-- [ ] **Step 9: Run focused, package, and race tests.**
+- [x] **Step 9: Run focused, package, and race tests.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
@@ -426,7 +426,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit unified serving eligibility.**
+- [x] **Step 10: Commit unified serving eligibility.**
 
 ```bash
 git add internal/runtime internal/webchat internal/mcpserver

@@ -273,13 +273,23 @@ func (s *ConversationService) prepareConversationTurn(ctx context.Context, reque
 		return PreparedConversationTurn{ChatTurnReceipt: turn}, nil
 	}
 
-	defaults, err := s.store.ListActiveGlobalDefaults(ctx, s.tenantID)
+	snapshot, err := s.store.CurrentEligibilitySnapshot(ctx, s.tenantID)
+	if err != nil {
+		return s.failPreparedTurn(ctx, turn, "eligibility_clock_error", err)
+	}
+	defaultsContinuityID, err := s.store.EnsureGlobalDefaultsContinuity(ctx, s.tenantID)
+	if err != nil {
+		return s.failPreparedTurn(ctx, turn, "global_defaults_retrieval_error", err)
+	}
+	defaults, err := s.store.ListEligibleGlobalDefaultsAt(ctx, s.tenantID, defaultsContinuityID, snapshot.AsOf)
 	if err != nil {
 		return s.failPreparedTurn(ctx, turn, "global_defaults_retrieval_error", err)
 	}
 	var memories []Memory
 	if s.config.Retriever == nil {
-		memories, err = s.store.SearchActiveConversationMemory(ctx, s.tenantID, resolution.ContinuityID, request.Message, s.config.MemoryLimit)
+		memories, err = s.store.SearchEligibleConversationMemoryAt(
+			ctx, s.tenantID, resolution.ContinuityID, request.Message, s.config.MemoryLimit, snapshot.AsOf,
+		)
 	} else {
 		continuityIDs, scopeErr := s.store.ResolveLinkedConversationContinuityIDs(ctx, s.tenantID, resolution.ContinuityID)
 		if scopeErr != nil {
@@ -287,11 +297,12 @@ func (s *ConversationService) prepareConversationTurn(ctx context.Context, reque
 		}
 		var result RetrievalResult
 		result, err = s.config.Retriever.Retrieve(ctx, RetrievalRequest{
-			OperationID:   "conversation-retrieval:" + request.OperationID,
-			TenantID:      s.tenantID,
-			ContinuityIDs: continuityIDs,
-			Query:         request.Message,
-			Limit:         s.config.MemoryLimit,
+			OperationID:     "conversation-retrieval:" + request.OperationID,
+			TenantID:        s.tenantID,
+			ContinuityIDs:   continuityIDs,
+			Query:           request.Message,
+			Limit:           s.config.MemoryLimit,
+			EligibilityAsOf: snapshot.AsOf,
 		})
 		memories = result.Memories
 	}
@@ -306,13 +317,14 @@ func (s *ConversationService) prepareConversationTurn(ctx context.Context, reque
 		}
 	}
 	contextPacket := BuildConversationContext(defaults, memories, recent)
-	delivery, err := s.store.RecordDelivery(
+	delivery, err := s.store.RecordDeliveryAt(
 		ctx,
 		s.tenantID,
 		resolution.ContinuityID,
 		"conversation-delivery:"+request.OperationID,
 		request.Message,
 		contextPacket,
+		snapshot.AsOf,
 	)
 	if err != nil {
 		return s.failPreparedTurn(ctx, turn, "delivery_error", err)

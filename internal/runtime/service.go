@@ -47,28 +47,42 @@ func (s *Service) PrepareContext(ctx context.Context, request PrepareContextRequ
 	if resolution.Status == ResolutionNeedsConfirmation {
 		return PrepareContextResponse{Status: resolution.Status}, nil
 	}
-	defaults, err := s.store.ListActiveGlobalDefaults(ctx, s.tenantID)
+	snapshot, err := s.store.CurrentEligibilitySnapshot(ctx, s.tenantID)
+	if err != nil {
+		return PrepareContextResponse{}, err
+	}
+	defaultsContinuityID, err := s.store.EnsureGlobalDefaultsContinuity(ctx, s.tenantID)
+	if err != nil {
+		return PrepareContextResponse{}, err
+	}
+	defaults, err := s.store.ListEligibleGlobalDefaultsAt(ctx, s.tenantID, defaultsContinuityID, snapshot.AsOf)
 	if err != nil {
 		return PrepareContextResponse{}, err
 	}
 	var memories []Memory
 	if s.retriever == nil {
-		memories, err = s.store.SearchActiveMemory(ctx, s.tenantID, resolution.ContinuityID, request.Task, request.MaxItems)
+		memories, err = s.store.SearchEligibleMemoryAt(
+			ctx, s.tenantID, resolution.ContinuityID, request.Task, request.MaxItems, snapshot.AsOf,
+		)
 	} else {
 		var result RetrievalResult
 		result, err = s.retriever.Retrieve(ctx, RetrievalRequest{
-			OperationID:   "workspace-retrieval:" + request.OperationID,
-			TenantID:      s.tenantID,
-			ContinuityIDs: []string{resolution.ContinuityID},
-			Query:         request.Task,
-			Limit:         request.MaxItems,
+			OperationID:     "workspace-retrieval:" + request.OperationID,
+			TenantID:        s.tenantID,
+			ContinuityIDs:   []string{resolution.ContinuityID},
+			Query:           request.Task,
+			Limit:           request.MaxItems,
+			EligibilityAsOf: snapshot.AsOf,
 		})
 		memories = result.Memories
 	}
 	if err != nil {
 		return PrepareContextResponse{}, err
 	}
-	delivery, err := s.store.RecordDelivery(ctx, s.tenantID, resolution.ContinuityID, request.OperationID, request.Task, BuildWorkspaceContext(defaults, memories))
+	delivery, err := s.store.RecordDeliveryAt(
+		ctx, s.tenantID, resolution.ContinuityID, request.OperationID,
+		request.Task, BuildWorkspaceContext(defaults, memories), snapshot.AsOf,
+	)
 	if err != nil {
 		return PrepareContextResponse{}, err
 	}

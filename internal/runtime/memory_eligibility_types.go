@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type MemoryEffectiveState string
@@ -48,6 +50,13 @@ func normalizedEligibilityTime(value *time.Time) *time.Time {
 	return &normalized
 }
 
+func normalizeEligibilityAsOf(asOf time.Time) (time.Time, error) {
+	if asOf.IsZero() {
+		return time.Time{}, fmt.Errorf("eligibility as_of is required")
+	}
+	return asOf.UTC(), nil
+}
+
 func EffectiveMemoryState(lifecycle, content string, validity MemoryValidity, asOf time.Time) MemoryEffectiveState {
 	lifecycle = strings.TrimSpace(lifecycle)
 	content = strings.TrimSpace(content)
@@ -87,6 +96,14 @@ func (s *Store) CurrentEligibilitySnapshot(ctx context.Context, tenantID string)
 	var asOf time.Time
 	if err := s.pool.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&asOf); err != nil {
 		return EligibilitySnapshot{}, fmt.Errorf("read eligibility clock: %w", err)
+	}
+	return EligibilitySnapshot{AsOf: asOf.UTC()}, nil
+}
+
+func currentEligibilitySnapshotTx(ctx context.Context, tx pgx.Tx) (EligibilitySnapshot, error) {
+	var asOf time.Time
+	if err := tx.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&asOf); err != nil {
+		return EligibilitySnapshot{}, fmt.Errorf("read transaction eligibility clock: %w", err)
 	}
 	return EligibilitySnapshot{AsOf: asOf.UTC()}, nil
 }

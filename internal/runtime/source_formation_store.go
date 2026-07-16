@@ -56,6 +56,10 @@ func (s *Store) BeginSourceFormation(ctx context.Context, tenantID, continuityID
 		return SourceFormationReceipt{}, fmt.Errorf("begin source formation: %w", err)
 	}
 	defer tx.Rollback(ctx)
+	snapshot, err := currentEligibilitySnapshotTx(ctx, tx)
+	if err != nil {
+		return SourceFormationReceipt{}, err
+	}
 
 	existing, found, err := lookupSourceFormationOperationTx(ctx, tx, tenantID, request.OperationID)
 	if err != nil {
@@ -65,7 +69,7 @@ func (s *Store) BeginSourceFormation(ctx context.Context, tenantID, continuityID
 		if existing.ContinuityID != continuityID || existing.RequestFingerprint != fingerprint {
 			return SourceFormationReceipt{}, fmt.Errorf("operation_id is already bound to another logical source formation")
 		}
-		currentSnapshot, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, continuityID, false)
+		currentSnapshot, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, continuityID, snapshot.AsOf, false)
 		if err != nil {
 			return SourceFormationReceipt{}, err
 		}
@@ -106,7 +110,7 @@ SELECT EXISTS (
 	if !validContinuity {
 		return SourceFormationReceipt{}, fmt.Errorf("workspace continuity is not active for this tenant")
 	}
-	activeSnapshot, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, continuityID, false)
+	activeSnapshot, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, continuityID, snapshot.AsOf, false)
 	if err != nil {
 		return SourceFormationReceipt{}, err
 	}
@@ -161,6 +165,10 @@ func (s *Store) CompleteSourceFormation(ctx context.Context, tenantID, runID str
 		return SourceFormationReceipt{}, fmt.Errorf("begin source formation completion: %w", err)
 	}
 	defer tx.Rollback(ctx)
+	snapshot, err := currentEligibilitySnapshotTx(ctx, tx)
+	if err != nil {
+		return SourceFormationReceipt{}, err
+	}
 
 	run, err := lockSourceFormationTx(ctx, tx, tenantID, runID)
 	if err != nil {
@@ -204,7 +212,7 @@ func (s *Store) CompleteSourceFormation(ctx context.Context, tenantID, runID str
 	if failureCode, reason := validateSourceFormationDocument(run, sourceDocument); failureCode != "" {
 		return commitInvalidSourceFormation(ctx, tx, tenantID, run.ID, completion, failureCode, reason)
 	}
-	currentSnapshot, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, run.ContinuityID, true)
+	currentSnapshot, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, run.ContinuityID, snapshot.AsOf, true)
 	if err != nil {
 		return SourceFormationReceipt{}, err
 	}

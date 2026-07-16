@@ -486,6 +486,22 @@ func (s *Store) RecordDelivery(ctx context.Context, tenantID, continuityID, oper
 	if err != nil {
 		return DeliveryReceipt{}, err
 	}
+	snapshot, err := s.CurrentEligibilitySnapshot(ctx, tenantID)
+	if err != nil {
+		return DeliveryReceipt{}, err
+	}
+	return s.RecordDeliveryAt(ctx, tenantID, continuityID, operationID, task, contextBody, snapshot.AsOf)
+}
+
+func (s *Store) RecordDeliveryAt(ctx context.Context, tenantID, continuityID, operationID, task, contextBody string, asOf time.Time) (DeliveryReceipt, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return DeliveryReceipt{}, err
+	}
+	asOf, err = normalizeEligibilityAsOf(asOf)
+	if err != nil {
+		return DeliveryReceipt{}, err
+	}
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return DeliveryReceipt{}, fmt.Errorf("begin context delivery: %w", err)
@@ -516,9 +532,11 @@ WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(
 		return DeliveryReceipt{}, fmt.Errorf("lookup context delivery: %w", err)
 	}
 	if err := tx.QueryRow(ctx, `
-INSERT INTO memory_deliveries (tenant_id, continuity_id, operation_id, task, context_body)
-VALUES ($1, $2::uuid, $3, $4, $5)
-RETURNING id::text, eligibility_as_of`, tenantID, continuityID, operationID, task, contextBody).Scan(
+INSERT INTO memory_deliveries (
+  tenant_id, continuity_id, operation_id, task, context_body, eligibility_as_of
+)
+VALUES ($1, $2::uuid, $3, $4, $5, $6)
+RETURNING id::text, eligibility_as_of`, tenantID, continuityID, operationID, task, contextBody, asOf).Scan(
 		&deliveryID, &eligibilityAsOf,
 	); err != nil {
 		return DeliveryReceipt{}, fmt.Errorf("record context delivery: %w", err)
@@ -883,6 +901,22 @@ func (s *Store) SearchActiveMemory(ctx context.Context, tenantID, continuityID, 
 	if err != nil {
 		return nil, err
 	}
+	snapshot, err := s.CurrentEligibilitySnapshot(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	return s.SearchEligibleMemoryAt(ctx, tenantID, continuityID, query, limit, snapshot.AsOf)
+}
+
+func (s *Store) SearchEligibleMemoryAt(ctx context.Context, tenantID, continuityID, query string, limit int, asOf time.Time) ([]Memory, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	asOf, err = normalizeEligibilityAsOf(asOf)
+	if err != nil {
+		return nil, err
+	}
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("search query is required")
@@ -909,7 +943,9 @@ WITH query_terms AS (
     AND document.continuity_id = $2::uuid
     AND memory.tenant_id = $1
     AND memory.continuity_id = $2::uuid
-    AND memory.lifecycle_status = 'active'
+	AND memory_is_eligible(
+	  memory.lifecycle_status, memory.content, memory.valid_from, memory.valid_until, $5
+	)
     AND position(query_terms.exact_query IN lower(document.content)) > 0
   LIMIT 1
 )
@@ -922,7 +958,9 @@ WHERE document.tenant_id = $1
   AND document.continuity_id = $2::uuid
   AND memory.tenant_id = $1
   AND memory.continuity_id = $2::uuid
-  AND memory.lifecycle_status = 'active'
+	AND memory_is_eligible(
+	  memory.lifecycle_status, memory.content, memory.valid_from, memory.valid_until, $5
+	)
   AND (
     position(query_terms.exact_query IN lower(document.content)) > 0
     OR (
@@ -946,7 +984,7 @@ ORDER BY
     ELSE 1
   END DESC,
   memory.updated_at DESC
-LIMIT $4`, tenantID, continuityID, query, limit)
+LIMIT $4`, tenantID, continuityID, query, limit, asOf)
 	if err != nil {
 		return nil, fmt.Errorf("search active memory: %w", err)
 	}

@@ -131,7 +131,21 @@ ON CONFLICT (tenant_id, profile_id) DO UPDATE SET
 }
 
 func (s *Store) searchActiveVectorMemory(ctx context.Context, tenantID string, continuityIDs []string, queryVector []float32, limit int, profileID string) ([]Memory, error) {
+	snapshot, err := s.CurrentEligibilitySnapshot(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	return s.searchEligibleVectorMemoryAt(
+		ctx, tenantID, continuityIDs, queryVector, limit, profileID, snapshot.AsOf,
+	)
+}
+
+func (s *Store) searchEligibleVectorMemoryAt(ctx context.Context, tenantID string, continuityIDs []string, queryVector []float32, limit int, profileID string, asOf time.Time) ([]Memory, error) {
 	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	asOf, err = normalizeEligibilityAsOf(asOf)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +160,10 @@ func (s *Store) searchActiveVectorMemory(ctx context.Context, tenantID string, c
 	if candidateLimit > 100 {
 		candidateLimit = 100
 	}
-	rows, err := s.pool.Query(ctx, projectionSQL.search, profileID, tenantID, continuityIDs, retrievalVectorLiteral(queryVector), candidateLimit, limit)
+	rows, err := s.pool.Query(
+		ctx, projectionSQL.search, profileID, tenantID, continuityIDs,
+		retrievalVectorLiteral(queryVector), candidateLimit, limit, asOf,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("search active vector memory: %w", err)
 	}
@@ -187,6 +204,28 @@ WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(&auditI
 	return auditID, nil
 }
 
+func (s *Store) retrievalAuditEligibilityAsOf(ctx context.Context, tenantID, operationID string) (time.Time, bool, error) {
+	if operationID == "" {
+		return time.Time{}, false, nil
+	}
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	var asOf time.Time
+	err = s.pool.QueryRow(ctx, `
+SELECT eligibility_as_of
+FROM memory_retrieval_runs
+WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(&asOf)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return time.Time{}, false, nil
+	}
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("lookup retrieval audit eligibility time: %w", err)
+	}
+	return asOf.UTC(), true, nil
+}
+
 func (s *Store) recordRetrievalAudit(ctx context.Context, input retrievalAuditInput) (string, error) {
 	ctx, err := withTenantContext(ctx, input.TenantID)
 	if err != nil {
@@ -198,12 +237,13 @@ INSERT INTO memory_retrieval_runs (
   tenant_id, primary_continuity_id, continuity_ids, operation_id,
   request_fingerprint, requested_mode, effective_mode, profile_id,
   query_sha256, lexical_memory_ids, vector_memory_ids, delivered_memory_ids,
-  projection_current, degraded, failure_code, lexical_latency_ms, vector_latency_ms
+  projection_current, degraded, failure_code, lexical_latency_ms, vector_latency_ms,
+  eligibility_as_of
 ) VALUES (
   $1, $2::uuid, $3::uuid[], $4,
   $5, $6, $7, $8,
   $9, $10::uuid[], $11::uuid[], $12::uuid[],
-  $13, $14, $15, $16, $17
+  $13, $14, $15, $16, $17, $18
 )
 ON CONFLICT (tenant_id, operation_id) DO UPDATE SET
   operation_id = memory_retrieval_runs.operation_id
@@ -226,6 +266,7 @@ RETURNING id::text`,
 		input.FailureCode,
 		durationMilliseconds(input.LexicalLatency),
 		durationMilliseconds(input.VectorLatency),
+		input.EligibilityAsOf,
 	).Scan(&auditID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", fmt.Errorf("retrieval audit operation conflict")

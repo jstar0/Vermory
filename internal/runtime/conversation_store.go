@@ -7,12 +7,29 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
 func (s *Store) SearchActiveConversationMemory(ctx context.Context, tenantID, continuityID, query string, limit int) ([]Memory, error) {
 	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := s.CurrentEligibilitySnapshot(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	return s.SearchEligibleConversationMemoryAt(ctx, tenantID, continuityID, query, limit, snapshot.AsOf)
+}
+
+func (s *Store) SearchEligibleConversationMemoryAt(ctx context.Context, tenantID, continuityID, query string, limit int, asOf time.Time) ([]Memory, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	asOf, err = normalizeEligibilityAsOf(asOf)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +76,9 @@ WITH link_root AS (
     AND document.continuity_id IN (SELECT continuity_id FROM scope)
     AND memory.tenant_id = $1
     AND memory.continuity_id = document.continuity_id
-    AND memory.lifecycle_status = 'active'
+	AND memory_is_eligible(
+	  memory.lifecycle_status, memory.content, memory.valid_from, memory.valid_until, $5
+	)
     AND position(query_terms.exact_query IN lower(document.content)) > 0
   LIMIT 1
 )
@@ -72,7 +91,9 @@ WHERE document.tenant_id = $1
   AND document.continuity_id IN (SELECT continuity_id FROM scope)
   AND memory.tenant_id = $1
   AND memory.continuity_id = document.continuity_id
-  AND memory.lifecycle_status = 'active'
+	AND memory_is_eligible(
+	  memory.lifecycle_status, memory.content, memory.valid_from, memory.valid_until, $5
+	)
   AND (
     position(query_terms.exact_query IN lower(document.content)) > 0
     OR (
@@ -96,7 +117,7 @@ ORDER BY
     ELSE 1
   END DESC,
   memory.updated_at DESC
-LIMIT $4`, tenantID, continuityID, query, limit)
+LIMIT $4`, tenantID, continuityID, query, limit, asOf)
 	if err != nil {
 		return nil, fmt.Errorf("search active conversation memory: %w", err)
 	}

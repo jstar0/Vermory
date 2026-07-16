@@ -81,6 +81,10 @@ WITH candidates AS (
   WHERE document.profile_id = $1
     AND document.tenant_id = $2
     AND document.continuity_id = ANY($3::uuid[])
+	AND memory.memory_kind = 'fact'
+	AND memory_is_eligible(
+	  memory.lifecycle_status, memory.content, memory.valid_from, memory.valid_until, $7
+	)
   ORDER BY document.embedding <=> $4::vector, document.memory_id
   LIMIT $5
 )
@@ -90,8 +94,9 @@ JOIN governed_memories memory
   ON memory.tenant_id = $2 AND memory.id = candidate.memory_id
 WHERE memory.continuity_id = ANY($3::uuid[])
   AND memory.memory_kind = 'fact'
-  AND memory.lifecycle_status = 'active'
-  AND memory.content <> '[redacted]'
+	AND memory_is_eligible(
+	  memory.lifecycle_status, memory.content, memory.valid_from, memory.valid_until, $7
+	)
   AND encode(digest(convert_to(memory.content, 'UTF8'), 'sha256'), 'hex') = candidate.content_sha256
 ORDER BY candidate.distance, candidate.authority_rank DESC, memory.id
 LIMIT $6`
@@ -115,6 +120,10 @@ WITH candidates AS (
   WHERE document.profile_id = $1
     AND document.tenant_id = $2
     AND document.continuity_id = ANY($3::uuid[])
+	AND memory.memory_kind = 'fact'
+	AND memory_is_eligible(
+	  memory.lifecycle_status, memory.content, memory.valid_from, memory.valid_until, $7
+	)
   ORDER BY document.embedding <=> $4::halfvec(2560), document.memory_id
   LIMIT $5
 )
@@ -124,8 +133,9 @@ JOIN governed_memories memory
   ON memory.tenant_id = $2 AND memory.id = candidate.memory_id
 WHERE memory.continuity_id = ANY($3::uuid[])
   AND memory.memory_kind = 'fact'
-  AND memory.lifecycle_status = 'active'
-  AND memory.content <> '[redacted]'
+	AND memory_is_eligible(
+	  memory.lifecycle_status, memory.content, memory.valid_from, memory.valid_until, $7
+	)
   AND encode(digest(convert_to(memory.content, 'UTF8'), 'sha256'), 'hex') = candidate.content_sha256
 ORDER BY candidate.distance, candidate.authority_rank DESC, memory.id
 LIMIT $6`

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -50,12 +51,31 @@ func (s *Store) ListActiveGlobalDefaults(ctx context.Context, tenantID string) (
 	if err != nil {
 		return nil, err
 	}
+	snapshot, err := s.CurrentEligibilitySnapshot(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	return s.ListEligibleGlobalDefaultsAt(ctx, tenantID, continuityID, snapshot.AsOf)
+}
+
+func (s *Store) ListEligibleGlobalDefaultsAt(ctx context.Context, tenantID, continuityID string, asOf time.Time) ([]Memory, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	asOf, err = normalizeEligibilityAsOf(asOf)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := s.pool.Query(ctx, `
 SELECT id::text, content
 FROM governed_memories
 WHERE tenant_id = $1 AND continuity_id = $2::uuid
-  AND memory_kind = 'global_default' AND lifecycle_status = 'active'
-ORDER BY memory_key ASC, created_at ASC`, tenantID, continuityID)
+  AND memory_kind = 'global_default'
+  AND memory_is_eligible(
+    lifecycle_status, content, valid_from, valid_until, $3
+  )
+ORDER BY memory_key ASC, created_at ASC`, tenantID, continuityID, asOf)
 	if err != nil {
 		return nil, fmt.Errorf("list active global defaults: %w", err)
 	}

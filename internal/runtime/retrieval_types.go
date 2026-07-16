@@ -66,12 +66,13 @@ const (
 )
 
 type RetrievalRequest struct {
-	OperationID   string
-	TenantID      string
-	ContinuityIDs []string
-	Query         string
-	Limit         int
-	Mode          RetrievalMode
+	OperationID     string
+	TenantID        string
+	ContinuityIDs   []string
+	Query           string
+	Limit           int
+	Mode            RetrievalMode
+	EligibilityAsOf time.Time
 }
 
 func (r RetrievalRequest) normalized() (RetrievalRequest, error) {
@@ -119,6 +120,9 @@ func (r RetrievalRequest) normalized() (RetrievalRequest, error) {
 	}
 	if r.Limit > maxContextItems {
 		r.Limit = maxContextItems
+	}
+	if !r.EligibilityAsOf.IsZero() {
+		r.EligibilityAsOf = r.EligibilityAsOf.UTC()
 	}
 	return r, nil
 }

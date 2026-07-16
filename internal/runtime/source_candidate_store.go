@@ -4,12 +4,29 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
 func (s *Store) ListActiveMemoriesByKey(ctx context.Context, tenantID, continuityID, memoryKey string, limit int) ([]GovernedMemory, error) {
 	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	snapshot, err := s.CurrentEligibilitySnapshot(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	return s.ListEligibleMemoriesByKeyAt(ctx, tenantID, continuityID, memoryKey, limit, snapshot.AsOf)
+}
+
+func (s *Store) ListEligibleMemoriesByKeyAt(ctx context.Context, tenantID, continuityID, memoryKey string, limit int, asOf time.Time) ([]GovernedMemory, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	asOf, err = normalizeEligibilityAsOf(asOf)
 	if err != nil {
 		return nil, err
 	}
@@ -20,9 +37,10 @@ func (s *Store) ListActiveMemoriesByKey(ctx context.Context, tenantID, continuit
 SELECT id::text, memory_key, lifecycle_status, content, COALESCE(supersedes_memory_id::text, '')
 FROM governed_memories
 WHERE tenant_id = $1 AND continuity_id = $2::uuid
-  AND memory_key = $3 AND lifecycle_status = 'active'
+	AND memory_key = $3
+	AND memory_is_eligible(lifecycle_status, content, valid_from, valid_until, $5)
 ORDER BY created_at ASC, id ASC
-LIMIT $4`, tenantID, continuityID, memoryKey, limit)
+LIMIT $4`, tenantID, continuityID, memoryKey, limit, asOf)
 	if err != nil {
 		return nil, fmt.Errorf("list active memories by key: %w", err)
 	}

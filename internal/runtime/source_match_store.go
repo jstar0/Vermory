@@ -45,6 +45,10 @@ func (s *Store) BeginSourceMatch(ctx context.Context, tenantID, continuityID str
 		return SourceMatchReceipt{}, fmt.Errorf("begin source match: %w", err)
 	}
 	defer tx.Rollback(ctx)
+	snapshot, err := currentEligibilitySnapshotTx(ctx, tx)
+	if err != nil {
+		return SourceMatchReceipt{}, err
+	}
 
 	existing, found, err := lookupSourceMatchOperationTx(ctx, tx, tenantID, request.OperationID)
 	if err != nil {
@@ -54,7 +58,7 @@ func (s *Store) BeginSourceMatch(ctx context.Context, tenantID, continuityID str
 		if existing.ContinuityID != continuityID || existing.RequestFingerprint != fingerprint {
 			return SourceMatchReceipt{}, fmt.Errorf("operation_id is already bound to another logical source match")
 		}
-		currentCandidates, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, continuityID, false)
+		currentCandidates, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, continuityID, snapshot.AsOf, false)
 		if err != nil {
 			return SourceMatchReceipt{}, err
 		}
@@ -100,7 +104,7 @@ SELECT EXISTS (
 	if !validContinuity {
 		return SourceMatchReceipt{}, fmt.Errorf("workspace continuity is not active for this tenant")
 	}
-	candidates, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, continuityID, false)
+	candidates, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, continuityID, snapshot.AsOf, false)
 	if err != nil {
 		return SourceMatchReceipt{}, err
 	}
@@ -156,6 +160,10 @@ func (s *Store) CompleteSourceMatch(ctx context.Context, tenantID, decisionID st
 		return SourceMatchReceipt{}, fmt.Errorf("begin source match completion: %w", err)
 	}
 	defer tx.Rollback(ctx)
+	snapshot, err := currentEligibilitySnapshotTx(ctx, tx)
+	if err != nil {
+		return SourceMatchReceipt{}, err
+	}
 
 	decision, err := scanSourceMatch(tx.QueryRow(ctx, `
 SELECT `+sourceMatchSelectColumns+`
@@ -177,7 +185,7 @@ FOR UPDATE`, decisionID, tenantID))
 	}
 
 	if completion.Decision == SourceMatchMatched {
-		return completeMatchedSourceMatch(ctx, tx, tenantID, decision, completion)
+		return completeMatchedSourceMatch(ctx, tx, tenantID, decision, completion, snapshot.AsOf)
 	}
 	receipt, err := updateTerminalSourceMatch(ctx, tx, tenantID, decision.ID, completion, "", "", "", "", "")
 	if err != nil {
@@ -211,8 +219,8 @@ WHERE tenant_id = $1 AND continuity_id = $2::uuid AND operation_id = $3`, tenant
 	return receipt, nil
 }
 
-func completeMatchedSourceMatch(ctx context.Context, tx pgx.Tx, tenantID string, decision SourceMatchReceipt, completion SourceMatchCompletion) (SourceMatchReceipt, error) {
-	currentCandidates, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, decision.ContinuityID, true)
+func completeMatchedSourceMatch(ctx context.Context, tx pgx.Tx, tenantID string, decision SourceMatchReceipt, completion SourceMatchCompletion, asOf time.Time) (SourceMatchReceipt, error) {
+	currentCandidates, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, decision.ContinuityID, asOf, true)
 	if err != nil {
 		return SourceMatchReceipt{}, err
 	}
@@ -368,7 +376,7 @@ FOR UPDATE`, tenantID, operationID))
 	return receipt, true, nil
 }
 
-func listSourceMatchCandidatesTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID string, lock bool) ([]SourceMatchCandidate, error) {
+func listSourceMatchCandidatesTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID string, asOf time.Time, lock bool) ([]SourceMatchCandidate, error) {
 	query := `
 SELECT memory.id::text, memory.memory_key, memory.content,
        COALESCE(observation.source_ref, '')
@@ -377,12 +385,15 @@ LEFT JOIN observations observation
   ON observation.tenant_id = memory.tenant_id
  AND observation.id = memory.origin_observation_id
 WHERE memory.tenant_id = $1 AND memory.continuity_id = $2::uuid
-  AND memory.lifecycle_status = 'active' AND btrim(memory.memory_key) <> ''
+	AND memory_is_eligible(
+	  memory.lifecycle_status, memory.content, memory.valid_from, memory.valid_until, $3
+	)
+	AND btrim(memory.memory_key) <> ''
 ORDER BY memory.memory_key ASC, memory.id ASC`
 	if lock {
 		query += " FOR UPDATE OF memory"
 	}
-	rows, err := tx.Query(ctx, query, tenantID, continuityID)
+	rows, err := tx.Query(ctx, query, tenantID, continuityID, asOf)
 	if err != nil {
 		return nil, fmt.Errorf("list source match candidates: %w", err)
 	}
