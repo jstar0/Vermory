@@ -299,8 +299,8 @@ Rules:
 
 Correction may target an active memory even when its effective state is
 scheduled or expired. The old revision becomes superseded and the replacement
-gets an explicitly chosen validity window; it never inherits a stale deadline
-implicitly.
+never inherits a stale deadline implicitly. The replacement is unbounded by
+default unless the caller performs an explicit validity operation.
 
 Forget can target every non-deleted lifecycle state and retains existing
 redaction behavior. A forget transaction locks the target row; a concurrent
