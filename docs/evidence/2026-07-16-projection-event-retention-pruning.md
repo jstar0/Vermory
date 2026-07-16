@@ -211,6 +211,7 @@ relabeled:
 | formal restart injection | 1 | dedicated PostgreSQL stopped after delete, floor, and receipt mutations but before commit | required all three mutations to roll back, recovered the same pool, and retried the operation |
 | offline replay | 1 | a manually transcribed full revision did not match the report | conflict was rejected without overwrite; replay was rerun with `git rev-parse HEAD` |
 | full local test gate | 1 | retrieval ablation still used reset followed by incremental `RunOnce`, and one test still expected schema 16 | changed the ablation rebuild path to `RebuildCurrent`, updated the latest-schema assertion to 17, and reran focused, package, full, and race tests |
+| protected CI run `29477995101` | 1 | Linux race instrumentation consumed a fixed 50 ms request deadline before source-formation provider entry, so the test failed while committing the begin transaction | replaced the wall-clock assumption with a controllable deadline context that expires exactly at provider entry; the focused race case passed 20 repetitions and the complete CI race set passed locally |
 
 The failed first-run root and PostgreSQL log remain outside Git for local audit.
 

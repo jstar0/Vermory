@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -335,9 +336,14 @@ func TestSourceFormationServicePersistsDetachedTimeoutAndSnapshotDrift(t *testin
 			t.Fatal(err)
 		}
 		addSourceMatchFact(t, governance, repoRoot, "formation-deadline-fact", "deploy.retry.max", "Retry at most 3 times.", "fixture:retry")
-		service := NewSourceFormationService(store, "formation-deadline", sourceFormationDeadlineProvider{}, "test-provider", "test-model")
-		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-		defer cancel()
+		ctx := newSourceFormationDeadlineContext(context.Background())
+		service := NewSourceFormationService(
+			store,
+			"formation-deadline",
+			sourceFormationDeadlineProvider{beforeWait: ctx.expire},
+			"test-provider",
+			"test-model",
+		)
 		receipt, err := service.FormDocument(ctx, repoRoot, SourceFormationRequest{
 			OperationID:    "formation-deadline-run",
 			SourceRef:      "fixture:formation-deadline",
@@ -408,9 +414,52 @@ func (p *sourceFormationTestProvider) Generate(_ context.Context, request provid
 	return p.response, p.err
 }
 
-type sourceFormationDeadlineProvider struct{}
+type sourceFormationDeadlineProvider struct {
+	beforeWait func()
+}
 
-func (sourceFormationDeadlineProvider) Generate(ctx context.Context, _ provider.GenerateRequest) (provider.GenerateResponse, error) {
+func (p sourceFormationDeadlineProvider) Generate(ctx context.Context, _ provider.GenerateRequest) (provider.GenerateResponse, error) {
+	if p.beforeWait != nil {
+		p.beforeWait()
+	}
 	<-ctx.Done()
 	return provider.GenerateResponse{}, ctx.Err()
+}
+
+type sourceFormationDeadlineContext struct {
+	context.Context
+	deadline time.Time
+	done     chan struct{}
+	once     sync.Once
+}
+
+func newSourceFormationDeadlineContext(parent context.Context) *sourceFormationDeadlineContext {
+	return &sourceFormationDeadlineContext{
+		Context:  parent,
+		deadline: time.Now().Add(time.Hour),
+		done:     make(chan struct{}),
+	}
+}
+
+func (c *sourceFormationDeadlineContext) Deadline() (time.Time, bool) {
+	return c.deadline, true
+}
+
+func (c *sourceFormationDeadlineContext) Done() <-chan struct{} {
+	return c.done
+}
+
+func (c *sourceFormationDeadlineContext) Err() error {
+	select {
+	case <-c.done:
+		return context.DeadlineExceeded
+	default:
+		return nil
+	}
+}
+
+func (c *sourceFormationDeadlineContext) expire() {
+	c.once.Do(func() {
+		close(c.done)
+	})
 }
