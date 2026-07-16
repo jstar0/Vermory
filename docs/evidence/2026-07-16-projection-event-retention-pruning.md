@@ -210,8 +210,33 @@ relabeled:
 | formal profile | 1 | revision `9dc6d08` reached the 30-minute test timeout while serially draining the first candidate tenant | kept all frozen counts and batch size, parallelized only independent per-tenant catch-up, and reran from a fresh root |
 | formal restart injection | 1 | dedicated PostgreSQL stopped after delete, floor, and receipt mutations but before commit | required all three mutations to roll back, recovered the same pool, and retried the operation |
 | offline replay | 1 | a manually transcribed full revision did not match the report | conflict was rejected without overwrite; replay was rerun with `git rev-parse HEAD` |
+| full local test gate | 1 | retrieval ablation still used reset followed by incremental `RunOnce`, and one test still expected schema 16 | changed the ablation rebuild path to `RebuildCurrent`, updated the latest-schema assertion to 17, and reran focused, package, full, and race tests |
 
 The failed first-run root and PostgreSQL log remain outside Git for local audit.
+
+## Local Release Gates
+
+After the formal report was committed, delivery compatibility was verified on
+code revision `0c31816b64bbd1a27220316757bb7ae101705f67`:
+
+- PostgreSQL-backed `go test -p 1 -count=1 ./...` passed on schema 17;
+- the CI race package set passed, including runtime, authn, Web Chat, CLI, MCP,
+  provider, memory backend, and retrieval ablation;
+- `internal/reality` passed independently under the race detector;
+- `go vet ./...`, `go mod tidy`, module-file diff, and `git diff --check`
+  passed;
+- operations acceptance passed migration replay, database-outage recovery,
+  trimpath migration outside the repository, schema-17 dump/restore, and
+  disposable projection rebuild;
+- OpenClaw passed 43 tests, TypeScript typecheck, build, and package dry-run;
+- GoReleaser v2.17.0 validated the config and produced Darwin and Linux
+  `amd64`/`arm64` archives with passing checksums;
+- the Darwin arm64 archive executed `vermory version`, while the Linux archives
+  were independently identified as static x86-64 and aarch64 ELF binaries.
+
+The local release snapshot is delivery evidence only. Protected GitHub CI and
+its synthetic-merge artifact are verified separately against the final
+checklist head.
 
 ## Hard Gates
 
