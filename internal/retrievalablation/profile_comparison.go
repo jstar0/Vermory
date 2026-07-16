@@ -323,7 +323,7 @@ func buildProfileProjection(
 		if err != nil {
 			return 0, 0, 0, err
 		}
-		if _, err := worker.RunOnce(ctx); err != nil {
+		if _, err := worker.RebuildCurrent(ctx); err != nil {
 			return 0, 0, 0, err
 		}
 	}
