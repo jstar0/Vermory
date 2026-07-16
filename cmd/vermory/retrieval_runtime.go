@@ -375,8 +375,8 @@ func newRetrievalPruneEventsCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("read projection prune schema version")
 			}
-			if version != 17 {
-				return fmt.Errorf("projection pruning requires schema 17")
+			if version < 17 {
+				return fmt.Errorf("projection pruning requires schema 17 or later")
 			}
 			if err := store.ValidateProjectionPruneOperatorRole(command.Context()); err != nil {
 				return err

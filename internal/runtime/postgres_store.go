@@ -40,17 +40,21 @@ type Memory struct {
 }
 
 type GovernedMemory struct {
-	ID                 string `json:"id"`
-	MemoryKey          string `json:"memory_key,omitempty"`
-	LifecycleStatus    string `json:"lifecycle_status"`
-	Content            string `json:"content"`
-	SupersedesMemoryID string `json:"supersedes_memory_id,omitempty"`
+	ID                 string               `json:"id"`
+	MemoryKey          string               `json:"memory_key,omitempty"`
+	LifecycleStatus    string               `json:"lifecycle_status"`
+	Content            string               `json:"content"`
+	SupersedesMemoryID string               `json:"supersedes_memory_id,omitempty"`
+	ValidFrom          *time.Time           `json:"valid_from,omitempty"`
+	ValidUntil         *time.Time           `json:"valid_until,omitempty"`
+	EffectiveState     MemoryEffectiveState `json:"effective_state"`
 }
 
 type DeliveryReceipt struct {
-	DeliveryID string `json:"delivery_id"`
-	Context    string `json:"context"`
-	Replayed   bool   `json:"replayed"`
+	DeliveryID      string    `json:"delivery_id"`
+	Context         string    `json:"context"`
+	EligibilityAsOf time.Time `json:"eligibility_as_of"`
+	Replayed        bool      `json:"replayed"`
 }
 
 type MemoryReceipt struct {
@@ -149,6 +153,7 @@ func (s *Store) SchemaVersion(ctx context.Context) (int64, error) {
 func (s *Store) ResetForTest(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 	TRUNCATE vermory_auth.api_tokens,
+	  memory_eligibility_operations,
 	  memory_projection_prune_runs, memory_projection_retention,
 	  memory_retrieval_runs, memory_vector_documents_2560, memory_vector_documents,
   memory_projection_cursors, memory_projection_events,
@@ -488,10 +493,13 @@ func (s *Store) RecordDelivery(ctx context.Context, tenantID, continuityID, oper
 	defer tx.Rollback(ctx)
 
 	var deliveryID, existingContinuityID, existingContext string
+	var eligibilityAsOf time.Time
 	err = tx.QueryRow(ctx, `
-SELECT id::text, continuity_id::text, context_body
+SELECT id::text, continuity_id::text, context_body, eligibility_as_of
 FROM memory_deliveries
-WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(&deliveryID, &existingContinuityID, &existingContext)
+WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(
+		&deliveryID, &existingContinuityID, &existingContext, &eligibilityAsOf,
+	)
 	if err == nil {
 		if existingContinuityID != continuityID {
 			return DeliveryReceipt{}, fmt.Errorf("operation_id is already bound to another continuity")
@@ -499,7 +507,10 @@ WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(&delive
 		if err := tx.Commit(ctx); err != nil {
 			return DeliveryReceipt{}, fmt.Errorf("commit replayed context delivery: %w", err)
 		}
-		return DeliveryReceipt{DeliveryID: deliveryID, Context: existingContext, Replayed: true}, nil
+		return DeliveryReceipt{
+			DeliveryID: deliveryID, Context: existingContext,
+			EligibilityAsOf: eligibilityAsOf.UTC(), Replayed: true,
+		}, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return DeliveryReceipt{}, fmt.Errorf("lookup context delivery: %w", err)
@@ -507,13 +518,18 @@ WHERE tenant_id = $1 AND operation_id = $2`, tenantID, operationID).Scan(&delive
 	if err := tx.QueryRow(ctx, `
 INSERT INTO memory_deliveries (tenant_id, continuity_id, operation_id, task, context_body)
 VALUES ($1, $2::uuid, $3, $4, $5)
-RETURNING id::text`, tenantID, continuityID, operationID, task, contextBody).Scan(&deliveryID); err != nil {
+RETURNING id::text, eligibility_as_of`, tenantID, continuityID, operationID, task, contextBody).Scan(
+		&deliveryID, &eligibilityAsOf,
+	); err != nil {
 		return DeliveryReceipt{}, fmt.Errorf("record context delivery: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return DeliveryReceipt{}, fmt.Errorf("commit context delivery: %w", err)
 	}
-	return DeliveryReceipt{DeliveryID: deliveryID, Context: contextBody}, nil
+	return DeliveryReceipt{
+		DeliveryID: deliveryID, Context: contextBody,
+		EligibilityAsOf: eligibilityAsOf.UTC(),
+	}, nil
 }
 
 func (s *Store) DeliveryContinuity(ctx context.Context, tenantID, deliveryID string) (string, error) {
@@ -824,8 +840,13 @@ func (s *Store) ListGovernedMemories(ctx context.Context, tenantID, continuityID
 	if err != nil {
 		return nil, err
 	}
+	var asOf time.Time
+	if err := s.pool.QueryRow(ctx, `SELECT clock_timestamp()`).Scan(&asOf); err != nil {
+		return nil, fmt.Errorf("read governed memory eligibility clock: %w", err)
+	}
 	rows, err := s.pool.Query(ctx, `
-SELECT id::text, memory_key, lifecycle_status, content, COALESCE(supersedes_memory_id::text, '')
+SELECT id::text, memory_key, lifecycle_status, content,
+       COALESCE(supersedes_memory_id::text, ''), valid_from, valid_until
 FROM governed_memories
 WHERE tenant_id = $1 AND continuity_id = $2::uuid
 ORDER BY created_at ASC, id ASC`, tenantID, continuityID)
@@ -837,9 +858,18 @@ ORDER BY created_at ASC, id ASC`, tenantID, continuityID)
 	memories := make([]GovernedMemory, 0)
 	for rows.Next() {
 		var memory GovernedMemory
-		if err := rows.Scan(&memory.ID, &memory.MemoryKey, &memory.LifecycleStatus, &memory.Content, &memory.SupersedesMemoryID); err != nil {
+		if err := rows.Scan(
+			&memory.ID, &memory.MemoryKey, &memory.LifecycleStatus, &memory.Content,
+			&memory.SupersedesMemoryID, &memory.ValidFrom, &memory.ValidUntil,
+		); err != nil {
 			return nil, fmt.Errorf("scan governed memory: %w", err)
 		}
+		memory.EffectiveState = EffectiveMemoryState(
+			memory.LifecycleStatus,
+			memory.Content,
+			MemoryValidity{ValidFrom: memory.ValidFrom, ValidUntil: memory.ValidUntil},
+			asOf,
+		)
 		memories = append(memories, memory)
 	}
 	if err := rows.Err(); err != nil {

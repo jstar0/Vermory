@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	storepostgres "vermory/internal/store/postgres"
 
@@ -119,12 +120,126 @@ WHERE conrelid = 'public.memory_eligibility_operations'::regclass`).Scan(&constr
 	for _, fragment := range []string{
 		"UNIQUE (tenant_id, operation_id)",
 		"action = ANY (ARRAY['set_validity'::text, 'archive'::text])",
-		"length(request_fingerprint) = 64",
+		"request_fingerprint ~ '^[0-9a-f]{64}$'::text",
 		"FOREIGN KEY (tenant_id, continuity_id, memory_id)",
 	} {
 		if !strings.Contains(constraints, fragment) {
 			t.Fatalf("eligibility operation constraints lack %q: %s", fragment, constraints)
 		}
+	}
+}
+
+func TestMemoryEligibilityMigrationRejectsInvalidState(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	var continuityID, observationID, memoryID string
+	if err := store.pool.QueryRow(ctx, `
+INSERT INTO continuity_spaces (tenant_id, continuity_line, state)
+VALUES ('eligibility-invalid', 'workspace', 'active')
+RETURNING id::text`).Scan(&continuityID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.pool.QueryRow(ctx, `
+INSERT INTO observations (
+  tenant_id, continuity_id, operation_id, observation_kind, content, source_ref
+) VALUES (
+  'eligibility-invalid', $1::uuid, 'eligibility-invalid-observation',
+  'source_update', 'valid control', 'fixture:eligibility-invalid'
+)
+RETURNING id::text`, continuityID).Scan(&observationID); err != nil {
+		t.Fatal(err)
+	}
+	boundary := time.Date(2026, 7, 20, 6, 0, 0, 0, time.UTC)
+	if _, err := store.pool.Exec(ctx, `
+INSERT INTO governed_memories (
+  tenant_id, continuity_id, origin_observation_id, memory_kind,
+  lifecycle_status, content, valid_from, valid_until
+) VALUES (
+  'eligibility-invalid', $1::uuid, $2::uuid, 'fact',
+  'active', 'invalid interval', $3, $3
+)`, continuityID, observationID, boundary); err == nil {
+		t.Fatal("equal validity interval was accepted")
+	}
+	if err := store.pool.QueryRow(ctx, `
+INSERT INTO governed_memories (
+  tenant_id, continuity_id, origin_observation_id, memory_kind,
+  lifecycle_status, content
+) VALUES (
+  'eligibility-invalid', $1::uuid, $2::uuid, 'fact', 'active', 'valid control'
+)
+RETURNING id::text`, continuityID, observationID).Scan(&memoryID); err != nil {
+		t.Fatal(err)
+	}
+	for name, test := range map[string]struct {
+		action      string
+		fingerprint string
+	}{
+		"action":      {action: "expire", fingerprint: strings.Repeat("a", 64)},
+		"fingerprint": {action: "archive", fingerprint: strings.Repeat("G", 64)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := store.pool.Exec(ctx, `
+INSERT INTO memory_eligibility_operations (
+  tenant_id, continuity_id, memory_id, operation_id, action,
+  request_fingerprint, previous_lifecycle_status, result_lifecycle_status
+) VALUES (
+  'eligibility-invalid', $1::uuid, $2::uuid, $3, $4, $5, 'active', 'active'
+)`, continuityID, memoryID, "eligibility-invalid-"+name, test.action, test.fingerprint)
+			if err == nil {
+				t.Fatalf("invalid %s was accepted", name)
+			}
+		})
+	}
+}
+
+func TestMemoryEligibilityMigrationRejectsUnsafeDowngrade(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	var continuityID, observationID, memoryID string
+	if err := store.pool.QueryRow(ctx, `
+INSERT INTO continuity_spaces (tenant_id, continuity_line, state)
+VALUES ('eligibility-downgrade', 'workspace', 'active')
+RETURNING id::text`).Scan(&continuityID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.pool.QueryRow(ctx, `
+INSERT INTO observations (
+  tenant_id, continuity_id, operation_id, observation_kind, content, source_ref
+) VALUES (
+  'eligibility-downgrade', $1::uuid, 'eligibility-downgrade-observation',
+  'source_update', 'bounded fact', 'fixture:eligibility-downgrade'
+)
+RETURNING id::text`, continuityID).Scan(&observationID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.pool.QueryRow(ctx, `
+INSERT INTO governed_memories (
+  tenant_id, continuity_id, origin_observation_id, memory_kind,
+  lifecycle_status, content, valid_until
+) VALUES (
+  'eligibility-downgrade', $1::uuid, $2::uuid, 'fact',
+  'active', 'bounded fact', '2026-07-21T00:00:00Z'
+)
+RETURNING id::text`, continuityID, observationID).Scan(&memoryID); err != nil {
+		t.Fatal(err)
+	}
+	db := openMemoryEligibilityMigrationDB(t)
+	if err := goose.DownToContext(ctx, db, "migrations", 17); err == nil ||
+		!strings.Contains(err.Error(), "cannot downgrade while memory eligibility state exists") {
+		t.Fatalf("schema 18 unsafe downgrade was not blocked: %v", err)
+	}
+	version, err := store.SchemaVersion(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != 18 {
+		t.Fatalf("blocked downgrade changed schema version to %d", version)
+	}
+	if _, err := store.pool.Exec(ctx, `
+UPDATE governed_memories
+SET valid_until = NULL
+WHERE id = $1::uuid`, memoryID); err != nil {
+		t.Fatal(err)
 	}
 }
 

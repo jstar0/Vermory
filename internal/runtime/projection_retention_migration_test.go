@@ -19,8 +19,8 @@ func TestProjectionRetentionSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version != 17 {
-		t.Fatalf("schema version=%d want 17", version)
+	if version != 18 {
+		t.Fatalf("schema version=%d want 18", version)
 	}
 
 	for _, table := range []string{"memory_projection_retention", "memory_projection_prune_runs"} {
@@ -131,6 +131,9 @@ DELETE FROM memory_projection_cursors
 WHERE tenant_id = $1 AND profile_id = $2`, "retention-downgrade-blocked", ProductionRetrievalProfileID); err != nil {
 		t.Fatal(err)
 	}
+	if err := goose.UpToContext(ctx, db, "migrations", 18); err != nil {
+		t.Fatalf("restore schema 18 after blocked W17 downgrade: %v", err)
+	}
 }
 
 func TestProjectionRetentionMigrationUpDown(t *testing.T) {
@@ -141,8 +144,8 @@ func TestProjectionRetentionMigrationUpDown(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if err := goose.UpToContext(context.Background(), db, "migrations", 17); err != nil {
-			t.Errorf("restore schema 17: %v", err)
+		if err := goose.UpToContext(context.Background(), db, "migrations", 18); err != nil {
+			t.Errorf("restore schema 18: %v", err)
 		}
 	})
 	for _, table := range []string{"memory_projection_retention", "memory_projection_prune_runs"} {

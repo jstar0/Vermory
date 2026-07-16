@@ -251,13 +251,13 @@ func (s *Store) CurrentEligibilitySnapshot(ctx context.Context, tenantID string)
 func EffectiveMemoryState(lifecycle, content string, validity MemoryValidity, asOf time.Time) MemoryEffectiveState
 ```
 
-- [ ] **Step 1: Add failing type, interval, boundary, and database-clock tests.**
+- [x] **Step 1: Add failing type, interval, boundary, and database-clock tests.**
 
 Cover unbounded, future, exact `valid_from`, before `valid_until`, exact
 `valid_until`, archived, superseded, rejected, deleted/redacted, invalid zero
 times, UTC normalization, tenant validation, and stable JSON fields.
 
-- [ ] **Step 2: Run type tests and observe RED.**
+- [x] **Step 2: Run type tests and observe RED.**
 
 ```bash
 go test -count=1 ./internal/runtime \
@@ -266,7 +266,7 @@ go test -count=1 ./internal/runtime \
 
 Expected: compile failure because the types and methods do not exist.
 
-- [ ] **Step 3: Implement migration 18.**
+- [x] **Step 3: Implement migration 18.**
 
 The Up migration must:
 
@@ -287,25 +287,25 @@ The Down migration must reject downgrade if archived rows, non-null validity,
 or eligibility-operation receipts remain, then remove only schema-18 objects
 and restore schema-17 checks.
 
-- [ ] **Step 4: Implement domain types and request-level database time.**
+- [x] **Step 4: Implement domain types and request-level database time.**
 
 Use `SELECT clock_timestamp()` under tenant context. Normalize to UTC and
 reject a zero or non-UTC `as_of` in diagnostic APIs. Keep normal client APIs
 unable to supply arbitrary historical time.
 
-- [ ] **Step 5: Extend inspection and audit DTOs without changing model-facing prose.**
+- [x] **Step 5: Extend inspection and audit DTOs without changing model-facing prose.**
 
 Add `ValidFrom`, `ValidUntil`, and `EffectiveState` to `GovernedMemory`. Add
 `EligibilityAsOf` to retrieval/delivery inspection receipts. Do not include
 these fields in `Memory` or semantic context text.
 
-- [ ] **Step 6: Update reset, migration replay, dump/restore, and latest-schema checks.**
+- [x] **Step 6: Update reset, migration replay, dump/restore, and latest-schema checks.**
 
 `ResetForTest` truncates the operation table before governed memories. Every
 intentional latest-schema assertion expects 18. Operations acceptance verifies
 schema-18 replay and dump/restore compatibility.
 
-- [ ] **Step 7: Run focused schema and type tests.**
+- [x] **Step 7: Run focused schema and type tests.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
@@ -315,7 +315,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit schema 18.**
+- [x] **Step 8: Commit schema 18.**
 
 ```bash
 git add internal/store/postgres/migrations/00018_memory_eligibility_retention.sql \

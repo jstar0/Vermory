@@ -124,10 +124,11 @@ func (r RetrievalRequest) normalized() (RetrievalRequest, error) {
 }
 
 type RetrievalResult struct {
-	Memories  []Memory
-	Effective RetrievalMode
-	Degraded  bool
-	AuditID   string
+	Memories        []Memory
+	Effective       RetrievalMode
+	Degraded        bool
+	AuditID         string
+	EligibilityAsOf time.Time
 }
 
 type MemoryRetriever interface {
