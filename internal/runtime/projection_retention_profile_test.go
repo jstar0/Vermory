@@ -48,8 +48,10 @@ func TestProjectionRetentionMiniatureProfile(t *testing.T) {
 			}
 		}
 	}
+	if err := drainProjectionRetentionWorkers(ctx, dataset.Tenants, dimensionalWorkers); err != nil {
+		t.Fatal(err)
+	}
 	for _, tenantID := range dataset.Tenants {
-		drainDimensionalProjection(t, dimensionalWorkers[tenantID])
 		receipt, err := store.PruneProjectionEvents(ctx, tenantID, ProjectionPruneRequest{
 			OperationID: "w18-mini-final-" + tenantID, Cutoff: cutoff, RetainTailEvents: 10,
 		})

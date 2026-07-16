@@ -193,8 +193,8 @@ WHERE tenant_id = ANY($1::text[]) AND profile_id = $2`, dataset.Tenants, futureP
 	}
 	queriesOverlappedPruning := !pruneStartedAt.IsZero() && !pruneCompletedAt.IsZero() &&
 		querySummary.startedAt.Before(pruneCompletedAt) && querySummary.completedAt.After(pruneStartedAt)
-	for _, tenantID := range dataset.Tenants {
-		drainDimensionalProjection(t, dimensionalWorkers[tenantID])
+	if err := drainProjectionRetentionWorkers(ctx, dataset.Tenants, dimensionalWorkers); err != nil {
+		t.Fatal(err)
 	}
 	var replayStable bool
 	for tenantIndex, tenantID := range dataset.Tenants {
@@ -377,10 +377,17 @@ SELECT count(*) FROM memory_search_documents WHERE tenant_id = ANY($1::text[])`,
 			QueryResponseSHA256:      provider.QueryResponseSHA256,
 		},
 		HardGates: hardGates,
-		Failures: []ProjectionRetentionFailure{{
-			Phase: "prune_restart", Attempt: 1, Code: "postgres_immediate_stop",
-			Message: "the dedicated PostgreSQL cluster stopped after delete, floor, and receipt mutations but before commit", Retried: true,
-		}},
+		Failures: []ProjectionRetentionFailure{
+			{
+				Phase: "formal_profile", Attempt: 1, Code: "test_timeout",
+				Message: "revision 9dc6d087a5c141db2aa0426d300fea1867f98511 reached the 30 minute test timeout while draining the first candidate tenant serially",
+				Retried: true,
+			},
+			{
+				Phase: "prune_restart", Attempt: 1, Code: "postgres_immediate_stop",
+				Message: "the dedicated PostgreSQL cluster stopped after delete, floor, and receipt mutations but before commit", Retried: true,
+			},
+		},
 		NonClaims: []string{
 			"not months of uninterrupted wall-clock operation",
 			"no automatic retention scheduling",
@@ -416,6 +423,51 @@ type projectionRetentionQuerySummary struct {
 type projectionRetentionQueryRun struct {
 	started <-chan struct{}
 	done    <-chan projectionRetentionQuerySummary
+}
+
+func drainProjectionRetentionWorkers(
+	ctx context.Context,
+	tenantIDs []string,
+	workers map[string]*ProjectionWorker,
+) error {
+	type drainResult struct {
+		tenantID string
+		err      error
+	}
+	results := make(chan drainResult, len(tenantIDs))
+	var drains sync.WaitGroup
+	drains.Add(len(tenantIDs))
+	for _, tenantID := range tenantIDs {
+		tenantID := tenantID
+		worker := workers[tenantID]
+		go func() {
+			defer drains.Done()
+			if worker == nil {
+				results <- drainResult{tenantID: tenantID, err: fmt.Errorf("projection worker is missing")}
+				return
+			}
+			for attempt := 0; attempt < 1000; attempt++ {
+				result, err := worker.RunOnce(ctx)
+				if err != nil {
+					results <- drainResult{tenantID: tenantID, err: fmt.Errorf("run projection worker: result=%#v: %w", result, err)}
+					return
+				}
+				if result.Lag == 0 {
+					results <- drainResult{tenantID: tenantID}
+					return
+				}
+			}
+			results <- drainResult{tenantID: tenantID, err: fmt.Errorf("projection did not reach zero lag after 1000 attempts")}
+		}()
+	}
+	drains.Wait()
+	close(results)
+	for result := range results {
+		if result.err != nil {
+			return fmt.Errorf("drain projection for tenant %s: %w", result.tenantID, result.err)
+		}
+	}
+	return nil
 }
 
 func runProjectionRetentionQueries(
