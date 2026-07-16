@@ -148,8 +148,9 @@ func (s *Store) SchemaVersion(ctx context.Context) (int64, error) {
 
 func (s *Store) ResetForTest(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
-TRUNCATE vermory_auth.api_tokens,
-  memory_retrieval_runs, memory_vector_documents_2560, memory_vector_documents,
+	TRUNCATE vermory_auth.api_tokens,
+	  memory_projection_prune_runs, memory_projection_retention,
+	  memory_retrieval_runs, memory_vector_documents_2560, memory_vector_documents,
   memory_projection_cursors, memory_projection_events,
   source_formation_items, source_formation_runs, source_match_decisions,
   conversation_links, bridge_memory_effects, bridge_events, bridge_operations,

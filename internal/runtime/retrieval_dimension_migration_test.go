@@ -17,8 +17,8 @@ func TestRetrievalDimensionMigrationSchema(t *testing.T) {
 SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&version); err != nil {
 		t.Fatal(err)
 	}
-	if version != 16 {
-		t.Fatalf("schema version=%d want 16", version)
+	if version != 17 {
+		t.Fatalf("schema version=%d want 17", version)
 	}
 
 	var model string

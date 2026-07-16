@@ -13,6 +13,8 @@ const (
 	ProductionRetrievalProfileID           = "siliconflow-bge-m3-1024-v1"
 	MigrationRetrievalProfileID            = "siliconflow-bge-large-zh-1024-v2"
 	DimensionalMigrationRetrievalProfileID = "siliconflow-qwen3-embedding-4b-2560-v3"
+	ProjectionStatusRebuildRequired        = "rebuild_required"
+	ProjectionFailureRebuildRequired       = "projection_rebuild_required"
 )
 
 type ProjectionClass string
@@ -170,16 +172,18 @@ type Embedder interface {
 }
 
 type ProjectionStatus struct {
-	TenantID      string     `json:"tenant_id"`
-	ProfileID     string     `json:"profile_id"`
-	LastEventID   int64      `json:"last_event_id"`
-	LatestEventID int64      `json:"latest_event_id"`
-	Lag           int64      `json:"lag"`
-	Status        string     `json:"status"`
-	AttemptCount  int        `json:"attempt_count"`
-	LastErrorCode string     `json:"last_error_code,omitempty"`
-	LastAttemptAt *time.Time `json:"last_attempt_at,omitempty"`
-	VectorCount   int64      `json:"vector_count"`
+	TenantID             string     `json:"tenant_id"`
+	ProfileID            string     `json:"profile_id"`
+	LastEventID          int64      `json:"last_event_id"`
+	LatestEventID        int64      `json:"latest_event_id"`
+	PrunedThroughEventID int64      `json:"pruned_through_event_id"`
+	Lag                  int64      `json:"lag"`
+	Status               string     `json:"status"`
+	RebuildRequired      bool       `json:"rebuild_required"`
+	AttemptCount         int        `json:"attempt_count"`
+	LastErrorCode        string     `json:"last_error_code,omitempty"`
+	LastAttemptAt        *time.Time `json:"last_attempt_at,omitempty"`
+	VectorCount          int64      `json:"vector_count"`
 }
 
 type ProjectionEvent struct {

@@ -50,8 +50,8 @@ func TestOperationsRecovery(t *testing.T) {
 		if err := admin.pool.QueryRow(ctx, `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&schemaVersion); err != nil {
 			t.Fatal(err)
 		}
-		if schemaVersion != 16 {
-			t.Fatalf("expected schema version 16 after replay, got %d", schemaVersion)
+		if schemaVersion != 17 {
+			t.Fatalf("expected schema version 17 after replay, got %d", schemaVersion)
 		}
 
 		continuityID, activeContent, staleContent, deletedContent := seedOperationsProjection(t, admin.pool)
@@ -205,12 +205,12 @@ func TestOperationsRecovery(t *testing.T) {
 		if err := pool.QueryRow(context.Background(), `SELECT max(version_id) FROM goose_db_version WHERE is_applied`).Scan(&schemaVersion); err != nil {
 			t.Fatal(err)
 		}
-		if schemaVersion != 16 {
+		if schemaVersion != 17 {
 			t.Fatalf("release migration reached schema %d", schemaVersion)
 		}
 	})
 
-	t.Run("schema 16 retrieval dump restore and disposable rebuild", func(t *testing.T) {
+	t.Run("schema 17 retrieval dump restore and disposable rebuild", func(t *testing.T) {
 		testProductionRetrievalDumpRestore(t, databaseURL)
 	})
 }
@@ -312,11 +312,11 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 	pgRestore := postgresTestTool(t, "pg_restore")
 	dump := exec.Command(pgDump, "--format=custom", "--file", dumpPath, sourceURL)
 	if output, err := dump.CombinedOutput(); err != nil {
-		t.Fatalf("dump schema 16 retrieval database: %v\n%s", err, output)
+		t.Fatalf("dump schema 17 retrieval database: %v\n%s", err, output)
 	}
 	restore := exec.Command(pgRestore, "--no-owner", "--dbname", targetURL, dumpPath)
 	if output, err := restore.CombinedOutput(); err != nil {
-		t.Fatalf("restore schema 16 retrieval database: %v\n%s", err, output)
+		t.Fatalf("restore schema 17 retrieval database: %v\n%s", err, output)
 	}
 
 	target, err := OpenStore(ctx, targetURL)
@@ -328,7 +328,7 @@ func testProductionRetrievalDumpRestore(t *testing.T, baseURL string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if version != 16 {
+	if version != 17 {
 		t.Fatalf("restored schema version=%d", version)
 	}
 	if targetCounts := operationsRetrievalCounts(t, target.pool); !reflect.DeepEqual(targetCounts, sourceCounts) {

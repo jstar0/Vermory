@@ -44,6 +44,12 @@ WHERE tenant_id = $1 AND profile_id = $2`, tenantID, profileID).Scan(
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return ProjectionStatus{}, fmt.Errorf("read retrieval projection cursor: %w", err)
 	}
+	retention, err := projectionRetention(ctx, querier, tenantID)
+	if err != nil {
+		return ProjectionStatus{}, err
+	}
+	status.PrunedThroughEventID = retention.PrunedThroughEventID
+	status.RebuildRequired = status.Status == ProjectionStatusRebuildRequired
 	if err := querier.QueryRow(ctx, `
 SELECT GREATEST(COALESCE((
          SELECT max(event_id)

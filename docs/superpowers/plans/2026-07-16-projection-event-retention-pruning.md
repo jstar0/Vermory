@@ -199,7 +199,7 @@ type ProjectionRetention struct {
     TenantID            string     `json:"tenant_id"`
     PrunedThroughEventID int64      `json:"pruned_through_event_id"`
     LastPrunedAt        *time.Time `json:"last_pruned_at,omitempty"`
-    UpdatedAt           time.Time  `json:"updated_at"`
+	UpdatedAt           *time.Time `json:"updated_at,omitempty"`
 }
 
 func (s *Store) ProjectionRetention(ctx context.Context, tenantID string) (ProjectionRetention, error)
