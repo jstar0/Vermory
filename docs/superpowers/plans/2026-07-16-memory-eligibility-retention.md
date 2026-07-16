@@ -584,40 +584,40 @@ git commit -m "feat: govern memory validity and archive"
 - Consumes: Tasks 2-4.
 - Produces: deterministic failure and operations acceptance for schema 18.
 
-- [ ] **Step 1: Add a deterministic forget-versus-extension race.**
+- [x] **Step 1: Add a deterministic forget-versus-extension race.**
 
 Pause validity update after target lock acquisition, issue forget through a
 second connection, release in controlled order, and run both orderings. Require
 one valid serialized outcome, no resurrection, no false success receipt, and
 deleted content redaction.
 
-- [ ] **Step 2: Add interrupted-transaction rollback.**
+- [x] **Step 2: Add interrupted-transaction rollback.**
 
 Inside one validity/archive transaction mutate authority and insert receipt,
 then stop the dedicated PostgreSQL cluster with `immediate` before commit.
 After restart require authority, projection state, and receipt insertion all
 rolled back together and the same pool recovers.
 
-- [ ] **Step 3: Add stale-projection and provider-outage controls.**
+- [x] **Step 3: Add stale-projection and provider-outage controls.**
 
 Keep vector rows for an expired memory deliberately. Require both current
 vector serving and lexical degradation to reject it. Simulate embedding timeout
 and ensure failure cannot bypass eligibility.
 
-- [ ] **Step 4: Add runtime-role and RLS attacks.**
+- [x] **Step 4: Add runtime-role and RLS attacks.**
 
 The runtime role may read eligible memory and its tenant's authorized audit
 view, but direct `INSERT`/`UPDATE`/`DELETE` on eligibility operations or
 governed validity fails. Cross-tenant receipt and target access returns zero or
 permission error according to the service contract.
 
-- [ ] **Step 5: Add dump/restore and rebuild equivalence.**
+- [x] **Step 5: Add dump/restore and rebuild equivalence.**
 
 Dump schema-18 authority, restore to a fresh database, reprovision runtime
 roles, rebuild lexical and both vector classes, and compare current/scheduled/
 expired/archived/deleted fingerprints. Forgotten content must remain absent.
 
-- [ ] **Step 6: Run failure and operations tests.**
+- [x] **Step 6: Run failure and operations tests.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
@@ -631,12 +631,12 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
 
 Expected: PASS.
 
-- [ ] **Step 7: Document the operations boundary.**
+- [x] **Step 7: Document the operations boundary.**
 
 Update identity/operations documentation to distinguish expiry, archive, and
 forget and explain that validity is serving-time authority, not a scheduler.
 
-- [ ] **Step 8: Commit fault and recovery qualification.**
+- [x] **Step 8: Commit fault and recovery qualification.**
 
 ```bash
 git add internal/runtime/memory_eligibility_* \

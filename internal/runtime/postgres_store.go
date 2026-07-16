@@ -69,8 +69,11 @@ type GovernedObservationReceipt struct {
 }
 
 type Store struct {
-	pool        *pgxpool.Pool
-	databaseURL string
+	pool                             *pgxpool.Pool
+	databaseURL                      string
+	memoryEligibilityAfterTargetLock func()
+	memoryEligibilityBeforeCommit    func()
+	memoryDeleteAfterTargetLock      func()
 }
 
 type StoreOptions struct {
@@ -223,15 +226,15 @@ WHERE rolname = current_user`).Scan(&canLogin, &superuser, &bypassRLS); err != n
 	}
 	readWriteTables := []string{
 		"continuity_spaces", "continuity_bindings", "conversation_bindings", "observations",
-		"governed_memories", "memory_deliveries", "memory_search_documents", "conversation_turns",
+		"memory_deliveries", "memory_search_documents", "conversation_turns",
 		"bridge_operations", "bridge_events", "bridge_memory_effects", "conversation_links",
 		"source_match_decisions", "source_formation_runs", "source_formation_items",
 		"memory_projection_events", "memory_projection_cursors", "memory_vector_documents",
 		"memory_vector_documents_2560", "memory_retrieval_runs",
 	}
-	readOnlyTables := []string{"memory_projection_retention"}
+	readOnlyTables := []string{"memory_eligibility_operations", "memory_projection_retention"}
 	ownedTableSet := append(append([]string(nil), readWriteTables...), readOnlyTables...)
-	ownedTableSet = append(ownedTableSet, "memory_projection_prune_runs")
+	ownedTableSet = append(ownedTableSet, "governed_memories", "memory_projection_prune_runs")
 	var ownedTables int
 	if err := s.pool.QueryRow(validationCtx, `
 SELECT count(*)
@@ -261,6 +264,29 @@ FROM unnest($1::text[]) AS required(table_name)`, readWriteTables).Scan(&hasRequ
 		return fmt.Errorf("validate runtime required privileges: %w", err)
 	}
 	if !hasRequiredPrivileges {
+		return ErrUnsafeRuntimeRole
+	}
+	var governedBoundary bool
+	if err := s.pool.QueryRow(validationCtx, `
+SELECT
+  has_table_privilege(current_user, 'public.governed_memories', 'SELECT')
+  AND has_table_privilege(current_user, 'public.governed_memories', 'DELETE')
+  AND NOT has_table_privilege(current_user, 'public.governed_memories', 'INSERT')
+  AND NOT has_table_privilege(current_user, 'public.governed_memories', 'UPDATE')
+  AND has_column_privilege(current_user, 'public.governed_memories', 'tenant_id', 'INSERT')
+  AND has_column_privilege(current_user, 'public.governed_memories', 'continuity_id', 'INSERT')
+  AND has_column_privilege(current_user, 'public.governed_memories', 'origin_observation_id', 'INSERT')
+  AND has_column_privilege(current_user, 'public.governed_memories', 'memory_kind', 'INSERT')
+  AND has_column_privilege(current_user, 'public.governed_memories', 'memory_key', 'INSERT')
+  AND has_column_privilege(current_user, 'public.governed_memories', 'lifecycle_status', 'INSERT,UPDATE')
+  AND has_column_privilege(current_user, 'public.governed_memories', 'content', 'INSERT,UPDATE')
+  AND has_column_privilege(current_user, 'public.governed_memories', 'supersedes_memory_id', 'INSERT')
+  AND has_column_privilege(current_user, 'public.governed_memories', 'updated_at', 'UPDATE')
+  AND NOT has_column_privilege(current_user, 'public.governed_memories', 'valid_from', 'INSERT,UPDATE')
+  AND NOT has_column_privilege(current_user, 'public.governed_memories', 'valid_until', 'INSERT,UPDATE')`).Scan(&governedBoundary); err != nil {
+		return fmt.Errorf("validate governed memory column boundary: %w", err)
+	}
+	if !governedBoundary {
 		return ErrUnsafeRuntimeRole
 	}
 	var hasReadOnlyBoundary bool
@@ -692,7 +718,7 @@ func (s *Store) DeleteMemory(ctx context.Context, tenantID, continuityID, memory
 		return fmt.Errorf("begin delete governed memory: %w", err)
 	}
 	defer tx.Rollback(ctx)
-	if err := deleteMemoryTx(ctx, tx, tenantID, continuityID, memoryID); err != nil {
+	if err := deleteMemoryTx(ctx, tx, tenantID, continuityID, memoryID, s.memoryDeleteAfterTargetLock); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -701,7 +727,7 @@ func (s *Store) DeleteMemory(ctx context.Context, tenantID, continuityID, memory
 	return nil
 }
 
-func deleteMemoryTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, memoryID string) error {
+func deleteMemoryTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, memoryID string, afterTargetLock ...func()) error {
 	var lifecycleStatus string
 	var originObservationID *string
 	var memoryContent string
@@ -715,6 +741,9 @@ FOR UPDATE`, memoryID, tenantID, continuityID).Scan(&lifecycleStatus, &originObs
 	}
 	if err != nil {
 		return fmt.Errorf("lookup governed memory for deletion: %w", err)
+	}
+	if len(afterTargetLock) > 0 && afterTargetLock[0] != nil {
+		afterTargetLock[0]()
 	}
 	if lifecycleStatus == "deleted" {
 		return nil

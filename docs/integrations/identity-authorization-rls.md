@@ -53,6 +53,8 @@ Grant the runtime boundary through the CLI:
 The grant command:
 
 - grants CRUD access only to the served tenant-bearing continuity and retrieval tables;
+- grants column-scoped governed-memory writes needed by normal runtime flows, but does not grant `INSERT` or `UPDATE` on `valid_from` or `valid_until`;
+- grants tenant-RLS-filtered read-only access to `memory_eligibility_operations`;
 - grants the observation and projection-event sequences needed by runtime writes;
 - grants `EXECUTE` on `vermory_auth.authenticate_token(text, bytea)`;
 - does not grant direct reads of `vermory_auth.api_tokens`;
@@ -112,6 +114,7 @@ Expired, revoked, unknown, malformed, or missing tokens receive `401`. Authentic
 | Confirm/correct/forget memory | Deny | Allow | Allow |
 | Global Defaults | Deny | Allow | Allow |
 | Bridge create/inspect/reverse | Deny | Allow | Allow |
+| Set validity / archive memory | CLI/admin only | CLI/admin only | CLI/admin only |
 | Token lifecycle | CLI/admin only | CLI/admin only | CLI/admin only |
 
 No HTTP role can select another tenant. Unknown routes are denied rather than inheriting client access.
@@ -175,7 +178,9 @@ source_formation_items
 memory_projection_events
 memory_projection_cursors
 memory_vector_documents
+memory_vector_documents_2560
 memory_retrieval_runs
+memory_eligibility_operations
 ```
 
 Using the runtime role, a missing tenant setting sees zero rows:
@@ -195,6 +200,37 @@ SELECT DISTINCT tenant_id FROM continuity_spaces;
 Only `example-tenant` may appear. A row carrying tenant B and referencing a tenant A continuity, observation, delivery, memory, or bridge UUID is rejected by the composite foreign key even when the attacker knows the UUID.
 
 Application queries keep explicit tenant predicates. RLS is the second barrier, not the only barrier.
+
+## Memory Eligibility, Archive, And Forget
+
+These operations have different user-visible and operational meaning:
+
+- **Expiry** is a current-use boundary. `valid_from` is inclusive and `valid_until` is exclusive, so eligibility is evaluated as `[valid_from, valid_until)`. Expired content remains authorized history and is still inspectable; it is not deleted or silently archived.
+- **Archive** is an explicit governance action. It preserves content and provenance for authorized inspection, changes lifecycle to `archived`, removes lexical current projection, emits an `absent` vector-projection event, and prevents current delivery.
+- **Forget** is protected-content deletion. It redacts authoritative and affected downstream content, removes disposable projections, and must remain absent after restart, dump/restore, and projection rebuild.
+
+There is no expiry daemon, cron job, hidden scheduler, or lifecycle rewrite at a time boundary. Every context preparation and retrieval obtains one UTC timestamp from PostgreSQL and uses it for Global Defaults, lexical/vector retrieval, bridge selection, and delivery evidence. Active scheduled or expired facts may remain in disposable lexical or vector storage so future activation needs no timed worker, but serving queries always join PostgreSQL authority and apply the same eligibility timestamp before ranking.
+
+Validity and archive are operator/admin mutations. The restricted runtime role can read its tenant's content-free operation receipts through RLS, but direct receipt mutation and direct writes to governed-memory validity columns are denied. Use the operator CLI with an admin connection:
+
+```bash
+./bin/vermory memory set-validity \
+  --database-url "$VERMORY_ADMIN_DATABASE_URL" \
+  --tenant-id example-tenant \
+  --continuity-id '<continuity-uuid>' \
+  --operation-id bound-viewing-window-v1 \
+  --memory-id '<memory-uuid>' \
+  --valid-until 2026-07-20T06:00:00Z
+
+./bin/vermory memory archive \
+  --database-url "$VERMORY_ADMIN_DATABASE_URL" \
+  --tenant-id example-tenant \
+  --continuity-id '<continuity-uuid>' \
+  --operation-id archive-obsolete-workaround-v1 \
+  --memory-id '<memory-uuid>'
+```
+
+Both commands are tenant/continuity/memory scoped, row locked, idempotent, conflict rejecting, and content-free in their audit records. An expired active memory may be explicitly extended. A corrected revision starts unbounded unless a separate validity operation bounds it.
 
 ## Backup And Restore
 
@@ -252,7 +288,7 @@ PostgreSQL roles and passwords are cluster-level objects and may require separat
   --database-url "$VERMORY_TARGET_ADMIN_DATABASE_URL"
 ```
 
-The projection rebuild runs in one transaction and inserts only active governed memories. Deleted and superseded content must remain absent from exact and related recall after rebuild. Source-match audit is authoritative rather than a search projection; forgetting a referenced memory redacts its fact text from source fields, candidate snapshots, provider output, and reason text while preserving structural decision metadata.
+The lexical projection rebuild runs in one transaction and inserts active lifecycle rows, including scheduled or expired rows needed for natural activation. Current serving still applies PostgreSQL validity before ranking. Archived, deleted, and superseded content remains absent from current recall after rebuild. Vector profiles are disposable and must be reset and rebuilt separately from the same authority. Source-match audit is authoritative rather than a search projection; forgetting a referenced memory redacts its fact text from source fields, candidate snapshots, provider output, and reason text while preserving structural decision metadata.
 
 The reproducible local restore evidence is recorded in [PostgreSQL Operations And Recovery Evidence](../evidence/2026-07-14-postgresql-operations-recovery.md).
 

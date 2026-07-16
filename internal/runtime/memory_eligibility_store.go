@@ -200,6 +200,9 @@ FOR UPDATE`, mutation.TenantID, mutation.ContinuityID, mutation.MemoryID).Scan(
 	if err != nil {
 		return MemoryEligibilityReceipt{}, fmt.Errorf("lock memory eligibility target: %w", err)
 	}
+	if s.memoryEligibilityAfterTargetLock != nil {
+		s.memoryEligibilityAfterTargetLock()
+	}
 	if lifecycle != "active" || content == "[redacted]" {
 		return MemoryEligibilityReceipt{}, fmt.Errorf("memory must be an active non-redacted fact for %s", mutation.Action)
 	}
@@ -264,6 +267,9 @@ RETURNING `+memoryEligibilityOperationColumns,
 	))
 	if err != nil {
 		return MemoryEligibilityReceipt{}, fmt.Errorf("record memory eligibility operation: %w", err)
+	}
+	if s.memoryEligibilityBeforeCommit != nil {
+		s.memoryEligibilityBeforeCommit()
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return MemoryEligibilityReceipt{}, fmt.Errorf("commit memory eligibility operation: %w", err)

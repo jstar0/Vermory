@@ -602,6 +602,7 @@ WITH authoritative_rows AS (
 	UNION ALL SELECT 'source_match_decisions', to_jsonb(row_data)::text FROM source_match_decisions row_data
 	UNION ALL SELECT 'source_formation_runs', to_jsonb(row_data)::text FROM source_formation_runs row_data
 	UNION ALL SELECT 'source_formation_items', to_jsonb(row_data)::text FROM source_formation_items row_data
+	UNION ALL SELECT 'memory_eligibility_operations', to_jsonb(row_data)::text FROM memory_eligibility_operations row_data
   UNION ALL SELECT 'api_tokens', to_jsonb(row_data)::text FROM vermory_auth.api_tokens row_data
 )
 SELECT md5(COALESCE(string_agg(table_name || ':' || row_data, E'\n' ORDER BY table_name, row_data), ''))
