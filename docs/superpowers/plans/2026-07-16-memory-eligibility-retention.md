@@ -80,7 +80,7 @@ protected GitHub Actions release tooling.
 - Produces: frozen C02/W03 cases, `memoryEligibilityCase`,
   `loadMemoryEligibilityCase`, and RED schema-18 assertions.
 
-- [ ] **Step 1: Freeze C02 with authorized fixture provenance.**
+- [x] **Step 1: Freeze C02 with authorized fixture provenance.**
 
 The case must include:
 
@@ -98,7 +98,7 @@ inspection expectation            viewing is expired, not deleted
 The fixture lock contains exact SHA-256 values and only authorized synthetic
 or anonymized content.
 
-- [ ] **Step 2: Freeze W03 with temporary workaround and durable controls.**
+- [x] **Step 2: Freeze W03 with temporary workaround and durable controls.**
 
 The case must include:
 
@@ -113,7 +113,7 @@ forget control                    separate synthetic secret remains redacted
 cross-client expectation          Codex and Grok see the same eligible state
 ```
 
-- [ ] **Step 3: Add the frozen W19 manifest.**
+- [x] **Step 3: Add the frozen W19 manifest.**
 
 The manifest must encode exactly:
 
@@ -142,7 +142,7 @@ The manifest must encode exactly:
 The README states that validity boundaries are accelerated qualification
 timestamps, not a wall-clock-duration claim.
 
-- [ ] **Step 4: Add case identity and arithmetic tests.**
+- [x] **Step 4: Add case identity and arithmetic tests.**
 
 Require:
 
@@ -155,7 +155,7 @@ Assert `sum == 10000`, `queries == 320`, exactly four reality case IDs are
 bound (`G01`, `S01`, `C02`, `W03`), exactly sixteen hard gates exist, fixture
 locks match bytes, and unknown manifest fields are rejected.
 
-- [ ] **Step 5: Add failing schema-18 assertions.**
+- [x] **Step 5: Add failing schema-18 assertions.**
 
 On a freshly migrated database require:
 
@@ -181,7 +181,7 @@ Also require migration 18 Down/Up replay and reject invalid intervals,
 unsupported actions, invalid fingerprints, cross-tenant foreign keys, and
 unsafe downgrade while archived/validity/audit state remains.
 
-- [ ] **Step 6: Run reality/case tests and observe RED.**
+- [x] **Step 6: Run reality/case tests and observe RED.**
 
 ```bash
 go test -count=1 ./internal/reality \
@@ -195,7 +195,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
 Expected: reality/case identity passes after fixtures are added; schema tests
 fail because migration 18 does not exist.
 
-- [ ] **Step 7: Commit the frozen evidence boundary.**
+- [x] **Step 7: Commit the frozen evidence boundary.**
 
 ```bash
 git add reality/cases/C02-housing-viewing-validity \

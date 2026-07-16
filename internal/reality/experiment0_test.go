@@ -17,15 +17,15 @@ func TestBuildExperiment0ReportsFrozenPublicCoverage(t *testing.T) {
 	if !report.Pass || !report.PublicValidation.Pass {
 		t.Fatalf("expected public evidence to pass: %#v", report)
 	}
-	if len(report.PublicValidation.Results) != 10 {
-		t.Fatalf("expected ten cases, got %d", len(report.PublicValidation.Results))
+	if len(report.PublicValidation.Results) != 12 {
+		t.Fatalf("expected twelve cases, got %d", len(report.PublicValidation.Results))
 	}
 	for _, result := range report.PublicValidation.Results {
 		if result.LockSHA256 == "" {
 			t.Fatalf("case %s has no fixture lock hash", result.CaseID)
 		}
 	}
-	if len(report.ContinuityCoverage[string(LineWorkspace)]) != 3 || len(report.ContinuityCoverage[string(LineConversation)]) != 6 {
+	if len(report.ContinuityCoverage[string(LineWorkspace)]) != 4 || len(report.ContinuityCoverage[string(LineConversation)]) != 7 {
 		t.Fatalf("unexpected continuity coverage: %#v", report.ContinuityCoverage)
 	}
 	if len(report.ContinuityCoverage[string(LineBridge)]) != 4 {
@@ -34,7 +34,7 @@ func TestBuildExperiment0ReportsFrozenPublicCoverage(t *testing.T) {
 	if len(report.PressureCoverage["explicit_deletion"]) != 1 {
 		t.Fatalf("expected deletion pressure coverage: %#v", report.PressureCoverage)
 	}
-	if report.EvidenceLevels[string(EvidencePublic)] != 10 || report.SealedStatus != "unavailable" {
+	if report.EvidenceLevels[string(EvidencePublic)] != 12 || report.SealedStatus != "unavailable" {
 		t.Fatalf("unexpected evidence status: levels=%#v sealed=%q", report.EvidenceLevels, report.SealedStatus)
 	}
 	if !containsText(report.Limitations, "target discovery coverage remains incomplete") {
@@ -45,6 +45,13 @@ func TestBuildExperiment0ReportsFrozenPublicCoverage(t *testing.T) {
 	}
 	if got := report.HypothesisSignals["H-014"]; len(got) != 2 || got[0] != "I02-postgresql-operations-recovery" || got[1] != "I03-postgresql-ha-pitr" {
 		t.Fatalf("unexpected operations recovery hypothesis signal: %#v", got)
+	}
+	if got := report.HypothesisSignals["H-007"]; len(got) != 4 ||
+		got[0] != "C02-housing-viewing-validity" ||
+		got[1] != "G01-language-default-local-override" ||
+		got[2] != "S01-deletion-and-source-injection" ||
+		got[3] != "W03-workspace-workaround-validity" {
+		t.Fatalf("unexpected retention hypothesis signal: %#v", got)
 	}
 }
 

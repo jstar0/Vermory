@@ -92,7 +92,13 @@ func BuildExperiment0(options Experiment0Options) Experiment0Report {
 	sortCoverage(report.PressureCoverage)
 	report.HypothesisSignals["H-003"] = existingCases(caseIDs, "W01-synapseloom-continuity", "S01-deletion-and-source-injection")
 	report.HypothesisSignals["H-005"] = existingCases(caseIDs, "W01-synapseloom-continuity", "C01-device-maintenance-continuity", "S01-deletion-and-source-injection")
-	report.HypothesisSignals["H-007"] = existingCases(caseIDs, "G01-language-default-local-override", "S01-deletion-and-source-injection")
+	report.HypothesisSignals["H-007"] = existingCases(
+		caseIDs,
+		"G01-language-default-local-override",
+		"S01-deletion-and-source-injection",
+		"C02-housing-viewing-validity",
+		"W03-workspace-workaround-validity",
+	)
 	report.HypothesisSignals["H-008"] = existingCases(caseIDs, "C01-device-maintenance-continuity", "S01-deletion-and-source-injection")
 	report.HypothesisSignals["H-013"] = existingCases(caseIDs, "I01-authenticated-multitenant-rls")
 	report.HypothesisSignals["H-014"] = existingCases(caseIDs, "I02-postgresql-operations-recovery", "I03-postgresql-ha-pitr")
