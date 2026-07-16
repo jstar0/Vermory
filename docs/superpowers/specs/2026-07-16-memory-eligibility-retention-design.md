@@ -197,6 +197,17 @@ Schema 18 also extends the lifecycle constraint with `archived`. It does not
 add `scheduled` or `expired`; those are effective states derived at one
 request-level `as_of` timestamp.
 
+Schema 18 also records that request-level timestamp on the evidence produced
+by serving paths:
+
+```text
+memory_deliveries.eligibility_as_of
+memory_retrieval_runs.eligibility_as_of
+```
+
+These fields are audit evidence. They do not let clients request historical
+context and they do not change the authority timestamp of the memory itself.
+
 ### 5.2 Effective state
 
 Inspection derives exactly one state in this order:
@@ -221,6 +232,9 @@ Every context preparation or retrieval operation uses one PostgreSQL-derived
 UTC `as_of` timestamp. Global Defaults, lexical candidates, vector candidates,
 bridge export, and final eligibility checks for the same operation use that
 same timestamp.
+
+The timestamp is stored with the resulting delivery and retrieval audit so a
+later inspection can reproduce the boundary decision.
 
 The public client cannot supply an arbitrary historical `as_of` value for
 normal context generation. Tests and administrative inspection may use an
