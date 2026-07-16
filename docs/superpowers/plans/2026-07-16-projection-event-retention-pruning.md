@@ -62,7 +62,7 @@ formal-profile, evidence, CI, and release tooling.
 - Produces: `projectionRetentionCase`, `loadProjectionRetentionCase`, and RED
   assertions for migration 17.
 
-- [ ] **Step 1: Add the frozen case manifest and README.**
+- [x] **Step 1: Add the frozen case manifest and README.**
 
 The manifest must encode this exact identity and arithmetic:
 
@@ -114,7 +114,7 @@ The manifest must encode this exact identity and arithmetic:
 The README must state that 24 accelerated epochs are workload compression,
 not 24 months of wall-clock uptime.
 
-- [ ] **Step 2: Add case identity and arithmetic tests.**
+- [x] **Step 2: Add case identity and arithmetic tests.**
 
 Require:
 
@@ -130,7 +130,7 @@ Assert `initial == 20000`, `tail == 153600`,
 `finalCurrent == 20000`, `queries == 320`, retained tail is exactly 1,000 per
 tenant, and there are exactly 14 hard gates. Reject unknown manifest fields.
 
-- [ ] **Step 3: Add failing migration-17 assertions.**
+- [x] **Step 3: Add failing migration-17 assertions.**
 
 On a fresh migrated database require:
 
@@ -153,7 +153,7 @@ Also require migration 17 Down/Up replay to preserve schema-16 behavior and
 reject invalid cursor states, negative floors, negative tail counts, invalid
 fingerprints, and invalid prune results.
 
-- [ ] **Step 4: Run focused tests and observe RED.**
+- [x] **Step 4: Run focused tests and observe RED.**
 
 Run:
 
@@ -166,7 +166,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
 Expected: the case test passes and schema assertions fail because migration 17
 and both retention tables do not exist.
 
-- [ ] **Step 5: Commit the frozen case boundary.**
+- [x] **Step 5: Commit the frozen case boundary.**
 
 ```bash
 git add runtime/cases/W18-projection-event-retention-pruning \
@@ -205,14 +205,14 @@ type ProjectionRetention struct {
 func (s *Store) ProjectionRetention(ctx context.Context, tenantID string) (ProjectionRetention, error)
 ```
 
-- [ ] **Step 1: Add failing type and default-floor tests.**
+- [x] **Step 1: Add failing type and default-floor tests.**
 
 Require a tenant with no row to return an effective floor of zero without
 creating state. Require tenant validation and JSON fields to be stable. Add a
 status serialization test for `pruned_through_event_id` and
 `rebuild_required`.
 
-- [ ] **Step 2: Run the type tests and observe RED.**
+- [x] **Step 2: Run the type tests and observe RED.**
 
 ```bash
 go test -count=1 ./internal/runtime \
@@ -221,7 +221,7 @@ go test -count=1 ./internal/runtime \
 
 Expected: compile failure because the types and method do not exist.
 
-- [ ] **Step 3: Implement migration 17.**
+- [x] **Step 3: Implement migration 17.**
 
 The Up migration must create the two tables exactly as frozen, extend the
 cursor status constraint to include `rebuild_required`, create tenant and
@@ -230,21 +230,21 @@ and revoke PUBLIC privileges. The Down migration must reject downgrade if any
 cursor remains `rebuild_required`, then restore the schema-16 cursor check and
 drop only W18 tables and policies.
 
-- [ ] **Step 4: Implement retention reads and status fields.**
+- [x] **Step 4: Implement retention reads and status fields.**
 
 Add `PrunedThroughEventID int64` and `RebuildRequired bool` to
 `ProjectionStatus`. `RetrievalProjectionStatus` reads the effective floor in
 the same tenant context and sets `RebuildRequired` only when status equals
 `rebuild_required`.
 
-- [ ] **Step 5: Update reset/test cleanup and schema-version assertions.**
+- [x] **Step 5: Update reset/test cleanup and schema-version assertions.**
 
 `ResetForTest` must truncate `memory_projection_prune_runs` and
 `memory_projection_retention` before event/cursor tables. All release and
 operations acceptance checks that intentionally assert latest schema must
 expect 17.
 
-- [ ] **Step 6: Run migration and focused runtime tests.**
+- [x] **Step 6: Run migration and focused runtime tests.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
@@ -254,7 +254,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit schema 17.**
+- [x] **Step 7: Commit schema 17.**
 
 ```bash
 git add internal/store/postgres/migrations/00017_projection_event_retention.sql \
@@ -295,7 +295,7 @@ func ensureProjectionCursor(
 
 and floor-aware reset/status/retrieval behavior.
 
-- [ ] **Step 1: Add RED worker tests.**
+- [x] **Step 1: Add RED worker tests.**
 
 Cover these independent behaviors:
 
@@ -310,7 +310,7 @@ Cover these independent behaviors:
 5. `RebuildCurrent` succeeds from `rebuild_required`, advances to the captured
    watermark, clears the failure code, and then drains newer retained events.
 
-- [ ] **Step 2: Run worker tests and observe RED.**
+- [x] **Step 2: Run worker tests and observe RED.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
@@ -320,7 +320,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
 
 Expected: failures because workers ignore the retention floor.
 
-- [ ] **Step 3: Implement worker start enforcement.**
+- [x] **Step 3: Implement worker start enforcement.**
 
 Under the existing tenant/profile advisory lock, read the floor before setting
 `running`. If the cursor is absent after pruning, insert it at the floor with
@@ -328,7 +328,7 @@ Under the existing tenant/profile advisory lock, read the floor before setting
 code atomically and return without calling the embedder. Never let ordinary
 `RunOnce` clear `rebuild_required`.
 
-- [ ] **Step 4: Add RED retrieval and reset tests.**
+- [x] **Step 4: Add RED retrieval and reset tests.**
 
 Require vector mode to degrade to lexical with these exact failure codes:
 
@@ -344,7 +344,7 @@ Require reset after pruning to clear only the selected physical projection and
 set cursor to floor/`rebuild_required`; authority, lexical state, other profile
 rows, other profile cursor, and another tenant must remain byte-identical.
 
-- [ ] **Step 5: Run retrieval/reset tests and observe RED.**
+- [x] **Step 5: Run retrieval/reset tests and observe RED.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
@@ -355,7 +355,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
 Expected: failures because currentness only checks lag and reset returns to
 zero/idle.
 
-- [ ] **Step 6: Implement floor-aware currentness and reset.**
+- [x] **Step 6: Implement floor-aware currentness and reset.**
 
 Semantic currentness is exactly:
 
@@ -369,7 +369,7 @@ Reset reads the floor in the same transaction that clears vectors and upserts
 the cursor. It writes `last_event_id=floor`, `status=rebuild_required`, and
 `last_error_code=projection_rebuild_required`.
 
-- [ ] **Step 7: Run focused and regression tests.**
+- [x] **Step 7: Run focused and regression tests.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
@@ -380,7 +380,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
 Expected: PASS. Existing reset tests must be updated to the new safe contract,
 not weakened.
 
-- [ ] **Step 8: Commit the state-machine boundary.**
+- [x] **Step 8: Commit the state-machine boundary.**
 
 ```bash
 git add internal/runtime/retrieval_worker.go \
@@ -437,7 +437,7 @@ func (s *Store) PruneProjectionEvents(
 ) (ProjectionPruneReceipt, error)
 ```
 
-- [ ] **Step 1: Add RED validation/fingerprint tests.**
+- [x] **Step 1: Add RED validation/fingerprint tests.**
 
 Reject blank tenant/operation ID, zero cutoff, negative tail count, overlong
 operation ID, and conflicting operation-ID reuse. Require UTC-normalized cutoff
@@ -445,7 +445,7 @@ and SHA-256 fingerprint over only normalized tenant, operation, cutoff, and
 tail values. Same request replay must return the original receipt with only
 `Replayed=true` changed in memory; persisted bytes remain unchanged.
 
-- [ ] **Step 2: Add RED prune-bound integration tests.**
+- [x] **Step 2: Add RED prune-bound integration tests.**
 
 Use interleaved tenant event IDs and three profiles:
 
@@ -458,7 +458,7 @@ old-enough event, and retain-tail bound. `rebuild_required` does not block.
 No-subscriber tenants use the latest tenant event as cursor bound. A noop still
 writes one idempotent receipt and never lowers the floor.
 
-- [ ] **Step 3: Run prune tests and observe RED.**
+- [x] **Step 3: Run prune tests and observe RED.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
@@ -468,14 +468,14 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
 
 Expected: compile failure because the API does not exist.
 
-- [ ] **Step 4: Implement normalized request and receipt replay.**
+- [x] **Step 4: Implement normalized request and receipt replay.**
 
 Validation and fingerprinting must be pure helpers. Existing receipt lookup
 occurs inside the same transaction and tenant advisory lock as pruning.
 Fingerprint mismatch returns `projection prune operation conflict` without
 revealing the DSN or request internals.
 
-- [ ] **Step 5: Implement one-transaction pruning.**
+- [x] **Step 5: Implement one-transaction pruning.**
 
 The transaction must:
 
@@ -494,14 +494,14 @@ The transaction must:
 The method must never delete events from another tenant and must not modify
 authority, vector documents, lexical documents, retrieval audits, or cursors.
 
-- [ ] **Step 6: Add concurrent insert and monotonicity tests.**
+- [x] **Step 6: Add concurrent insert and monotonicity tests.**
 
 Insert new events after bound selection and prove they survive. Run two
 different operation IDs concurrently and prove the advisory lock serializes
 floor movement. Require every subsequent floor to be greater than or equal to
 the previous floor.
 
-- [ ] **Step 7: Run focused and package tests.**
+- [x] **Step 7: Run focused and package tests.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
@@ -510,7 +510,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit the prune transaction.**
+- [x] **Step 8: Commit the prune transaction.**
 
 ```bash
 git add internal/runtime/projection_retention.go \
@@ -541,7 +541,7 @@ git commit -m "feat: prune projection events atomically"
 - Produces: `newRetrievalPruneEventsCommand()` and a runtime-role privilege
   contract with explicit read-write and read-only table sets.
 
-- [ ] **Step 1: Add RED runtime-role tests.**
+- [x] **Step 1: Add RED runtime-role tests.**
 
 Require the restricted runtime role to have:
 
@@ -554,7 +554,7 @@ All existing runtime-served tables retain their existing required privileges.
 `ValidateRuntimeRole` must reject blanket CRUD on either retention-control
 table and must reject missing retention-floor SELECT.
 
-- [ ] **Step 2: Run role tests and observe RED.**
+- [x] **Step 2: Run role tests and observe RED.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
@@ -564,7 +564,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
 
 Expected: failures because runtime privilege validation assumes blanket CRUD.
 
-- [ ] **Step 3: Split runtime privilege validation by access class.**
+- [x] **Step 3: Split runtime privilege validation by access class.**
 
 Replace one blanket table list with these exact access classes:
 
@@ -590,13 +590,13 @@ Validate exact access for each class. Migration/deployment test setup must
 grant runtime SELECT on retention and no mutation privilege on either control
 table.
 
-- [ ] **Step 4: Add RED RLS and cross-tenant prune tests.**
+- [x] **Step 4: Add RED RLS and cross-tenant prune tests.**
 
 Prove a restricted tenant session cannot read another tenant's floor, cannot
 read prune receipts, and cannot mutate either table. Prove an admin prune of
 tenant A cannot count/delete tenant B events or return tenant B receipts.
 
-- [ ] **Step 5: Add RED CLI tests.**
+- [x] **Step 5: Add RED CLI tests.**
 
 Require root registration and flags:
 
@@ -613,14 +613,14 @@ Reject missing values, malformed RFC3339, negative tail count, and unsupported
 positional arguments. Successful output is one JSON receipt. Errors and output
 must not contain the supplied DSN, password, API keys, or environment values.
 
-- [ ] **Step 6: Implement the operator CLI.**
+- [x] **Step 6: Implement the operator CLI.**
 
 Open an ordinary admin `Store`, validate schema, call
 `PruneProjectionEvents`, and JSON-encode only the receipt. The command must not
 call `Migrate` implicitly and must not accept runtime-role credentials as safe
 merely because they connect.
 
-- [ ] **Step 7: Add and run real restart-rollback test.**
+- [x] **Step 7: Add and run real restart-rollback test.**
 
 Using the existing dedicated PostgreSQL 18 helper pattern, pause a transaction
 after delete/floor/audit writes but before commit, stop that dedicated cluster
@@ -645,7 +645,7 @@ VERMORY_W18_ROOT="/tmp/vermory-w18-restart-$(date -u +%Y%m%dT%H%M%SZ)" \
 
 Expected: PASS and one retained injected failure record in test output.
 
-- [ ] **Step 8: Run CLI, RLS, role, and recovery regressions.**
+- [x] **Step 8: Run CLI, RLS, role, and recovery regressions.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
@@ -655,7 +655,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit the operator boundary.**
+- [x] **Step 9: Commit the operator boundary.**
 
 ```bash
 git add internal/authn/provision.go internal/authn/postgres_test.go \
@@ -805,7 +805,7 @@ func WriteProjectionRetentionReport(root string, report ProjectionRetentionRepor
 func ReadProjectionRetentionReport(path string) (ProjectionRetentionReport, error)
 ```
 
-- [ ] **Step 1: Add RED report validation and replay tests.**
+- [x] **Step 1: Add RED report validation and replay tests.**
 
 The report must include case/revision/fingerprint, schema and versions, per
 tenant/epoch generated-pruned-retained counts, all profile cursor/floor
@@ -815,7 +815,7 @@ exactly 14 hard gates. Reject missing/false gates, unsorted percentiles,
 inconsistent counts, invalid hashes, duplicate receipts, secret-shaped values,
 and conflicting same-run replay.
 
-- [ ] **Step 2: Run report tests and observe RED.**
+- [x] **Step 2: Run report tests and observe RED.**
 
 ```bash
 go test -count=1 ./internal/runtime \
@@ -824,14 +824,14 @@ go test -count=1 ./internal/runtime \
 
 Expected: compile failure because report types do not exist.
 
-- [ ] **Step 3: Implement deterministic report serialization.**
+- [x] **Step 3: Implement deterministic report serialization.**
 
 JSON uses indented deterministic structures and newline termination. Markdown
 renders the same normalized values. Existing identical JSON/Markdown returns
 `replayed=true`; any conflict fails without overwriting. Secret scan must cover
 both serialized forms before atomic rename.
 
-- [ ] **Step 4: Add and run a miniature end-to-end profile.**
+- [x] **Step 4: Add and run a miniature end-to-end profile.**
 
 Use 2 tenants, 2 continuities each, 20 facts each, 3 epochs, two established
 profiles, one future subscriber, 10 retained events per tenant, and one
@@ -846,7 +846,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
 Expected: PASS with no cross-scope result and exact authority/vector ID/hash
 equivalence after rebuild.
 
-- [ ] **Step 5: Implement the opt-in formal harness.**
+- [x] **Step 5: Implement the opt-in formal harness.**
 
 The formal test runs only when `VERMORY_W18_FORMAL=1`. Required environment:
 
@@ -864,7 +864,7 @@ The harness must use a new dedicated root, direct
 completed run IDs replay offline before checking PostgreSQL binaries or the
 provider credential. A conflicting implementation/case fingerprint fails.
 
-- [ ] **Step 6: Encode the full frozen trajectory.**
+- [x] **Step 6: Encode the full frozen trajectory.**
 
 The formal test must execute all six design phases and record:
 
@@ -892,7 +892,7 @@ The formal test must execute all six design phases and record:
 Prune attempts during the slow-candidate phase must prove the floor never
 passes its cursor. After catch-up, retention must reach the calibrated bound.
 
-- [ ] **Step 7: Run all deterministic W18 tests.**
+- [x] **Step 7: Run all deterministic W18 tests.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
@@ -902,7 +902,7 @@ VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w18_test?host=/tmp' \
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit the formal harness.**
+- [x] **Step 8: Commit the formal harness.**
 
 ```bash
 git add internal/runtime/projection_retention_profile_helpers_test.go \
@@ -927,7 +927,7 @@ git commit -m "test: add projection retention fault profile"
 - Consumes: Task 6 formal harness and a process-only provider credential.
 - Produces: committed normalized W18 evidence with hashes and retained failures.
 
-- [ ] **Step 1: Run a fresh formal profile.**
+- [x] **Step 1: Run a fresh formal profile.**
 
 Use a unique run ID and dedicated root. Keep the provider key only in the
 process environment. Do not echo it or persist shell history containing it.
@@ -947,7 +947,7 @@ VERMORY_IMPLEMENTATION_REVISION="$(git rev-parse HEAD)" \
 Expected: PASS, 14/14 hard gates, and a normalized `report.json` plus
 `report.md`.
 
-- [ ] **Step 2: Replay the completed run offline.**
+- [x] **Step 2: Replay the completed run offline.**
 
 Unset `SILICONFLOW_API_KEY`, point PostgreSQL binary/root variables at invalid
 paths, rerun the same run ID, and require byte-identical report hashes and no
@@ -964,7 +964,7 @@ VERMORY_IMPLEMENTATION_REVISION="$(git rev-parse HEAD)" \
   go test -p 1 -count=1 ./internal/runtime -run TestProjectionRetentionFormalProfile -v
 ```
 
-- [ ] **Step 3: Inspect evidence and scan for secrets.**
+- [x] **Step 3: Inspect evidence and scan for secrets.**
 
 ```bash
 rg -n '(sk-[A-Za-z0-9]|postgres(ql)?://[^[:space:]]+:[^[:space:]@]+@|Bearer[[:space:]]+[A-Za-z0-9._-]+)' \
@@ -974,7 +974,7 @@ rg -n '(sk-[A-Za-z0-9]|postgres(ql)?://[^[:space:]]+:[^[:space:]@]+@|Bearer[[:sp
 Expected: no matches. Verify report counts, receipts, chronological failures,
 non-claims, hashes, and latency ordering manually against the case manifest.
 
-- [ ] **Step 4: Commit the normalized snapshot and evidence narrative.**
+- [x] **Step 4: Commit the normalized snapshot and evidence narrative.**
 
 The narrative must distinguish implemented behavior, formal verification,
 retained failures, and explicit non-claims. It must not claim wall-clock months,
@@ -1001,7 +1001,7 @@ git commit -m "docs: record projection retention evidence"
 - Produces: clean final checklist head, protected CI, verified artifact and
   synthetic merge, and exactly one W18 PR section.
 
-- [ ] **Step 1: Run formatting and full local gates.**
+- [x] **Step 1: Run formatting and full local gates.**
 
 ```bash
 gofmt -w $(rg --files cmd/vermory internal/runtime -g '*.go')
@@ -1014,14 +1014,14 @@ git status --short
 Expected: all checks pass; only intentional plan-checkbox/evidence changes are
 present before the final checklist commit.
 
-- [ ] **Step 2: Verify migration replay and release build.**
+- [x] **Step 2: Verify migration replay and release build.**
 
 Run the existing operations acceptance suite against schema 17, then run the
 same release/build commands used by `.github/workflows/ci.yml` and
 `.github/workflows/release.yml`. Verify Linux `amd64` and `arm64` binaries are
 produced without credentials.
 
-- [ ] **Step 3: Mark every completed checkbox and commit the final checklist.**
+- [x] **Step 3: Mark every completed checkbox and commit the final checklist.**
 
 Do not mark a checkbox until its command and expected result have been freshly
 verified.
