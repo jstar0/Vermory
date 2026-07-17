@@ -755,7 +755,7 @@ git commit -m "test: replay memory eligibility through clients"
 - Produces: deterministic `report.json`, `report.md`, replay validation, and a
   complete failure ledger.
 
-- [ ] **Step 1: Add report schema and RED validation tests.**
+- [x] **Step 1: Add report schema and RED validation tests.**
 
 The report must include:
 
@@ -783,19 +783,19 @@ Reject invalid arithmetic, failed gates, non-monotonic latency, duplicate
 receipts, missing client hashes, unexpected provider request count, secrets,
 DSNs, vectors, and raw provider bodies.
 
-- [ ] **Step 2: Add deterministic write/replay/conflict tests.**
+- [x] **Step 2: Add deterministic write/replay/conflict tests.**
 
 The same report writes byte-identical JSON/Markdown. Replay returns existing
 paths without database or provider startup. A different report under the same
 run ID is rejected without overwrite.
 
-- [ ] **Step 3: Build the miniature profile.**
+- [x] **Step 3: Build the miniature profile.**
 
 Run a small schema-18 corpus through all sixteen gates using deterministic
 embeddings. Verify counts, boundary behavior, race outcomes, projection
 serving filters, restore equivalence, and report validation before scaling.
 
-- [ ] **Step 4: Run the miniature profile.**
+- [x] **Step 4: Run the miniature profile.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
