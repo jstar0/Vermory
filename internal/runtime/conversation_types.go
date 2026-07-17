@@ -201,6 +201,29 @@ type ConversationServiceConfig struct {
 	Retriever   MemoryRetriever
 }
 
+type ReviewConversationCandidateRequest struct {
+	OperationID string             `json:"operation_id"`
+	Anchor      ConversationAnchor `json:"-"`
+	MemoryID    string             `json:"memory_id"`
+}
+
+func (r *ReviewConversationCandidateRequest) Validate() error {
+	r.OperationID = strings.TrimSpace(r.OperationID)
+	r.MemoryID = strings.TrimSpace(r.MemoryID)
+	if r.OperationID == "" {
+		return fmt.Errorf("operation_id is required")
+	}
+	if r.MemoryID == "" {
+		return fmt.Errorf("memory_id is required")
+	}
+	anchor, err := r.Anchor.Normalized()
+	if err != nil {
+		return err
+	}
+	r.Anchor = anchor
+	return nil
+}
+
 type ConfirmConversationMemoryRequest struct {
 	OperationID   string             `json:"operation_id"`
 	Anchor        ConversationAnchor `json:"-"`

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,7 +65,11 @@ type commandSourceFormationReceipt struct {
 	SourceFormationID      string                               `json:"source_formation_id"`
 	ContinuityID           string                               `json:"continuity_id"`
 	RepoRoot               string                               `json:"repo_root"`
+	Channel                string                               `json:"channel"`
+	ThreadID               string                               `json:"thread_id"`
 	Status                 runtime.SourceFormationStatus        `json:"status"`
+	InputKind              runtime.SourceFormationInputKind     `json:"input_kind"`
+	InputManifestSHA256    string                               `json:"input_manifest_sha256"`
 	SourceRef              string                               `json:"source_ref"`
 	SourceSHA256           string                               `json:"source_sha256"`
 	SourceBytes            int                                  `json:"source_bytes"`
@@ -652,6 +657,86 @@ func TestMemorySourceFormationCommandsPersistAbstentionFailureAndRejectInvalidFi
 		"--source-ref", "fixture:invalid:directory",
 		"--grok-command", abstainCommand); err == nil || !strings.Contains(err.Error(), "regular file") {
 		t.Fatalf("source directory was not rejected: %v", err)
+	}
+}
+
+func TestMemoryConversationFormationCommandsUseExactAnchorAndCandidateLifecycle(t *testing.T) {
+	databaseURL := resetCommandStore(t)
+	store, err := runtime.OpenStore(context.Background(), databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(store.Close)
+	if err := store.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	anchor := runtime.ConversationAnchor{Channel: "openclaw", ThreadID: "cli-formation-thread"}
+	conversation := runtime.NewConversationService(store, "local", nil, "", runtime.ConversationServiceConfig{})
+	prepared, err := conversation.PrepareExternalTurn(context.Background(), runtime.ExternalConversationTurnRequest{
+		OperationID: "cli-formation-turn",
+		Anchor:      anchor,
+		Message:     "The deployment review is Thursday at 14:00.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversation.CompleteExternalTurn(context.Background(), runtime.CompleteExternalConversationTurnRequest{
+		OperationID: "cli-formation-turn",
+		Anchor:      anchor,
+		Answer:      "Acknowledged for this conversation.",
+		Model:       "fixture-client-model",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	output := fmt.Sprintf(`{"candidates":[{"decision":"new","memory_key":"deployment.review.current","source_observation_id":%q,"quote":"The deployment review is Thursday at 14:00.","occurrence":1,"content":"The deployment review is Thursday at 14:00.","reason":"Explicit durable schedule."}],"reason":"One durable fact."}`, prepared.UserObservationID)
+	commandPath, callsPath := writeSourceMatchGrok(t, output)
+	args := []string{
+		"memory", "form-conversation",
+		"--channel", anchor.Channel,
+		"--thread-id", anchor.ThreadID,
+		"--operation-id", "cli-conversation-formation",
+		"--observation-id", prepared.UserObservationID,
+		"--grok-command", commandPath,
+	}
+	formed, raw := runSourceFormationJSONCommand(t, databaseURL, args...)
+	if formed.Status != runtime.SourceFormationCompleted || formed.InputKind != runtime.SourceFormationInputConversation ||
+		formed.Channel != anchor.Channel || formed.ThreadID != anchor.ThreadID || formed.InputManifestSHA256 == "" ||
+		len(formed.Items) != 1 || formed.Items[0].EvidenceObservationID != prepared.UserObservationID ||
+		formed.Items[0].CandidateStatus != "proposed" {
+		t.Fatalf("unexpected conversation formation CLI output: %#v", formed)
+	}
+	if strings.Contains(raw, "provider_output") || strings.Contains(raw, "active_snapshot\"") {
+		t.Fatalf("conversation formation CLI leaked internal provider payload: %s", raw)
+	}
+	replay, _ := runSourceFormationJSONCommand(t, databaseURL, args...)
+	if !replay.Replayed || replay.SourceFormationID != formed.SourceFormationID {
+		t.Fatalf("conversation formation CLI replay changed receipt: first=%#v replay=%#v", formed, replay)
+	}
+	calls, err := os.ReadFile(callsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(calls), "call") != 1 {
+		t.Fatalf("conversation formation CLI replay called provider again: %q", calls)
+	}
+
+	accepted := runJSONCommand(t, databaseURL,
+		"memory", "accept-conversation-candidate",
+		"--channel", anchor.Channel,
+		"--thread-id", anchor.ThreadID,
+		"--operation-id", "cli-conversation-accept",
+		"--memory-id", formed.Items[0].CandidateMemoryID)
+	if accepted.MemoryStatus != "active" || accepted.ContinuityID != formed.ContinuityID {
+		t.Fatalf("conversation candidate was not accepted in scope: %#v", accepted)
+	}
+	inspected, _ := runSourceFormationJSONCommand(t, databaseURL,
+		"memory", "inspect-conversation-formation",
+		"--channel", anchor.Channel,
+		"--thread-id", anchor.ThreadID,
+		"--operation-id", "cli-conversation-formation")
+	if len(inspected.Items) != 1 || inspected.Items[0].CandidateStatus != "active" {
+		t.Fatalf("conversation formation inspection missed accepted state: %#v", inspected)
 	}
 }
 

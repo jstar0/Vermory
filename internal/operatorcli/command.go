@@ -75,8 +75,12 @@ type sourceMatchOutput struct {
 type sourceFormationOutput struct {
 	SourceFormationID      string                               `json:"source_formation_id"`
 	ContinuityID           string                               `json:"continuity_id"`
-	RepoRoot               string                               `json:"repo_root"`
+	RepoRoot               string                               `json:"repo_root,omitempty"`
+	Channel                string                               `json:"channel,omitempty"`
+	ThreadID               string                               `json:"thread_id,omitempty"`
 	Status                 runtime.SourceFormationStatus        `json:"status"`
+	InputKind              runtime.SourceFormationInputKind     `json:"input_kind"`
+	InputManifestSHA256    string                               `json:"input_manifest_sha256"`
 	SourceRef              string                               `json:"source_ref"`
 	SourceSHA256           string                               `json:"source_sha256"`
 	SourceBytes            int                                  `json:"source_bytes"`
@@ -354,6 +358,125 @@ func NewMemoryCommand() *cobra.Command {
 	inspectSourceFormation.Flags().StringVar(&inspectFormationOperationID, "operation-id", "", "source formation idempotency key")
 	markRequired(inspectSourceFormation, "repo-root", "operation-id")
 
+	var formConversationOperationID, formConversationChannel, formConversationThreadID string
+	var formConversationObservationIDs []string
+	var formConversationRecentLimit int
+	var formConversationProvider, formConversationModel, formConversationBaseURL, formConversationAPIKeyEnv, formConversationGrokCommand string
+	formConversation := &cobra.Command{
+		Use:   "form-conversation",
+		Short: "Form reviewable memory candidates from bounded user conversation observations",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			llm, providerName, model, err := buildDirectProvider(
+				formConversationProvider,
+				formConversationModel,
+				formConversationBaseURL,
+				formConversationAPIKeyEnv,
+				formConversationGrokCommand,
+			)
+			if err != nil {
+				return err
+			}
+			anchor := runtime.ConversationAnchor{Channel: formConversationChannel, ThreadID: formConversationThreadID}
+			return withSourceFormation(cmd.Context(), options, llm, providerName, model, func(store *runtime.Store, service *runtime.SourceFormationService) error {
+				receipt, err := service.FormConversation(cmd.Context(), runtime.ConversationFormationRequest{
+					OperationID:    formConversationOperationID,
+					Anchor:         anchor,
+					ObservationIDs: formConversationObservationIDs,
+					RecentLimit:    formConversationRecentLimit,
+				})
+				if err != nil {
+					return err
+				}
+				return writeConversationFormationJSON(cmd, store, options.tenantID, anchor, receipt)
+			})
+		},
+	}
+	formConversation.Flags().StringVar(&formConversationOperationID, "operation-id", "", "idempotency key")
+	formConversation.Flags().StringVar(&formConversationChannel, "channel", "", "confirmed conversation channel")
+	formConversation.Flags().StringVar(&formConversationThreadID, "thread-id", "", "confirmed conversation thread")
+	formConversation.Flags().StringSliceVar(&formConversationObservationIDs, "observation-id", nil, "explicit user observation ID; repeat or use a comma-separated list")
+	formConversation.Flags().IntVar(&formConversationRecentLimit, "recent-user-observations", 0, "select the most recent eligible user observations; defaults to 12 when no IDs are supplied")
+	formConversation.Flags().StringVar(&formConversationProvider, "provider", "grok-cli", "provider: grok-cli, openai-compatible, siliconflow, or duojie")
+	formConversation.Flags().StringVar(&formConversationModel, "model", "", "provider model name")
+	formConversation.Flags().StringVar(&formConversationBaseURL, "base-url", "", "direct provider base URL")
+	formConversation.Flags().StringVar(&formConversationAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
+	formConversation.Flags().StringVar(&formConversationGrokCommand, "grok-command", "", "authenticated Grok CLI command")
+	markRequired(formConversation, "operation-id", "channel", "thread-id")
+
+	var inspectConversationFormationOperationID, inspectConversationFormationChannel, inspectConversationFormationThreadID string
+	inspectConversationFormation := &cobra.Command{
+		Use:   "inspect-conversation-formation",
+		Short: "Inspect one durable conversation formation run",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			anchor := runtime.ConversationAnchor{Channel: inspectConversationFormationChannel, ThreadID: inspectConversationFormationThreadID}
+			return withSourceFormation(cmd.Context(), options, nil, "", "", func(store *runtime.Store, service *runtime.SourceFormationService) error {
+				receipt, err := service.InspectConversationFormation(cmd.Context(), anchor, inspectConversationFormationOperationID)
+				if err != nil {
+					return err
+				}
+				return writeConversationFormationJSON(cmd, store, options.tenantID, anchor, receipt)
+			})
+		},
+	}
+	inspectConversationFormation.Flags().StringVar(&inspectConversationFormationOperationID, "operation-id", "", "conversation formation idempotency key")
+	inspectConversationFormation.Flags().StringVar(&inspectConversationFormationChannel, "channel", "", "confirmed conversation channel")
+	inspectConversationFormation.Flags().StringVar(&inspectConversationFormationThreadID, "thread-id", "", "confirmed conversation thread")
+	markRequired(inspectConversationFormation, "operation-id", "channel", "thread-id")
+
+	var acceptConversationOperationID, acceptConversationChannel, acceptConversationThreadID, acceptConversationMemoryID string
+	acceptConversationCandidate := &cobra.Command{
+		Use:   "accept-conversation-candidate",
+		Short: "Accept one proposed candidate in an exact conversation continuity",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			anchor := runtime.ConversationAnchor{Channel: acceptConversationChannel, ThreadID: acceptConversationThreadID}
+			return withConversation(cmd.Context(), options, func(store *runtime.Store, service *runtime.ConversationService) error {
+				receipt, err := service.AcceptCandidate(cmd.Context(), runtime.ReviewConversationCandidateRequest{
+					OperationID: acceptConversationOperationID,
+					Anchor:      anchor,
+					MemoryID:    acceptConversationMemoryID,
+				})
+				if err != nil {
+					return err
+				}
+				return writeConversationMutationJSON(cmd, service, anchor, receipt)
+			})
+		},
+	}
+	acceptConversationCandidate.Flags().StringVar(&acceptConversationOperationID, "operation-id", "", "idempotency key")
+	acceptConversationCandidate.Flags().StringVar(&acceptConversationChannel, "channel", "", "confirmed conversation channel")
+	acceptConversationCandidate.Flags().StringVar(&acceptConversationThreadID, "thread-id", "", "confirmed conversation thread")
+	acceptConversationCandidate.Flags().StringVar(&acceptConversationMemoryID, "memory-id", "", "proposed conversation formation candidate")
+	markRequired(acceptConversationCandidate, "operation-id", "channel", "thread-id", "memory-id")
+
+	var rejectConversationOperationID, rejectConversationChannel, rejectConversationThreadID, rejectConversationMemoryID string
+	rejectConversationCandidate := &cobra.Command{
+		Use:   "reject-conversation-candidate",
+		Short: "Reject one proposed candidate in an exact conversation continuity",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			anchor := runtime.ConversationAnchor{Channel: rejectConversationChannel, ThreadID: rejectConversationThreadID}
+			return withConversation(cmd.Context(), options, func(store *runtime.Store, service *runtime.ConversationService) error {
+				receipt, err := service.RejectCandidate(cmd.Context(), runtime.ReviewConversationCandidateRequest{
+					OperationID: rejectConversationOperationID,
+					Anchor:      anchor,
+					MemoryID:    rejectConversationMemoryID,
+				})
+				if err != nil {
+					return err
+				}
+				return writeConversationMutationJSON(cmd, service, anchor, receipt)
+			})
+		},
+	}
+	rejectConversationCandidate.Flags().StringVar(&rejectConversationOperationID, "operation-id", "", "idempotency key")
+	rejectConversationCandidate.Flags().StringVar(&rejectConversationChannel, "channel", "", "confirmed conversation channel")
+	rejectConversationCandidate.Flags().StringVar(&rejectConversationThreadID, "thread-id", "", "confirmed conversation thread")
+	rejectConversationCandidate.Flags().StringVar(&rejectConversationMemoryID, "memory-id", "", "proposed conversation formation candidate")
+	markRequired(rejectConversationCandidate, "operation-id", "channel", "thread-id", "memory-id")
+
 	var acceptRoot, acceptOperationID, acceptMemoryID string
 	acceptCandidate := &cobra.Command{
 		Use:   "accept-candidate",
@@ -520,7 +643,12 @@ func NewMemoryCommand() *cobra.Command {
 	archive.Flags().StringVar(&archiveMemoryID, "memory-id", "", "exact governed memory identifier")
 	markRequired(archive, "continuity-id", "operation-id", "memory-id")
 
-	command.AddCommand(inspect, addSource, proposeSource, matchSource, inspectSourceMatch, formDocument, inspectSourceFormation, acceptCandidate, rejectCandidate, reviseSource, correct, forget, setValidity, archive)
+	command.AddCommand(
+		inspect, addSource, proposeSource, matchSource, inspectSourceMatch,
+		formDocument, inspectSourceFormation, formConversation, inspectConversationFormation,
+		acceptCandidate, rejectCandidate, acceptConversationCandidate, rejectConversationCandidate,
+		reviseSource, correct, forget, setValidity, archive,
+	)
 	return command
 }
 
@@ -929,6 +1057,28 @@ func withSourceFormation(
 	return run(store, runtime.NewSourceFormationService(store, options.tenantID, llm, providerName, model))
 }
 
+func withConversation(
+	ctx context.Context,
+	options connectionOptions,
+	run func(*runtime.Store, *runtime.ConversationService) error,
+) error {
+	if strings.TrimSpace(options.databaseURL) == "" {
+		return fmt.Errorf("--database-url is required")
+	}
+	if strings.TrimSpace(options.tenantID) == "" {
+		return fmt.Errorf("--tenant-id is required")
+	}
+	store, err := runtime.OpenStore(ctx, options.databaseURL)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx); err != nil {
+		return err
+	}
+	return run(store, runtime.NewConversationService(store, options.tenantID, nil, "", runtime.ConversationServiceConfig{}))
+}
+
 func buildDirectProvider(name, model, baseURL, apiKeyEnv, grokCommand string) (provider.Provider, string, string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -1105,6 +1255,8 @@ func writeSourceFormationJSON(cmd *cobra.Command, store *runtime.Store, tenantID
 		ContinuityID:           resolution.ContinuityID,
 		RepoRoot:               resolution.RepoRoot,
 		Status:                 receipt.Status,
+		InputKind:              receipt.InputKind,
+		InputManifestSHA256:    receipt.InputManifestFingerprint,
 		SourceRef:              receipt.SourceRef,
 		SourceSHA256:           receipt.SourceSHA256,
 		SourceBytes:            receipt.SourceBytes,
@@ -1116,5 +1268,72 @@ func writeSourceFormationJSON(cmd *cobra.Command, store *runtime.Store, tenantID
 		Reason:                 receipt.Reason,
 		Items:                  items,
 		Replayed:               receipt.Replayed,
+	})
+}
+
+func writeConversationFormationJSON(
+	cmd *cobra.Command,
+	store *runtime.Store,
+	tenantID string,
+	anchor runtime.ConversationAnchor,
+	receipt runtime.SourceFormationReceipt,
+) error {
+	service := runtime.NewConversationService(store, tenantID, nil, "", runtime.ConversationServiceConfig{})
+	inspection, err := service.Inspect(cmd.Context(), anchor)
+	if err != nil {
+		return err
+	}
+	statusByMemoryID := make(map[string]string, len(inspection.Memories))
+	for _, memory := range inspection.Memories {
+		statusByMemoryID[memory.ID] = memory.LifecycleStatus
+	}
+	items := append([]runtime.SourceFormationItemReceipt(nil), receipt.Items...)
+	for index := range items {
+		if items[index].CandidateMemoryID != "" {
+			items[index].CandidateStatus = statusByMemoryID[items[index].CandidateMemoryID]
+		}
+	}
+	model := receipt.ResolvedModel
+	if model == "" {
+		model = receipt.RequestedModel
+	}
+	return writeJSON(cmd, sourceFormationOutput{
+		SourceFormationID:      receipt.ID,
+		ContinuityID:           inspection.Resolution.ContinuityID,
+		Channel:                inspection.Resolution.Channel,
+		ThreadID:               inspection.Resolution.ThreadID,
+		Status:                 receipt.Status,
+		InputKind:              receipt.InputKind,
+		InputManifestSHA256:    receipt.InputManifestFingerprint,
+		SourceRef:              receipt.SourceRef,
+		SourceSHA256:           receipt.SourceSHA256,
+		SourceBytes:            receipt.SourceBytes,
+		ActiveSnapshotSHA256:   receipt.ActiveSnapshotFingerprint,
+		Provider:               receipt.ProviderName,
+		Model:                  model,
+		ProviderArtifactSHA256: receipt.ProviderArtifactSHA256,
+		FailureCode:            receipt.FailureCode,
+		Reason:                 receipt.Reason,
+		Items:                  items,
+		Replayed:               receipt.Replayed,
+	})
+}
+
+func writeConversationMutationJSON(
+	cmd *cobra.Command,
+	service *runtime.ConversationService,
+	anchor runtime.ConversationAnchor,
+	receipt runtime.GovernedObservationReceipt,
+) error {
+	inspection, err := service.Inspect(cmd.Context(), anchor)
+	if err != nil {
+		return err
+	}
+	return writeJSON(cmd, mutationOutput{
+		ContinuityID:  inspection.Resolution.ContinuityID,
+		ObservationID: receipt.Observation.ObservationID,
+		MemoryID:      receipt.Memory.MemoryID,
+		MemoryStatus:  receipt.Memory.Status,
+		Replayed:      receipt.Observation.Replayed || receipt.Memory.Replayed,
 	})
 }

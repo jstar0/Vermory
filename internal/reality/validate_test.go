@@ -181,6 +181,68 @@ func TestO01OpenClawCaseIsFrozen(t *testing.T) {
 	}
 }
 
+func TestF01ConversationFormationCaseIsFrozen(t *testing.T) {
+	c, err := LoadCase("../../reality/cases/F01-conversation-formation-loop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ValidateCase(c); len(got) != 0 {
+		t.Fatalf("expected valid F01 case, got violations: %#v", got)
+	}
+
+	for _, expected := range []ContinuityLine{LineConversation, LineGlobalDefaults, LineBridge, LineSecurity} {
+		found := false
+		for _, line := range c.Manifest.ContinuityLines {
+			if line == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("F01 does not declare continuity line %q: %#v", expected, c.Manifest.ContinuityLines)
+		}
+	}
+	requireStrings(t, c.Manifest.Pressures,
+		"real_client_observations",
+		"bounded_formation_window",
+		"exact_observation_evidence",
+		"transient_noise_exclusion",
+		"explicit_candidate_governance",
+		"correction",
+		"deletion",
+		"input_manifest_drift",
+		"active_snapshot_drift",
+		"idempotent_replay",
+		"cross_continuity_isolation",
+		"global_default_non_promotion",
+	)
+	for _, anchor := range []string{
+		"agent:main:formation-home-maintenance-a",
+		"agent:main:formation-home-maintenance-b",
+		"agent:main:formation-unrelated-c",
+	} {
+		found := false
+		for _, candidate := range c.Manifest.Anchors {
+			if candidate.Value == anchor && !candidate.Ambiguous {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("missing unambiguous F01 anchor %q", anchor)
+		}
+	}
+	requireStrings(t, c.Manifest.Expectations.ForbiddenFacts,
+		"The current appointment is Friday at 15:30.",
+		"The temporary access code is CEDAR-4826.",
+		"Rain and lunch chatter are governed memory.",
+		"Assistant output is authoritative formation evidence.",
+		"Session B or Session C raw observations enter Session A formation.",
+		"A one-turn English request becomes a Global Default.",
+		"A replay invokes the provider or duplicates candidates.",
+	)
+}
+
 func TestH01HermesCaseIsFrozen(t *testing.T) {
 	c, err := LoadCase("../../reality/cases/H01-hermes-linked-sessions")
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -16,9 +17,10 @@ import (
 )
 
 const sourceFormationSelectColumns = `
-id::text, continuity_id::text, operation_id, request_fingerprint,
-source_ref, source_sha256, source_bytes, active_snapshot,
-active_snapshot_fingerprint, provider_name, requested_model, resolved_model,
+	id::text, continuity_id::text, operation_id, request_fingerprint,
+	source_ref, source_sha256, source_bytes, input_kind, input_manifest,
+	input_manifest_fingerprint, active_snapshot,
+	active_snapshot_fingerprint, provider_name, requested_model, resolved_model,
 status, provider_output, provider_artifact_sha256, reason, failure_code,
 created_at, completed_at`
 
@@ -31,11 +33,12 @@ type sourceFormationRow interface {
 }
 
 type validatedSourceFormationItem struct {
-	item      SourceFormationProviderItem
-	byteStart int
-	byteEnd   int
-	target    SourceMatchCandidate
-	hasTarget bool
+	item                  SourceFormationProviderItem
+	evidenceObservationID string
+	byteStart             int
+	byteEnd               int
+	target                SourceMatchCandidate
+	hasTarget             bool
 }
 
 func (s *Store) BeginSourceFormation(ctx context.Context, tenantID, continuityID string, request SourceFormationBeginRequest) (SourceFormationReceipt, error) {
@@ -80,6 +83,11 @@ func (s *Store) BeginSourceFormation(ctx context.Context, tenantID, continuityID
 		if currentFingerprint != existing.ActiveSnapshotFingerprint {
 			return SourceFormationReceipt{}, fmt.Errorf("operation_id active snapshot has changed")
 		}
+		if existing.InputKind == SourceFormationInputConversation {
+			if err := verifyConversationFormationManifestTx(ctx, tx, tenantID, continuityID, existing.InputManifest); err != nil {
+				return SourceFormationReceipt{}, fmt.Errorf("operation_id input manifest has changed: %w", err)
+			}
+		}
 		if existing.Status == SourceFormationPending && time.Since(existing.CreatedAt) >= sourceFormationPendingExpiry {
 			existing, err = updateTerminalSourceFormation(ctx, tx, tenantID, existing.ID, SourceFormationCompletion{
 				Status:        SourceFormationFailed,
@@ -98,17 +106,26 @@ func (s *Store) BeginSourceFormation(ctx context.Context, tenantID, continuityID
 		return existing, nil
 	}
 
+	continuityLine := string(request.InputKind)
+	if request.InputKind == SourceFormationInputDocument {
+		continuityLine = "workspace"
+	}
 	var validContinuity bool
 	if err := tx.QueryRow(ctx, `
 SELECT EXISTS (
   SELECT 1 FROM continuity_spaces
   WHERE id = $1::uuid AND tenant_id = $2
-    AND continuity_line = 'workspace' AND state = 'active'
-)`, continuityID, tenantID).Scan(&validContinuity); err != nil {
+    AND continuity_line = $3 AND state = 'active'
+)`, continuityID, tenantID, continuityLine).Scan(&validContinuity); err != nil {
 		return SourceFormationReceipt{}, fmt.Errorf("check source formation continuity: %w", err)
 	}
 	if !validContinuity {
-		return SourceFormationReceipt{}, fmt.Errorf("workspace continuity is not active for this tenant")
+		return SourceFormationReceipt{}, fmt.Errorf("%s continuity is not active for this tenant", continuityLine)
+	}
+	if request.InputKind == SourceFormationInputConversation {
+		if err := verifyConversationFormationManifestTx(ctx, tx, tenantID, continuityID, request.InputManifest); err != nil {
+			return SourceFormationReceipt{}, err
+		}
 	}
 	activeSnapshot, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, continuityID, snapshot.AsOf, false)
 	if err != nil {
@@ -119,12 +136,13 @@ SELECT EXISTS (
 		return SourceFormationReceipt{}, err
 	}
 	receipt, err := scanSourceFormation(tx.QueryRow(ctx, `
-INSERT INTO source_formation_runs (
-  tenant_id, continuity_id, operation_id, request_fingerprint,
-  source_ref, source_sha256, source_bytes, active_snapshot,
-  active_snapshot_fingerprint, provider_name, requested_model, status
-)
-VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, 'pending')
+	INSERT INTO source_formation_runs (
+	  tenant_id, continuity_id, operation_id, request_fingerprint,
+	  source_ref, source_sha256, source_bytes, input_kind, input_manifest,
+	  input_manifest_fingerprint, active_snapshot, active_snapshot_fingerprint,
+	  provider_name, requested_model, status
+	)
+	VALUES ($1, $2::uuid, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12, $13, $14, 'pending')
 RETURNING `+sourceFormationSelectColumns,
 		tenantID,
 		continuityID,
@@ -133,6 +151,9 @@ RETURNING `+sourceFormationSelectColumns,
 		request.SourceRef,
 		request.SourceSHA256,
 		request.SourceBytes,
+		request.InputKind,
+		mustSourceFormationInputManifestJSON(request.InputManifest),
+		sourceFormationInputManifestFingerprint(request.InputManifest),
 		snapshotJSON,
 		snapshotFingerprint,
 		request.ProviderName,
@@ -148,6 +169,24 @@ RETURNING `+sourceFormationSelectColumns,
 }
 
 func (s *Store) CompleteSourceFormation(ctx context.Context, tenantID, runID string, sourceDocument []byte, completion SourceFormationCompletion) (SourceFormationReceipt, error) {
+	var err error
+	ctx, err = withTenantContext(ctx, tenantID)
+	if err != nil {
+		return SourceFormationReceipt{}, err
+	}
+	return s.completeSourceFormation(ctx, tenantID, runID, sourceDocument, completion)
+}
+
+func (s *Store) CompleteConversationFormation(ctx context.Context, tenantID, runID string, completion SourceFormationCompletion) (SourceFormationReceipt, error) {
+	var err error
+	ctx, err = withTenantContext(ctx, tenantID)
+	if err != nil {
+		return SourceFormationReceipt{}, err
+	}
+	return s.completeSourceFormation(ctx, tenantID, runID, nil, completion)
+}
+
+func (s *Store) completeSourceFormation(ctx context.Context, tenantID, runID string, sourceDocument []byte, completion SourceFormationCompletion) (SourceFormationReceipt, error) {
 	ctx, err := withTenantContext(ctx, tenantID)
 	if err != nil {
 		return SourceFormationReceipt{}, err
@@ -209,8 +248,22 @@ func (s *Store) CompleteSourceFormation(ctx context.Context, tenantID, runID str
 		return receipt, nil
 	}
 
-	if failureCode, reason := validateSourceFormationDocument(run, sourceDocument); failureCode != "" {
-		return commitInvalidSourceFormation(ctx, tx, tenantID, run.ID, completion, failureCode, reason)
+	conversationEvidence := map[string]ConversationObservation(nil)
+	switch run.InputKind {
+	case SourceFormationInputDocument:
+		if failureCode, reason := validateSourceFormationDocument(run, sourceDocument); failureCode != "" {
+			return commitInvalidSourceFormation(ctx, tx, tenantID, run.ID, completion, failureCode, reason)
+		}
+	case SourceFormationInputConversation:
+		if err := verifyConversationFormationManifestTx(ctx, tx, tenantID, run.ContinuityID, run.InputManifest); err != nil {
+			return commitInvalidSourceFormation(ctx, tx, tenantID, run.ID, completion, "input_manifest_changed", err.Error())
+		}
+		conversationEvidence, err = loadConversationFormationEvidenceTx(ctx, tx, tenantID, run.ContinuityID, run.InputManifest)
+		if err != nil {
+			return commitInvalidSourceFormation(ctx, tx, tenantID, run.ID, completion, "input_manifest_changed", err.Error())
+		}
+	default:
+		return commitInvalidSourceFormation(ctx, tx, tenantID, run.ID, completion, "invalid_input_kind", "source formation run has an unsupported input kind")
 	}
 	currentSnapshot, err := listSourceMatchCandidatesTx(ctx, tx, tenantID, run.ContinuityID, snapshot.AsOf, true)
 	if err != nil {
@@ -234,16 +287,20 @@ func (s *Store) CompleteSourceFormation(ctx context.Context, tenantID, runID str
 		return receipt, nil
 	}
 
-	validated, failureCode, reason := validateSourceFormationItems(sourceDocument, completion.Items, run.ActiveSnapshot)
+	validated, failureCode, reason := validateSourceFormationItems(run.InputKind, sourceDocument, conversationEvidence, completion.Items, run.ActiveSnapshot)
 	if failureCode != "" {
 		return commitInvalidSourceFormation(ctx, tx, tenantID, run.ID, completion, failureCode, reason)
 	}
 	for ordinal, item := range validated {
+		sourceRef := run.SourceRef
+		if item.evidenceObservationID != "" {
+			sourceRef = "observation:" + item.evidenceObservationID
+		}
 		observationRequest := CommitObservationRequest{
 			OperationID: "source-formation:" + run.ID + ":" + fmt.Sprint(ordinal+1),
 			Kind:        ObservationKindSourceCandidate,
 			Content:     item.item.Content,
-			SourceRef:   run.SourceRef,
+			SourceRef:   sourceRef,
 			MemoryKey:   item.item.MemoryKey,
 		}
 		if item.hasTarget && item.item.Decision == SourceFormationUpdate {
@@ -269,18 +326,18 @@ func (s *Store) CompleteSourceFormation(ctx context.Context, tenantID, runID str
 			targetMemoryID = item.target.MemoryID
 		}
 		if _, err := tx.Exec(ctx, `
-INSERT INTO source_formation_items (
-  tenant_id, continuity_id, run_id, ordinal, decision, memory_key,
-  quote, quote_occurrence, byte_start, byte_end, content, reason,
-  target_memory_id, observation_id, candidate_memory_id
-)
-VALUES (
-  $1, $2::uuid, $3::uuid, $4, $5, $6,
-  $7, $8, $9, $10, $11, $12,
-  NULLIF($13, '')::uuid, $14::uuid, NULLIF($15, '')::uuid
-)`, tenantID, run.ContinuityID, run.ID, ordinal+1, item.item.Decision, item.item.MemoryKey,
+	INSERT INTO source_formation_items (
+	  tenant_id, continuity_id, run_id, ordinal, decision, memory_key,
+	  quote, quote_occurrence, byte_start, byte_end, content, reason,
+	  target_memory_id, evidence_observation_id, observation_id, candidate_memory_id
+	)
+	VALUES (
+	  $1, $2::uuid, $3::uuid, $4, $5, $6,
+	  $7, $8, $9, $10, $11, $12,
+	  NULLIF($13, '')::uuid, NULLIF($14, '')::uuid, $15::uuid, NULLIF($16, '')::uuid
+	)`, tenantID, run.ContinuityID, run.ID, ordinal+1, item.item.Decision, item.item.MemoryKey,
 			item.item.Quote, item.item.Occurrence, item.byteStart, item.byteEnd, item.item.Content, item.item.Reason,
-			targetMemoryID, observation.ObservationID, candidateMemoryID); err != nil {
+			targetMemoryID, item.evidenceObservationID, observation.ObservationID, candidateMemoryID); err != nil {
 			return SourceFormationReceipt{}, fmt.Errorf("insert source formation item: %w", err)
 		}
 	}
@@ -301,7 +358,7 @@ func (s *Store) FailSourceFormation(ctx context.Context, tenantID, runID string,
 		return SourceFormationReceipt{}, err
 	}
 	completion.Status = SourceFormationFailed
-	return s.CompleteSourceFormation(ctx, tenantID, runID, nil, completion)
+	return s.completeSourceFormation(ctx, tenantID, runID, nil, completion)
 }
 
 func (s *Store) InspectSourceFormation(ctx context.Context, tenantID, continuityID, operationID string) (SourceFormationReceipt, error) {
@@ -337,6 +394,41 @@ WHERE tenant_id = $1 AND continuity_id = $2::uuid AND operation_id = $3`, tenant
 		return SourceFormationReceipt{}, fmt.Errorf("commit source formation inspection: %w", err)
 	}
 	return receipt, nil
+}
+
+func (s *Store) LookupSourceFormation(ctx context.Context, tenantID, continuityID, operationID string) (SourceFormationReceipt, bool, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return SourceFormationReceipt{}, false, err
+	}
+	continuityID = strings.TrimSpace(continuityID)
+	operationID = strings.TrimSpace(operationID)
+	if continuityID == "" || operationID == "" {
+		return SourceFormationReceipt{}, false, fmt.Errorf("source formation continuity_id and operation_id are required")
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return SourceFormationReceipt{}, false, fmt.Errorf("begin source formation lookup: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	receipt, err := scanSourceFormation(tx.QueryRow(ctx, `
+SELECT `+sourceFormationSelectColumns+`
+FROM source_formation_runs
+WHERE tenant_id = $1 AND continuity_id = $2::uuid AND operation_id = $3`, tenantID, continuityID, operationID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return SourceFormationReceipt{}, false, nil
+	}
+	if err != nil {
+		return SourceFormationReceipt{}, false, fmt.Errorf("lookup source formation run: %w", err)
+	}
+	receipt.Items, err = listSourceFormationItemsTx(ctx, tx, tenantID, receipt.ContinuityID, receipt.ID)
+	if err != nil {
+		return SourceFormationReceipt{}, false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return SourceFormationReceipt{}, false, fmt.Errorf("commit source formation lookup: %w", err)
+	}
+	return receipt, true, nil
 }
 
 func lookupSourceFormationOperationTx(ctx context.Context, tx pgx.Tx, tenantID, operationID string) (SourceFormationReceipt, bool, error) {
@@ -428,7 +520,8 @@ func listSourceFormationItemsTx(ctx context.Context, tx pgx.Tx, tenantID, contin
 SELECT item.id::text, item.ordinal, item.decision, item.memory_key,
        item.quote, item.quote_occurrence, item.byte_start, item.byte_end,
        item.content, item.reason,
-       COALESCE(item.target_memory_id::text, ''), item.observation_id::text,
+	       COALESCE(item.target_memory_id::text, ''), COALESCE(item.evidence_observation_id::text, ''),
+	       item.observation_id::text,
        COALESCE(item.candidate_memory_id::text, ''),
        COALESCE(candidate.lifecycle_status, ''), item.created_at
 FROM source_formation_items item
@@ -457,6 +550,7 @@ ORDER BY item.ordinal ASC`, tenantID, continuityID, runID)
 			&item.Content,
 			&item.Reason,
 			&item.TargetMemoryID,
+			&item.EvidenceObservationID,
 			&item.ObservationID,
 			&item.CandidateMemoryID,
 			&item.CandidateStatus,
@@ -474,6 +568,7 @@ ORDER BY item.ordinal ASC`, tenantID, continuityID, runID)
 
 func scanSourceFormation(row sourceFormationRow) (SourceFormationReceipt, error) {
 	var receipt SourceFormationReceipt
+	var inputManifestJSON []byte
 	var snapshotJSON []byte
 	if err := row.Scan(
 		&receipt.ID,
@@ -483,6 +578,9 @@ func scanSourceFormation(row sourceFormationRow) (SourceFormationReceipt, error)
 		&receipt.SourceRef,
 		&receipt.SourceSHA256,
 		&receipt.SourceBytes,
+		&receipt.InputKind,
+		&inputManifestJSON,
+		&receipt.InputManifestFingerprint,
 		&snapshotJSON,
 		&receipt.ActiveSnapshotFingerprint,
 		&receipt.ProviderName,
@@ -498,6 +596,9 @@ func scanSourceFormation(row sourceFormationRow) (SourceFormationReceipt, error)
 	); err != nil {
 		return SourceFormationReceipt{}, err
 	}
+	if err := json.Unmarshal(inputManifestJSON, &receipt.InputManifest); err != nil {
+		return SourceFormationReceipt{}, fmt.Errorf("decode source formation input manifest: %w", err)
+	}
 	if err := json.Unmarshal(snapshotJSON, &receipt.ActiveSnapshot); err != nil {
 		return SourceFormationReceipt{}, fmt.Errorf("decode source formation active snapshot: %w", err)
 	}
@@ -510,6 +611,9 @@ func normalizeSourceFormationBeginRequest(request SourceFormationBeginRequest) (
 	request.SourceSHA256 = strings.ToLower(strings.TrimSpace(request.SourceSHA256))
 	request.ProviderName = strings.TrimSpace(request.ProviderName)
 	request.RequestedModel = strings.TrimSpace(request.RequestedModel)
+	if request.InputKind == "" {
+		request.InputKind = SourceFormationInputDocument
+	}
 	if request.OperationID == "" || request.SourceRef == "" || request.ProviderName == "" || request.RequestedModel == "" {
 		return SourceFormationBeginRequest{}, fmt.Errorf("operation_id, source_ref, provider_name, and requested_model are required")
 	}
@@ -522,6 +626,11 @@ func normalizeSourceFormationBeginRequest(request SourceFormationBeginRequest) (
 	if err := validateSourceFormationSHA256(request.SourceSHA256, "source"); err != nil {
 		return SourceFormationBeginRequest{}, err
 	}
+	manifest, err := normalizeSourceFormationInputManifest(request.InputKind, request.InputManifest)
+	if err != nil {
+		return SourceFormationBeginRequest{}, err
+	}
+	request.InputManifest = manifest
 	return request, nil
 }
 
@@ -557,18 +666,243 @@ func normalizeSourceFormationCompletion(completion SourceFormationCompletion) (S
 
 func sourceFormationRequestFingerprint(continuityID string, request SourceFormationBeginRequest) (string, error) {
 	payload := struct {
-		ContinuityID   string `json:"continuity_id"`
-		SourceRef      string `json:"source_ref"`
-		SourceSHA256   string `json:"source_sha256"`
-		SourceBytes    int    `json:"source_bytes"`
-		ProviderName   string `json:"provider_name"`
-		RequestedModel string `json:"requested_model"`
-	}{continuityID, request.SourceRef, request.SourceSHA256, request.SourceBytes, request.ProviderName, request.RequestedModel}
+		ContinuityID             string                   `json:"continuity_id"`
+		SourceRef                string                   `json:"source_ref"`
+		SourceSHA256             string                   `json:"source_sha256"`
+		SourceBytes              int                      `json:"source_bytes"`
+		InputKind                SourceFormationInputKind `json:"input_kind"`
+		InputManifestFingerprint string                   `json:"input_manifest_fingerprint"`
+		ProviderName             string                   `json:"provider_name"`
+		RequestedModel           string                   `json:"requested_model"`
+	}{
+		ContinuityID:             continuityID,
+		SourceRef:                request.SourceRef,
+		SourceSHA256:             request.SourceSHA256,
+		SourceBytes:              request.SourceBytes,
+		InputKind:                request.InputKind,
+		InputManifestFingerprint: sourceFormationInputManifestFingerprint(request.InputManifest),
+		ProviderName:             request.ProviderName,
+		RequestedModel:           request.RequestedModel,
+	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return "", fmt.Errorf("encode source formation request fingerprint: %w", err)
 	}
 	return sourceMatchSHA256(raw), nil
+}
+
+func normalizeSourceFormationInputManifest(kind SourceFormationInputKind, manifest []SourceFormationInputObservation) ([]SourceFormationInputObservation, error) {
+	switch kind {
+	case SourceFormationInputDocument:
+		if len(manifest) != 0 {
+			return nil, fmt.Errorf("document formation input manifest must be empty")
+		}
+		return []SourceFormationInputObservation{}, nil
+	case SourceFormationInputConversation:
+		if len(manifest) == 0 || len(manifest) > maxRecentConversationObservations {
+			return nil, fmt.Errorf("conversation formation requires between 1 and %d input observations", maxRecentConversationObservations)
+		}
+	default:
+		return nil, fmt.Errorf("source formation input kind %q is unsupported", kind)
+	}
+
+	normalized := make([]SourceFormationInputObservation, len(manifest))
+	seen := make(map[string]struct{}, len(manifest))
+	totalBytes := 0
+	var previousSequence int64
+	for index, raw := range manifest {
+		entry := raw
+		entry.ID = strings.TrimSpace(entry.ID)
+		entry.SHA256 = strings.ToLower(strings.TrimSpace(entry.SHA256))
+		if entry.ID == "" || len(entry.ID) > 64 {
+			return nil, fmt.Errorf("conversation formation input observation %d has an invalid id", index+1)
+		}
+		if _, exists := seen[entry.ID]; exists {
+			return nil, fmt.Errorf("conversation formation input contains duplicate observation %q", entry.ID)
+		}
+		seen[entry.ID] = struct{}{}
+		if entry.Sequence <= previousSequence {
+			return nil, fmt.Errorf("conversation formation input observations must follow authoritative sequence order")
+		}
+		previousSequence = entry.Sequence
+		if entry.Bytes <= 0 || entry.Bytes > 65536 {
+			return nil, fmt.Errorf("conversation formation input observation %q has invalid byte length", entry.ID)
+		}
+		totalBytes += entry.Bytes
+		if totalBytes > 65536 {
+			return nil, fmt.Errorf("conversation formation input exceeds 65536 bytes")
+		}
+		if err := validateSourceFormationSHA256(entry.SHA256, "conversation observation"); err != nil {
+			return nil, err
+		}
+		normalized[index] = entry
+	}
+	return normalized, nil
+}
+
+func mustSourceFormationInputManifestJSON(manifest []SourceFormationInputObservation) []byte {
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		panic(err)
+	}
+	return raw
+}
+
+func sourceFormationInputManifestFingerprint(manifest []SourceFormationInputObservation) string {
+	return sourceMatchSHA256(mustSourceFormationInputManifestJSON(manifest))
+}
+
+func verifyConversationFormationManifestTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID string,
+	continuityID string,
+	manifest []SourceFormationInputObservation,
+) error {
+	normalized, err := normalizeSourceFormationInputManifest(SourceFormationInputConversation, manifest)
+	if err != nil {
+		return err
+	}
+	for _, expected := range normalized {
+		var sequence int64
+		var kind ObservationKind
+		var content string
+		err := tx.QueryRow(ctx, `
+SELECT observation_seq, observation_kind, content
+FROM observations
+WHERE tenant_id = $1 AND continuity_id = $2::uuid AND id::text = $3
+FOR SHARE`, tenantID, continuityID, expected.ID).Scan(&sequence, &kind, &content)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("conversation formation input observation %q does not belong to this continuity", expected.ID)
+		}
+		if err != nil {
+			return fmt.Errorf("verify conversation formation input observation: %w", err)
+		}
+		if kind != ObservationKindUserMessage {
+			return fmt.Errorf("conversation formation input observation %q is not a user message", expected.ID)
+		}
+		if content == "" || content == "[redacted]" || !utf8.ValidString(content) || strings.IndexByte(content, 0) >= 0 {
+			return fmt.Errorf("conversation formation input observation %q is unavailable", expected.ID)
+		}
+		if sequence != expected.Sequence || len([]byte(content)) != expected.Bytes || sourceMatchSHA256([]byte(content)) != expected.SHA256 {
+			return fmt.Errorf("conversation formation input observation %q changed", expected.ID)
+		}
+	}
+	return nil
+}
+
+func (s *Store) SelectConversationFormationObservations(
+	ctx context.Context,
+	tenantID string,
+	continuityID string,
+	observationIDs []string,
+	recentLimit int,
+) ([]ConversationObservation, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	if len(observationIDs) > maxRecentConversationObservations {
+		return nil, fmt.Errorf("conversation formation accepts at most %d observation IDs", maxRecentConversationObservations)
+	}
+	if recentLimit <= 0 {
+		recentLimit = defaultRecentConversationObservations
+	}
+	if recentLimit > maxRecentConversationObservations {
+		return nil, fmt.Errorf("conversation formation recent limit may not exceed %d", maxRecentConversationObservations)
+	}
+
+	observations := make([]ConversationObservation, 0, max(recentLimit, len(observationIDs)))
+	if len(observationIDs) == 0 {
+		rows, err := s.pool.Query(ctx, `
+SELECT id::text, observation_seq, observation_kind, content
+FROM observations
+WHERE tenant_id = $1 AND continuity_id = $2::uuid
+  AND observation_kind = 'user_message' AND content <> '[redacted]'
+ORDER BY observation_seq DESC
+LIMIT $3`, tenantID, continuityID, recentLimit)
+		if err != nil {
+			return nil, fmt.Errorf("select recent conversation formation observations: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var observation ConversationObservation
+			if err := rows.Scan(&observation.ID, &observation.Sequence, &observation.Kind, &observation.Content); err != nil {
+				return nil, fmt.Errorf("scan recent conversation formation observation: %w", err)
+			}
+			observations = append(observations, observation)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, fmt.Errorf("iterate recent conversation formation observations: %w", err)
+		}
+		slicesReverseConversationObservations(observations)
+	} else {
+		seen := make(map[string]struct{}, len(observationIDs))
+		for _, rawID := range observationIDs {
+			id := strings.TrimSpace(rawID)
+			if id == "" || len(id) > 64 {
+				return nil, fmt.Errorf("conversation formation observation_id is invalid")
+			}
+			if _, exists := seen[id]; exists {
+				return nil, fmt.Errorf("conversation formation contains duplicate observation_id %q", id)
+			}
+			seen[id] = struct{}{}
+			var observation ConversationObservation
+			err := s.pool.QueryRow(ctx, `
+SELECT id::text, observation_seq, observation_kind, content
+FROM observations
+WHERE tenant_id = $1 AND continuity_id = $2::uuid AND id::text = $3`, tenantID, continuityID, id).Scan(
+				&observation.ID,
+				&observation.Sequence,
+				&observation.Kind,
+				&observation.Content,
+			)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, fmt.Errorf("conversation formation observation %q does not belong to this continuity", id)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("select conversation formation observation: %w", err)
+			}
+			observations = append(observations, observation)
+		}
+		sort.Slice(observations, func(i, j int) bool { return observations[i].Sequence < observations[j].Sequence })
+	}
+	if len(observations) == 0 {
+		return nil, fmt.Errorf("conversation formation found no eligible user observations")
+	}
+	totalBytes := 0
+	for _, observation := range observations {
+		if observation.Kind != ObservationKindUserMessage {
+			return nil, fmt.Errorf("conversation formation observation %q is not a user message", observation.ID)
+		}
+		if observation.Content == "" || observation.Content == "[redacted]" || !utf8.ValidString(observation.Content) || strings.IndexByte(observation.Content, 0) >= 0 {
+			return nil, fmt.Errorf("conversation formation observation %q is unavailable", observation.ID)
+		}
+		totalBytes += len([]byte(observation.Content))
+		if totalBytes > 65536 {
+			return nil, fmt.Errorf("conversation formation input exceeds 65536 bytes")
+		}
+	}
+	return observations, nil
+}
+
+func slicesReverseConversationObservations(observations []ConversationObservation) {
+	for left, right := 0, len(observations)-1; left < right; left, right = left+1, right-1 {
+		observations[left], observations[right] = observations[right], observations[left]
+	}
+}
+
+func sourceFormationManifestFromObservations(observations []ConversationObservation) []SourceFormationInputObservation {
+	manifest := make([]SourceFormationInputObservation, len(observations))
+	for index, observation := range observations {
+		manifest[index] = SourceFormationInputObservation{
+			ID:       observation.ID,
+			Sequence: observation.Sequence,
+			SHA256:   sourceMatchSHA256([]byte(observation.Content)),
+			Bytes:    len([]byte(observation.Content)),
+		}
+	}
+	return manifest
 }
 
 func validateSourceFormationDocument(run SourceFormationReceipt, sourceDocument []byte) (string, string) {
@@ -584,7 +918,13 @@ func validateSourceFormationDocument(run SourceFormationReceipt, sourceDocument 
 	return "", ""
 }
 
-func validateSourceFormationItems(sourceDocument []byte, items []SourceFormationProviderItem, snapshot []SourceMatchCandidate) ([]validatedSourceFormationItem, string, string) {
+func validateSourceFormationItems(
+	inputKind SourceFormationInputKind,
+	sourceDocument []byte,
+	conversationEvidence map[string]ConversationObservation,
+	items []SourceFormationProviderItem,
+	snapshot []SourceMatchCandidate,
+) ([]validatedSourceFormationItem, string, string) {
 	if len(items) == 0 {
 		return nil, "empty_formation_batch", "completed source formation requires at least one item"
 	}
@@ -600,6 +940,7 @@ func validateSourceFormationItems(sourceDocument []byte, items []SourceFormation
 	for _, raw := range items {
 		item := raw
 		item.MemoryKey = strings.TrimSpace(item.MemoryKey)
+		item.SourceObservationID = strings.TrimSpace(item.SourceObservationID)
 		item.Content = strings.TrimSpace(item.Content)
 		item.Reason = strings.TrimSpace(item.Reason)
 		if len(item.MemoryKey) == 0 || len(item.MemoryKey) > 160 || !sourceFormationMemoryKeyPattern.MatchString(item.MemoryKey) {
@@ -621,11 +962,31 @@ func validateSourceFormationItems(sourceDocument []byte, items []SourceFormation
 		if item.Reason == "" || len(item.Reason) > 512 {
 			return nil, "invalid_reason", "formation item reason is required and may contain at most 512 bytes"
 		}
-		byteStart, byteEnd, ok := sourceFormationQuoteSpan(sourceDocument, []byte(item.Quote), item.Occurrence)
-		if !ok {
-			return nil, "quote_occurrence_not_found", "formation item quote occurrence was not found exactly in the source document"
+		quoteSource := sourceDocument
+		evidenceObservationID := ""
+		switch inputKind {
+		case SourceFormationInputDocument:
+			if item.SourceObservationID != "" {
+				return nil, "unexpected_evidence_observation", "document formation item cannot reference a conversation observation"
+			}
+		case SourceFormationInputConversation:
+			if item.SourceObservationID == "" {
+				return nil, "missing_evidence_observation", "conversation formation item requires source_observation_id"
+			}
+			evidence, exists := conversationEvidence[item.SourceObservationID]
+			if !exists {
+				return nil, "evidence_observation_outside_manifest", "conversation formation item references an observation outside the input manifest"
+			}
+			evidenceObservationID = evidence.ID
+			quoteSource = []byte(evidence.Content)
+		default:
+			return nil, "invalid_input_kind", "source formation input kind is unsupported"
 		}
-		entry := validatedSourceFormationItem{item: item, byteStart: byteStart, byteEnd: byteEnd}
+		byteStart, byteEnd, ok := sourceFormationQuoteSpan(quoteSource, []byte(item.Quote), item.Occurrence)
+		if !ok {
+			return nil, "quote_occurrence_not_found", "formation item quote occurrence was not found exactly in its bound evidence"
+		}
+		entry := validatedSourceFormationItem{item: item, evidenceObservationID: evidenceObservationID, byteStart: byteStart, byteEnd: byteEnd}
 		matches := byKey[item.MemoryKey]
 		switch item.Decision {
 		case SourceFormationNew:
@@ -654,13 +1015,41 @@ func validateSourceFormationItems(sourceDocument []byte, items []SourceFormation
 			return nil, "invalid_formation_decision", "formation item decision must be new, update, or unchanged"
 		}
 		for _, prior := range validated {
-			if byteStart < prior.byteEnd && prior.byteStart < byteEnd {
+			if evidenceObservationID == prior.evidenceObservationID && byteStart < prior.byteEnd && prior.byteStart < byteEnd {
 				return nil, "overlapping_source_spans", "formation item source spans must not overlap"
 			}
 		}
 		validated = append(validated, entry)
 	}
 	return validated, "", ""
+}
+
+func loadConversationFormationEvidenceTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID string,
+	continuityID string,
+	manifest []SourceFormationInputObservation,
+) (map[string]ConversationObservation, error) {
+	evidence := make(map[string]ConversationObservation, len(manifest))
+	for _, expected := range manifest {
+		var observation ConversationObservation
+		err := tx.QueryRow(ctx, `
+SELECT id::text, observation_seq, observation_kind, content
+FROM observations
+WHERE tenant_id = $1 AND continuity_id = $2::uuid AND id::text = $3
+FOR SHARE`, tenantID, continuityID, expected.ID).Scan(
+			&observation.ID,
+			&observation.Sequence,
+			&observation.Kind,
+			&observation.Content,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("load conversation formation evidence %q: %w", expected.ID, err)
+		}
+		evidence[observation.ID] = observation
+	}
+	return evidence, nil
 }
 
 func sourceFormationQuoteSpan(document, quote []byte, occurrence int) (int, int, bool) {
@@ -759,6 +1148,34 @@ WHERE observation.tenant_id = $1
       AND (item.target_memory_id = $4::uuid OR item.candidate_memory_id = $4::uuid)
   )`, tenantID, continuityID, run.id, memoryID); err != nil {
 			return fmt.Errorf("redact source formation observations: %w", err)
+		}
+		evidenceRows, err := tx.Query(ctx, `
+SELECT DISTINCT evidence_observation_id::text
+FROM source_formation_items
+WHERE tenant_id = $1 AND continuity_id = $2::uuid AND run_id = $3::uuid
+  AND candidate_memory_id = $4::uuid
+  AND evidence_observation_id IS NOT NULL`, tenantID, continuityID, run.id, memoryID)
+		if err != nil {
+			return fmt.Errorf("list source formation evidence observations for redaction: %w", err)
+		}
+		evidenceObservationIDs := make([]string, 0)
+		for evidenceRows.Next() {
+			var observationID string
+			if err := evidenceRows.Scan(&observationID); err != nil {
+				evidenceRows.Close()
+				return fmt.Errorf("scan source formation evidence observation for redaction: %w", err)
+			}
+			evidenceObservationIDs = append(evidenceObservationIDs, observationID)
+		}
+		if err := evidenceRows.Err(); err != nil {
+			evidenceRows.Close()
+			return fmt.Errorf("iterate source formation evidence observations for redaction: %w", err)
+		}
+		evidenceRows.Close()
+		for _, observationID := range evidenceObservationIDs {
+			if err := redactConversationObservationTx(ctx, tx, tenantID, continuityID, observationID); err != nil {
+				return err
+			}
 		}
 		if _, err := tx.Exec(ctx, `
 UPDATE source_formation_items

@@ -456,3 +456,69 @@ func TestSourceFormationPendingExpiryConstantCoversProviderDeadline(t *testing.T
 		t.Fatalf("unexpected formation pending expiry: %s", sourceFormationPendingExpiry)
 	}
 }
+
+func TestConversationFormationStoreBindsManifestAndEvidence(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	tenantID := "conversation-formation-store"
+	anchor := ConversationAnchor{Channel: "web_chat", ThreadID: "store-formation"}
+	conversation := NewConversationService(store, tenantID, nil, "", ConversationServiceConfig{})
+	turn := persistFormationConversationTurn(
+		t,
+		conversation,
+		anchor,
+		"store-formation-turn",
+		"The maintenance visit is Saturday at 10:00.",
+		"Acknowledged.",
+	)
+	resolution, err := store.ResolveConversation(ctx, tenantID, anchor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observations, err := store.SelectConversationFormationObservations(ctx, tenantID, resolution.ContinuityID, []string{turn.UserObservationID}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest := sourceFormationManifestFromObservations(observations)
+	begin, err := store.BeginSourceFormation(ctx, tenantID, resolution.ContinuityID, SourceFormationBeginRequest{
+		OperationID:    "store-conversation-formation",
+		SourceRef:      "conversation:" + resolution.ContinuityID + "@1-1",
+		SourceSHA256:   sourceFormationInputManifestFingerprint(manifest),
+		SourceBytes:    len([]byte(observations[0].Content)),
+		InputKind:      SourceFormationInputConversation,
+		InputManifest:  manifest,
+		ProviderName:   "test-provider",
+		RequestedModel: "test-model",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := store.CompleteConversationFormation(ctx, tenantID, begin.ID, SourceFormationCompletion{
+		Status:        SourceFormationCompleted,
+		ResolvedModel: "test-model",
+		Reason:        "One exact fact.",
+		Items: []SourceFormationProviderItem{{
+			Decision:            SourceFormationNew,
+			MemoryKey:           "maintenance.visit.current",
+			SourceObservationID: turn.UserObservationID,
+			Quote:               "The maintenance visit is Saturday at 10:00.",
+			Occurrence:          1,
+			Content:             "The maintenance visit is Saturday at 10:00.",
+			Reason:              "Explicit schedule.",
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.InputKind != SourceFormationInputConversation || len(completed.Items) != 1 ||
+		completed.Items[0].EvidenceObservationID != turn.UserObservationID || completed.Items[0].CandidateMemoryID == "" {
+		t.Fatalf("conversation formation store did not bind evidence: %#v", completed)
+	}
+
+	if _, err := store.BeginSourceFormation(ctx, tenantID, resolution.ContinuityID, sourceFormationBeginRequest(
+		"store-document-on-conversation",
+		"The maintenance visit is Saturday at 10:00.",
+	)); err == nil || !strings.Contains(err.Error(), "workspace continuity") {
+		t.Fatalf("document formation attached to conversation continuity: %v", err)
+	}
+}

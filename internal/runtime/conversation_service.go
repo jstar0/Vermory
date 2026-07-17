@@ -163,6 +163,34 @@ func (s *ConversationService) Confirm(ctx context.Context, request ConfirmConver
 	)
 }
 
+func (s *ConversationService) AcceptCandidate(ctx context.Context, request ReviewConversationCandidateRequest) (GovernedObservationReceipt, error) {
+	if err := s.configured(); err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	resolution, err := s.confirmedConversation(ctx, request.Anchor)
+	if err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	return s.store.AcceptSourceCandidate(ctx, s.tenantID, resolution.ContinuityID, request.MemoryID, request.OperationID)
+}
+
+func (s *ConversationService) RejectCandidate(ctx context.Context, request ReviewConversationCandidateRequest) (GovernedObservationReceipt, error) {
+	if err := s.configured(); err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	resolution, err := s.confirmedConversation(ctx, request.Anchor)
+	if err != nil {
+		return GovernedObservationReceipt{}, err
+	}
+	return s.store.RejectSourceCandidate(ctx, s.tenantID, resolution.ContinuityID, request.MemoryID, request.OperationID)
+}
+
 func (s *ConversationService) Correct(ctx context.Context, request CorrectConversationMemoryRequest) (GovernedObservationReceipt, error) {
 	if err := s.configured(); err != nil {
 		return GovernedObservationReceipt{}, err

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -66,6 +67,13 @@ func TestParseSourceFormationProviderOutputStrictly(t *testing.T) {
 	}
 	if len(abstained.Candidates) != 0 || abstained.Reason == "" {
 		t.Fatalf("unexpected parsed abstention: %#v", abstained)
+	}
+	conversation, err := parseSourceFormationProviderOutput(`{"candidates":[{"decision":"new","memory_key":"maintenance.time","source_observation_id":"00000000-0000-0000-0000-000000000001","quote":"Saturday at 10:00","occurrence":1,"content":"The visit is Saturday at 10:00.","reason":"Explicit schedule."}],"reason":"One fact."}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(conversation.Candidates) != 1 || conversation.Candidates[0].SourceObservationID != "00000000-0000-0000-0000-000000000001" {
+		t.Fatalf("conversation evidence reference was not preserved: %#v", conversation)
 	}
 
 	seventeen := make([]string, 17)
@@ -397,6 +405,326 @@ func TestSourceFormationServicePersistsDetachedTimeoutAndSnapshotDrift(t *testin
 		}
 		assertSourceCandidateSearch(t, store, "formation-drift-service", resolution.ContinuityID, "Retry at most 5 times.", false)
 	})
+}
+
+func TestConversationFormationServiceCompletesF01Lifecycle(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	tenantID := "conversation-formation-f01"
+	anchor := ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:formation-home-maintenance-a"}
+	conversation := NewConversationService(store, tenantID, nil, "", ConversationServiceConfig{})
+
+	appointment := persistFormationConversationTurn(t, conversation, anchor, "f01-turn-1",
+		"The plumbing inspection is booked for Friday at 15:30. The technician must check in with the concierge.",
+		"assistant-one")
+	code := persistFormationConversationTurn(t, conversation, anchor, "f01-turn-2",
+		"The temporary access code is CEDAR-4826. Keep it only until the visit details are finalized.",
+		"assistant-two")
+	chatter := persistFormationConversationTurn(t, conversation, anchor, "f01-turn-3",
+		"It may rain on Friday and I might order lunch early.",
+		"assistant-three")
+
+	llm := &sourceFormationTestProvider{response: provider.GenerateResponse{
+		Output: fmt.Sprintf(`{
+  "candidates": [
+    {"decision":"new","memory_key":"maintenance.appointment.current","source_observation_id":%q,"quote":"The plumbing inspection is booked for Friday at 15:30.","occurrence":1,"content":"The plumbing inspection is Friday at 15:30.","reason":"Durable scheduled appointment."},
+    {"decision":"new","memory_key":"maintenance.concierge.check_in","source_observation_id":%q,"quote":"The technician must check in with the concierge.","occurrence":1,"content":"The technician must check in with the concierge.","reason":"Durable visit requirement."},
+    {"decision":"new","memory_key":"maintenance.access.temporary_code","source_observation_id":%q,"quote":"The temporary access code is CEDAR-4826.","occurrence":1,"content":"The temporary access code is CEDAR-4826.","reason":"Explicit temporary visit credential."}
+  ],
+  "reason":"Three reviewable facts were stated explicitly."
+}`, appointment.UserObservationID, appointment.UserObservationID, code.UserObservationID),
+		Model: "resolved-f01-model",
+	}}
+	formation := NewSourceFormationService(store, tenantID, llm, "test-provider", "requested-f01-model")
+	initialRequest := ConversationFormationRequest{
+		OperationID:    "f01-formation-initial",
+		Anchor:         anchor,
+		ObservationIDs: []string{appointment.UserObservationID, code.UserObservationID, chatter.UserObservationID},
+	}
+	initial, err := formation.FormConversation(ctx, initialRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if initial.Status != SourceFormationCompleted || initial.InputKind != SourceFormationInputConversation ||
+		len(initial.InputManifest) != 3 || len(initial.Items) != 3 || initial.InputManifestFingerprint == "" {
+		t.Fatalf("unexpected initial conversation formation: %#v", initial)
+	}
+	if initial.SourceSHA256 != initial.InputManifestFingerprint {
+		t.Fatalf("conversation source fingerprint is not manifest-bound: %#v", initial)
+	}
+	for _, item := range initial.Items {
+		if item.EvidenceObservationID == "" || item.CandidateStatus != "proposed" {
+			t.Fatalf("formation item lacks governed evidence or proposal state: %#v", item)
+		}
+		if strings.Contains(strings.ToLower(item.Content+item.Quote), "rain") || strings.Contains(strings.ToLower(item.Content+item.Quote), "lunch") {
+			t.Fatalf("transient chatter became a candidate: %#v", item)
+		}
+	}
+	if len(llm.calls) != 1 {
+		t.Fatalf("initial formation provider calls=%d", len(llm.calls))
+	}
+	providerCall := llm.calls[0]
+	for _, required := range []string{"source_observation_id", "Global Defaults", appointment.UserObservationID, code.UserObservationID, chatter.UserObservationID} {
+		if !strings.Contains(providerCall.System+providerCall.JSONSchema+providerCall.ContextPacket, required) {
+			t.Fatalf("conversation formation provider packet omitted %q: %#v", required, providerCall)
+		}
+	}
+	for _, forbidden := range []string{"assistant-one", "assistant-two", "assistant-three"} {
+		if strings.Contains(providerCall.ContextPacket, forbidden) {
+			t.Fatalf("assistant output entered formation input: %s", providerCall.ContextPacket)
+		}
+	}
+
+	replay, err := formation.FormConversation(ctx, initialRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !replay.Replayed || replay.ID != initial.ID || len(llm.calls) != 1 {
+		t.Fatalf("formation replay was not idempotent: first=%#v replay=%#v calls=%d", initial, replay, len(llm.calls))
+	}
+
+	for index, item := range initial.Items {
+		if _, err := conversation.AcceptCandidate(ctx, ReviewConversationCandidateRequest{
+			OperationID: fmt.Sprintf("f01-accept-initial-%d", index+1),
+			Anchor:      anchor,
+			MemoryID:    item.CandidateMemoryID,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	correction := persistFormationConversationTurn(t, conversation, anchor, "f01-turn-4",
+		"Correction: the building moved the inspection to Saturday at 10:00. Friday at 15:30 is obsolete.",
+		"assistant-four")
+	llm.response.Output = fmt.Sprintf(`{"candidates":[{"decision":"update","memory_key":"maintenance.appointment.current","source_observation_id":%q,"quote":"the building moved the inspection to Saturday at 10:00.","occurrence":1,"content":"The plumbing inspection is Saturday at 10:00.","reason":"The user explicitly replaced the prior appointment."}],"reason":"One explicit correction."}`, correction.UserObservationID)
+	updated, err := formation.FormConversation(ctx, ConversationFormationRequest{
+		OperationID:    "f01-formation-correction",
+		Anchor:         anchor,
+		ObservationIDs: []string{correction.UserObservationID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != SourceFormationCompleted || len(updated.Items) != 1 || updated.Items[0].Decision != SourceFormationUpdate {
+		t.Fatalf("unexpected correction formation: %#v", updated)
+	}
+	if _, err := conversation.AcceptCandidate(ctx, ReviewConversationCandidateRequest{
+		OperationID: "f01-accept-correction",
+		Anchor:      anchor,
+		MemoryID:    updated.Items[0].CandidateMemoryID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	transient := persistFormationConversationTurn(t, conversation, anchor, "f01-turn-5",
+		"For this turn only, reply in English with the current visit time.",
+		"assistant-five")
+	llm.response.Output = `{"candidates":[],"reason":"The request is explicitly turn-local and is not durable memory."}`
+	abstained, err := formation.FormConversation(ctx, ConversationFormationRequest{
+		OperationID:    "f01-formation-transient",
+		Anchor:         anchor,
+		ObservationIDs: []string{transient.UserObservationID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if abstained.Status != SourceFormationAbstained || len(abstained.Items) != 0 {
+		t.Fatalf("turn-local instruction did not abstain: %#v", abstained)
+	}
+	defaults, err := NewGlobalDefaultsService(store, tenantID).Inspect(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(defaults.Defaults) != 0 {
+		t.Fatalf("conversation formation polluted Global Defaults: %#v", defaults)
+	}
+
+	inspection, err := conversation.Inspect(ctx, anchor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var activeAppointment, codeMemory GovernedMemory
+	for _, memory := range inspection.Memories {
+		if memory.MemoryKey == "maintenance.appointment.current" && memory.LifecycleStatus == "active" {
+			activeAppointment = memory
+		}
+		if memory.MemoryKey == "maintenance.access.temporary_code" && memory.LifecycleStatus == "active" {
+			codeMemory = memory
+		}
+	}
+	if activeAppointment.ID == "" || !strings.Contains(activeAppointment.Content, "Saturday at 10:00") || codeMemory.ID == "" {
+		t.Fatalf("accepted formation lifecycle is not current: %#v", inspection.Memories)
+	}
+	prepared, err := conversation.PrepareExternalTurn(ctx, ExternalConversationTurnRequest{
+		OperationID: "f01-fresh-delivery",
+		Anchor:      anchor,
+		Message:     "What is the current plumbing inspection time and concierge requirement?",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, required := range []string{"Saturday at 10:00", "concierge"} {
+		if !strings.Contains(prepared.Context, required) {
+			t.Fatalf("fresh delivery omitted %q: %s", required, prepared.Context)
+		}
+	}
+	if strings.Contains(prepared.Context, "Friday at 15:30") {
+		t.Fatalf("fresh delivery retained obsolete appointment: %s", prepared.Context)
+	}
+
+	if _, err := conversation.Forget(ctx, ForgetConversationMemoryRequest{
+		OperationID: "f01-forget-code",
+		Anchor:      anchor,
+		MemoryID:    codeMemory.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RebuildProjection(ctx, tenantID, initial.ContinuityID); err != nil {
+		t.Fatal(err)
+	}
+	postDelete, err := conversation.Inspect(ctx, anchor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if encoded := inspectionText(postDelete); strings.Contains(encoded, "CEDAR-4826") {
+		t.Fatalf("conversation inspection retained forgotten formation evidence: %s", encoded)
+	}
+	formationInspection, err := formation.InspectConversationFormation(ctx, anchor, initial.OperationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedFormation, err := json.Marshal(formationInspection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encodedFormation), "CEDAR-4826") || !strings.Contains(string(encodedFormation), "[redacted]") {
+		t.Fatalf("formation audit retained forgotten code: %s", encodedFormation)
+	}
+	for _, query := range []string{"CEDAR-4826", "temporary access code", "cedar style visit credential"} {
+		matches, err := store.SearchActiveMemory(ctx, tenantID, initial.ContinuityID, query, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, match := range matches {
+			if strings.Contains(match.Content, "CEDAR-4826") {
+				t.Fatalf("forgotten code returned for %q: %#v", query, matches)
+			}
+		}
+	}
+}
+
+func TestConversationFormationRejectsCrossScopeEvidenceAndInputDrift(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	tenantID := "conversation-formation-isolation"
+	anchorA := ConversationAnchor{Channel: "openclaw", ThreadID: "formation-a"}
+	anchorB := ConversationAnchor{Channel: "openclaw", ThreadID: "formation-b"}
+	conversation := NewConversationService(store, tenantID, nil, "", ConversationServiceConfig{})
+	turnA := persistFormationConversationTurn(t, conversation, anchorA, "formation-a-turn", "The inspection is Friday at 15:30.", "assistant-a")
+	turnB := persistFormationConversationTurn(t, conversation, anchorB, "formation-b-turn", "The unrelated delivery is Monday.", "assistant-b")
+
+	llm := &sourceFormationTestProvider{response: provider.GenerateResponse{Model: "test-model"}}
+	formation := NewSourceFormationService(store, tenantID, llm, "test-provider", "test-model")
+	if _, err := formation.FormConversation(ctx, ConversationFormationRequest{
+		OperationID:    "cross-continuity-input",
+		Anchor:         anchorA,
+		ObservationIDs: []string{turnB.UserObservationID},
+	}); err == nil || !strings.Contains(err.Error(), "does not belong") {
+		t.Fatalf("cross-continuity input was not rejected: %v", err)
+	}
+	if len(llm.calls) != 0 {
+		t.Fatalf("cross-continuity input called provider: %d", len(llm.calls))
+	}
+
+	llm.response.Output = fmt.Sprintf(`{"candidates":[{"decision":"new","memory_key":"maintenance.invalid","source_observation_id":%q,"quote":"The unrelated delivery is Monday.","occurrence":1,"content":"The unrelated delivery is Monday.","reason":"invalid cross-manifest reference"}],"reason":"invalid"}`, turnB.UserObservationID)
+	outside, err := formation.FormConversation(ctx, ConversationFormationRequest{
+		OperationID:    "outside-manifest-evidence",
+		Anchor:         anchorA,
+		ObservationIDs: []string{turnA.UserObservationID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outside.Status != SourceFormationFailed || outside.FailureCode != "evidence_observation_outside_manifest" || len(outside.Items) != 0 {
+		t.Fatalf("manifest-external provider evidence was not rejected atomically: %#v", outside)
+	}
+
+	llm.response.Output = fmt.Sprintf(`{"candidates":[{"decision":"new","memory_key":"maintenance.appointment.current","source_observation_id":%q,"quote":"The inspection is Friday at 15:30.","occurrence":1,"content":"The inspection is Friday at 15:30.","reason":"explicit appointment"}],"reason":"one"}`, turnA.UserObservationID)
+	llm.beforeReturn = func() {
+		if _, err := store.pool.Exec(ctx, `UPDATE observations SET content = 'changed during provider call' WHERE id = $1::uuid`, turnA.UserObservationID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	drifted, err := formation.FormConversation(ctx, ConversationFormationRequest{
+		OperationID:    "input-manifest-drift",
+		Anchor:         anchorA,
+		ObservationIDs: []string{turnA.UserObservationID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if drifted.Status != SourceFormationFailed || drifted.FailureCode != "input_manifest_changed" || len(drifted.Items) != 0 {
+		t.Fatalf("input manifest drift did not fail atomically: %#v", drifted)
+	}
+}
+
+func TestConversationFormationRecentWindowReplayKeepsBoundManifest(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	tenantID := "conversation-formation-recent-replay"
+	anchor := ConversationAnchor{Channel: "web_chat", ThreadID: "recent-replay"}
+	conversation := NewConversationService(store, tenantID, nil, "", ConversationServiceConfig{})
+	persistFormationConversationTurn(t, conversation, anchor, "recent-replay-turn-1", "The visit is Friday at 15:30.", "ack-one")
+	llm := &sourceFormationTestProvider{response: provider.GenerateResponse{
+		Output: `{"candidates":[],"reason":"Nothing durable was selected by the fixture provider."}`,
+		Model:  "test-model",
+	}}
+	formation := NewSourceFormationService(store, tenantID, llm, "test-provider", "test-model")
+	request := ConversationFormationRequest{OperationID: "recent-replay-formation", Anchor: anchor}
+	first, err := formation.FormConversation(ctx, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	persistFormationConversationTurn(t, conversation, anchor, "recent-replay-turn-2", "A newer unrelated message arrived.", "ack-two")
+	replay, err := formation.FormConversation(ctx, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !replay.Replayed || replay.ID != first.ID || replay.InputManifestFingerprint != first.InputManifestFingerprint || len(llm.calls) != 1 {
+		t.Fatalf("recent-window replay rebound its manifest: first=%#v replay=%#v calls=%d", first, replay, len(llm.calls))
+	}
+}
+
+func persistFormationConversationTurn(
+	t *testing.T,
+	service *ConversationService,
+	anchor ConversationAnchor,
+	operationID string,
+	message string,
+	answer string,
+) ChatTurnReceipt {
+	t.Helper()
+	prepared, err := service.PrepareExternalTurn(context.Background(), ExternalConversationTurnRequest{
+		OperationID: operationID,
+		Anchor:      anchor,
+		Message:     message,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := service.CompleteExternalTurn(context.Background(), CompleteExternalConversationTurnRequest{
+		OperationID: operationID,
+		Anchor:      anchor,
+		Answer:      answer,
+		Model:       "fixture-client-model",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if completed.UserObservationID != prepared.UserObservationID || completed.AssistantObservationID == "" {
+		t.Fatalf("external turn did not persist both observations: prepared=%#v completed=%#v", prepared, completed)
+	}
+	return completed
 }
 
 type sourceFormationTestProvider struct {

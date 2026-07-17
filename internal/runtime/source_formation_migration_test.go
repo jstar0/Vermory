@@ -13,7 +13,8 @@ func TestSourceFormationMigrationCreatesAuthoritativeTables(t *testing.T) {
 	for table, required := range map[string][]string{
 		"source_formation_runs": {
 			"id", "tenant_id", "continuity_id", "operation_id", "request_fingerprint",
-			"source_ref", "source_sha256", "source_bytes", "active_snapshot",
+			"source_ref", "source_sha256", "source_bytes", "input_kind", "input_manifest",
+			"input_manifest_fingerprint", "active_snapshot",
 			"active_snapshot_fingerprint", "provider_name", "requested_model",
 			"resolved_model", "status", "provider_output", "provider_artifact_sha256",
 			"reason", "failure_code", "created_at", "completed_at",
@@ -21,7 +22,7 @@ func TestSourceFormationMigrationCreatesAuthoritativeTables(t *testing.T) {
 		"source_formation_items": {
 			"id", "tenant_id", "continuity_id", "run_id", "ordinal", "decision",
 			"memory_key", "quote", "quote_occurrence", "byte_start", "byte_end",
-			"content", "reason", "target_memory_id", "observation_id",
+			"content", "reason", "target_memory_id", "evidence_observation_id", "observation_id",
 			"candidate_memory_id", "created_at",
 		},
 	} {
@@ -87,7 +88,7 @@ WHERE conrelid = 'public.source_formation_items'::regclass AND contype = 'c'`).S
 		t.Fatal(err)
 	}
 	runJoined := strings.Join(runChecks, " ")
-	for _, expected := range []string{"pending", "completed", "abstained", "failed", "jsonb_typeof", "65536", "64"} {
+	for _, expected := range []string{"pending", "completed", "abstained", "failed", "document", "conversation", "input_manifest", "jsonb_typeof", "65536", "64"} {
 		if !strings.Contains(runJoined, expected) {
 			t.Fatalf("formation run checks do not constrain %q: %s", expected, runJoined)
 		}
@@ -103,6 +104,7 @@ WHERE conrelid = 'public.source_formation_items'::regclass AND contype = 'c'`).S
 		"source_formation_runs_tenant_continuity_fk",
 		"source_formation_items_tenant_run_fk",
 		"source_formation_items_tenant_target_memory_fk",
+		"source_formation_items_tenant_evidence_observation_fk",
 		"source_formation_items_tenant_observation_fk",
 		"source_formation_items_tenant_candidate_memory_fk",
 	} {
