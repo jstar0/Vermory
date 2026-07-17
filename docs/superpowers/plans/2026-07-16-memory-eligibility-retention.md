@@ -666,25 +666,25 @@ git commit -m "test: qualify memory eligibility failures"
   Chat/OpenClaw entry points, and frozen reality cases.
 - Produces: deterministic replay harness plus real-client artifact hashes.
 
-- [ ] **Step 1: Add deterministic G01/C02 Web Chat tests.**
+- [x] **Step 1: Add deterministic G01/C02 Web Chat tests.**
 
 Require one task-local English request, a later unrelated Chinese request,
 pre-boundary viewing use, exact-boundary viewing suppression, durable budget
 recall, and identical `eligibility_as_of` evidence inside each turn.
 
-- [ ] **Step 2: Add deterministic W03 MCP and S01 forget tests.**
+- [x] **Step 2: Add deterministic W03 MCP and S01 forget tests.**
 
 Require temporary workaround delivery before boundary, absence afterward,
 durable command/security controls, archive inspection, and synthetic-secret
 forget redaction through prepare/commit/rebuild.
 
-- [ ] **Step 3: Add OpenClaw eligibility regression tests.**
+- [x] **Step 3: Add OpenClaw eligibility regression tests.**
 
 The plugin remains transport-only. Prepared external turns must receive the
 server's filtered context, must not send lifecycle metadata to the model, and
 must not cache an expired memory independently.
 
-- [ ] **Step 4: Run all deterministic client tests.**
+- [x] **Step 4: Run all deterministic client tests.**
 
 ```bash
 VERMORY_TEST_DATABASE_URL='postgresql:///vermory_w19_test?host=/tmp' \
@@ -698,7 +698,7 @@ pnpm -C integrations/openclaw pack --dry-run
 
 Expected: PASS.
 
-- [ ] **Step 5: Run the real Grok Web Chat trajectory.**
+- [x] **Step 5: Run the real Grok Web Chat trajectory.**
 
 Use an isolated authenticated Grok wrapper with no tools or private session
 memory. Replay G01 and C02 through the real `web-chat` HTTP lifecycle. Preserve
@@ -720,18 +720,18 @@ one bounded artifact, and call `commit_observation`. Repeat after expiry or use
 a second frozen boundary snapshot. Preserve proof that Codex consumed the
 eligible durable facts and did not use the expired workaround.
 
-- [ ] **Step 7: Run an independent Grok MCP workspace control.**
+- [x] **Step 7: Run an independent Grok MCP workspace control.**
 
 Use the same continuity with an isolated Grok call so cross-client continuity
 is demonstrated without relying on either client's private session cache.
 
-- [ ] **Step 8: Preserve failures and normalize real-client evidence.**
+- [x] **Step 8: Preserve failures and normalize real-client evidence.**
 
 Record canceled approvals, CLI timeouts, provider failures, or invalid outputs
 chronologically. Commit only hashes, semantic outputs, command versions, and
 bounded non-secret excerpts.
 
-- [ ] **Step 9: Commit client integration and runbook.**
+- [x] **Step 9: Commit client integration and runbook.**
 
 ```bash
 git add docs/integrations/memory-eligibility-retention-runtime.md \

@@ -305,6 +305,22 @@ func (s *Store) ListRecentConversationObservations(ctx context.Context, tenantID
 	if err != nil {
 		return nil, err
 	}
+	snapshot, err := s.CurrentEligibilitySnapshot(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	return s.ListRecentConversationObservationsAt(ctx, tenantID, continuityID, beforeObservationID, limit, snapshot.AsOf)
+}
+
+func (s *Store) ListRecentConversationObservationsAt(ctx context.Context, tenantID, continuityID, beforeObservationID string, limit int, asOf time.Time) ([]ConversationObservation, error) {
+	ctx, err := withTenantContext(ctx, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	asOf, err = normalizeEligibilityAsOf(asOf)
+	if err != nil {
+		return nil, err
+	}
 	if limit <= 0 {
 		limit = defaultRecentConversationObservations
 	}
@@ -330,14 +346,44 @@ WHERE o.id = $1::uuid AND o.tenant_id = $2 AND o.continuity_id = $3::uuid
 	}
 
 	rows, err := s.pool.Query(ctx, `
-SELECT id::text, observation_seq, observation_kind, content
-FROM observations
-WHERE tenant_id = $1 AND continuity_id = $2::uuid
-  AND observation_kind IN ('user_message', 'assistant_message')
-  AND content <> '[redacted]'
-  AND ($3::bigint = 0 OR observation_seq < $3)
-ORDER BY observation_seq DESC
-LIMIT $4`, tenantID, continuityID, beforeSequence, limit)
+SELECT observation.id::text, observation.observation_seq, observation.observation_kind, observation.content
+FROM observations observation
+WHERE observation.tenant_id = $1 AND observation.continuity_id = $2::uuid
+  AND observation.observation_kind IN ('user_message', 'assistant_message')
+  AND observation.content <> '[redacted]'
+  AND ($3::bigint = 0 OR observation.observation_seq < $3)
+  AND NOT EXISTS (
+    SELECT 1
+    FROM governed_memories memory
+    WHERE memory.tenant_id = observation.tenant_id
+      AND memory.continuity_id = observation.continuity_id
+      AND memory.origin_observation_id = observation.id
+      AND NOT memory_is_eligible(
+        memory.lifecycle_status, memory.content, memory.valid_from, memory.valid_until, $5
+      )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM conversation_turns turn_record
+    JOIN memory_deliveries delivery
+      ON delivery.tenant_id = turn_record.tenant_id
+     AND delivery.id = turn_record.delivery_id
+    JOIN governed_memories memory
+      ON memory.tenant_id = observation.tenant_id
+     AND memory.continuity_id = observation.continuity_id
+    WHERE turn_record.tenant_id = observation.tenant_id
+      AND turn_record.continuity_id = observation.continuity_id
+      AND turn_record.assistant_observation_id = observation.id
+      AND (
+        memory.origin_observation_id = turn_record.user_observation_id
+        OR position(lower(memory.content) IN lower(delivery.context_body)) > 0
+      )
+      AND NOT memory_is_eligible(
+        memory.lifecycle_status, memory.content, memory.valid_from, memory.valid_until, $5
+      )
+  )
+ORDER BY observation.observation_seq DESC
+LIMIT $4`, tenantID, continuityID, beforeSequence, limit, asOf)
 	if err != nil {
 		return nil, fmt.Errorf("list recent conversation observations: %w", err)
 	}

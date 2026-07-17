@@ -60,6 +60,39 @@ describe("Vermory OpenClaw plugin", () => {
     expect(result?.prependContext).not.toContain("turn-1");
     expect(result?.prependContext).not.toContain("continuity-1");
     expect(result?.prependContext).not.toContain("openclaw:run-prepare");
+    expect(result?.prependContext).not.toContain("valid_from");
+    expect(result?.prependContext).not.toContain("valid_until");
+    expect(result?.prependContext).not.toContain("eligibility_as_of");
+    expect(result?.prependContext).not.toContain("lifecycle_status");
+    expect(result?.prependContext).not.toContain("effective_state");
+  });
+
+  it("replaces an earlier eligible fact with the next server-filtered response", async () => {
+    let prepareCount = 0;
+    const fetchMock = vi.fn(async (_input: unknown, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      prepareCount += 1;
+      const context = prepareCount === 1
+        ? "Temporary workaround: set VERMORY_CACHE_DISABLED=1.\nRun go test -p 1 -count=1 ./..."
+        : "Run go test -p 1 -count=1 ./...";
+      return jsonResponse(prepareReceipt(body.operation_id, context));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const harness = registerPlugin();
+
+    const before = await harness.beforePrompt(
+      { prompt: "How should verification run?", messages: [] },
+      { sessionKey: "agent:main:w03", runId: "eligibility-before" },
+    );
+    const after = await harness.beforePrompt(
+      { prompt: "How should verification run now?", messages: [] },
+      { sessionKey: "agent:main:w03", runId: "eligibility-after" },
+    );
+
+    expect(before?.prependContext).toContain("VERMORY_CACHE_DISABLED=1");
+    expect(after?.prependContext).toContain("Run go test -p 1 -count=1 ./...");
+    expect(after?.prependContext).not.toContain("VERMORY_CACHE_DISABLED=1");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("reads the bearer token once during registration", async () => {

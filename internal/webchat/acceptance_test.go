@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"vermory/internal/provider"
 	"vermory/internal/runtime"
@@ -34,7 +35,8 @@ func TestG01GlobalDefaultLocalOverrideAcceptance(t *testing.T) {
 		return "这是 local-scope 覆盖；全局默认仍是 Chinese，新任务应继续使用中文。"
 	}}
 	store := openAcceptanceStore(t, true)
-	handler := acceptanceHandler(store, "g01", llm)
+	retriever := &acceptanceEligibilityRetriever{store: store, tenantID: "g01"}
+	handler := acceptanceHandlerWithRetriever(store, "g01", llm, retriever)
 
 	setResponse := performJSON(t, handler, http.MethodPost, "/v1/defaults/set", fmt.Sprintf(`{
   "operation_id":"g01-default-set",
@@ -66,10 +68,11 @@ func TestG01GlobalDefaultLocalOverrideAcceptance(t *testing.T) {
 	}
 
 	anchor := conversationInput{Channel: "web_chat", ThreadID: "mcm-table-task"}
-	_ = postChatTurn(t, handler, "g01-local-override", anchor, events[2])
+	local := postChatTurn(t, handler, "g01-local-override", anchor, events[2])
 	if len(llm.calls) != 1 {
 		t.Fatalf("G01 expected one provider call, got %d", len(llm.calls))
 	}
+	assertClientEligibilitySnapshot(t, "g01", local.DeliveryID, retriever.requests[0])
 	assertSemanticDefaultPacket(t, llm.calls[0].ContextPacket, events[1], created.MemoryID)
 	if !strings.Contains(llm.calls[0].Prompt, "English") {
 		t.Fatalf("G01 local override was not delivered as the current prompt: %#v", llm.calls[0])
@@ -81,6 +84,7 @@ func TestG01GlobalDefaultLocalOverrideAcceptance(t *testing.T) {
 	}
 
 	final := postChatTurn(t, handler, "g01-new-unrelated", conversationInput{Channel: "web_chat", ThreadID: "new-unrelated-task"}, manifest.Task.Prompt)
+	assertClientEligibilitySnapshot(t, "g01", final.DeliveryID, retriever.requests[1])
 	for _, check := range manifest.Task.DeterministicChecks {
 		assertFrozenCheck(t, final.Answer, check)
 	}
@@ -132,6 +136,153 @@ func TestG01GlobalDefaultLocalOverrideAcceptance(t *testing.T) {
 	_ = postChatTurn(t, handler, "g01-chat-deleted", conversationInput{Channel: "web_chat", ThreadID: "deleted-default-task"}, "继续一个新任务。")
 	if strings.Contains(llm.calls[len(llm.calls)-1].ContextPacket, "Default user-facing replies") {
 		t.Fatalf("G01 deleted default remained in chat context: %s", llm.calls[len(llm.calls)-1].ContextPacket)
+	}
+}
+
+func TestC02HousingViewingValidityAcceptance(t *testing.T) {
+	caseDir := filepath.Join("..", "..", "reality", "cases", "C02-housing-viewing-validity")
+	manifest := loadFrozenManifest(t, filepath.Join(caseDir, "manifest.json"))
+	events := loadFrozenEvents(t, filepath.Join(caseDir, "events.jsonl"))
+	if manifest.ID != "C02-housing-viewing-validity" {
+		t.Fatalf("unexpected C02 manifest: %#v", manifest)
+	}
+
+	const tenantID = "c02"
+	ctx := context.Background()
+	anchor := runtime.ConversationAnchor{Channel: "web_chat", ThreadID: "housing-search-validity"}
+	store := openAcceptanceStore(t, true)
+	continuityID, budgetMemoryID := seedAcceptanceConversationMemory(t, store, "c02-budget", anchor, events[1])
+	_, viewingMemoryID := seedAcceptanceConversationMemory(t, store, "c02-viewing", anchor, events[2])
+
+	initialSnapshot, err := store.CurrentEligibilitySnapshot(ctx, tenantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialBoundary := initialSnapshot.AsOf.Add(time.Hour)
+	if _, err := store.SetMemoryValidity(ctx, runtime.SetMemoryValidityRequest{
+		OperationID:  "c02-viewing-initial-validity",
+		TenantID:     tenantID,
+		ContinuityID: continuityID,
+		MemoryID:     viewingMemoryID,
+		ValidUntil:   &initialBoundary,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	retriever := &acceptanceEligibilityRetriever{store: store, tenantID: tenantID}
+	llm := &acceptanceProvider{final: func(request provider.GenerateRequest) string {
+		if strings.Contains(request.ContextPacket, events[2]) {
+			return "Before the boundary, the 2026-07-20 14:00 viewing is active and the CNY 6,500 budget ceiling applies."
+		}
+		return "The old viewing has expired and is no longer actionable; it was not deleted. The CNY 6,500 budget ceiling remains."
+	}}
+	handler := acceptanceHandlerWithRetriever(store, tenantID, llm, retriever)
+
+	conversation := conversationInput{Channel: anchor.Channel, ThreadID: anchor.ThreadID}
+	before := postChatTurn(t, handler, "c02-before-boundary", conversation, events[3])
+	if len(llm.calls) != 1 {
+		t.Fatalf("C02 expected one pre-boundary provider call, got %d", len(llm.calls))
+	}
+	for _, required := range []string{events[1], events[2]} {
+		if !strings.Contains(llm.calls[0].ContextPacket, required) {
+			t.Fatalf("C02 pre-boundary context omitted %q: %s", required, llm.calls[0].ContextPacket)
+		}
+	}
+	assertSemanticContextOnly(t, llm.calls[0].ContextPacket, budgetMemoryID, viewingMemoryID)
+	assertClientEligibilitySnapshot(t, tenantID, before.DeliveryID, retriever.requests[0])
+
+	boundarySnapshot, err := store.CurrentEligibilitySnapshot(ctx, tenantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	boundary := boundarySnapshot.AsOf
+	if _, err := store.SetMemoryValidity(ctx, runtime.SetMemoryValidityRequest{
+		OperationID:  "c02-viewing-exact-boundary",
+		TenantID:     tenantID,
+		ContinuityID: continuityID,
+		MemoryID:     viewingMemoryID,
+		ValidUntil:   &boundary,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	atBoundary := postChatTurn(t, handler, "c02-at-boundary", conversation, manifest.Task.Prompt)
+	if len(llm.calls) != 2 {
+		t.Fatalf("C02 expected two provider calls, got %d", len(llm.calls))
+	}
+	if strings.Contains(llm.calls[1].ContextPacket, events[2]) {
+		t.Fatalf("C02 expired viewing remained model-facing: %s", llm.calls[1].ContextPacket)
+	}
+	for _, stale := range []string{"2026-07-20 14:00", "viewing is active"} {
+		if strings.Contains(llm.calls[1].ContextPacket, stale) {
+			t.Fatalf("C02 answer derived from expired viewing remained model-facing %q: %s", stale, llm.calls[1].ContextPacket)
+		}
+	}
+	if !strings.Contains(llm.calls[1].ContextPacket, events[1]) {
+		t.Fatalf("C02 durable budget disappeared with viewing expiry: %s", llm.calls[1].ContextPacket)
+	}
+	assertSemanticContextOnly(t, llm.calls[1].ContextPacket, budgetMemoryID, viewingMemoryID)
+	assertClientEligibilitySnapshot(t, tenantID, atBoundary.DeliveryID, retriever.requests[1])
+	for _, check := range manifest.Task.DeterministicChecks {
+		assertFrozenCheck(t, atBoundary.Answer, check)
+	}
+
+	inspection, err := runtime.NewConversationService(store, tenantID, nil, "", runtime.ConversationServiceConfig{}).Inspect(ctx, anchor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var expiredViewing *runtime.GovernedMemory
+	for index := range inspection.Memories {
+		if inspection.Memories[index].ID == viewingMemoryID {
+			expiredViewing = &inspection.Memories[index]
+			break
+		}
+	}
+	if expiredViewing == nil || expiredViewing.Content != events[2] || expiredViewing.LifecycleStatus != "active" || expiredViewing.EffectiveState != runtime.MemoryEffectiveExpired {
+		t.Fatalf("C02 expiry did not preserve authorized history: %#v", expiredViewing)
+	}
+}
+
+func TestExpiredConfirmedUserObservationSuppressesSiblingAssistantHistory(t *testing.T) {
+	const tenantID = "eligibility-sibling"
+	ctx := context.Background()
+	store := openAcceptanceStore(t, true)
+	llm := &acceptanceProvider{final: func(request provider.GenerateRequest) string {
+		if strings.Contains(request.Prompt, "temporary viewing") {
+			return "Sibling assistant repeats temporary viewing 2026-07-20 14:00."
+		}
+		return "Only current context remains."
+	}}
+	handler := acceptanceHandler(store, tenantID, llm)
+	anchor := conversationInput{Channel: "web_chat", ThreadID: "confirmed-user-origin"}
+
+	origin := postChatTurn(t, handler, "eligibility-sibling-origin", anchor, "The temporary viewing is 2026-07-20 14:00.")
+	confirmed := confirmObservation(t, handler, "eligibility-sibling-confirm", anchor, origin.UserObservationID)
+	snapshot, err := store.CurrentEligibilitySnapshot(ctx, tenantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SetMemoryValidity(ctx, runtime.SetMemoryValidityRequest{
+		OperationID:  "eligibility-sibling-expire",
+		TenantID:     tenantID,
+		ContinuityID: origin.ContinuityID,
+		MemoryID:     confirmed.MemoryID,
+		ValidUntil:   &snapshot.AsOf,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	_ = postChatTurn(t, handler, "eligibility-sibling-after", anchor, "What remains current?")
+	if len(llm.calls) != 2 {
+		t.Fatalf("provider calls = %d, want 2", len(llm.calls))
+	}
+	for _, stale := range []string{
+		"The temporary viewing is 2026-07-20 14:00.",
+		"Sibling assistant repeats temporary viewing 2026-07-20 14:00.",
+	} {
+		if strings.Contains(llm.calls[1].ContextPacket, stale) {
+			t.Fatalf("expired origin sibling remained in recent history %q: %s", stale, llm.calls[1].ContextPacket)
+		}
 	}
 }
 
@@ -782,6 +933,46 @@ func acceptanceHandler(store *runtime.Store, tenantID string, llm provider.Provi
 	)
 }
 
+func acceptanceHandlerWithRetriever(store *runtime.Store, tenantID string, llm provider.Provider, retriever runtime.MemoryRetriever) http.Handler {
+	return NewHandler(
+		runtime.NewConversationService(store, tenantID, llm, "acceptance-model", runtime.ConversationServiceConfig{Retriever: retriever}),
+		runtime.NewGlobalDefaultsService(store, tenantID),
+	)
+}
+
+type acceptanceEligibilityRetriever struct {
+	store    *runtime.Store
+	tenantID string
+	requests []runtime.RetrievalRequest
+}
+
+func (retriever *acceptanceEligibilityRetriever) Retrieve(ctx context.Context, request runtime.RetrievalRequest) (runtime.RetrievalResult, error) {
+	retriever.requests = append(retriever.requests, request)
+	memories := make([]runtime.Memory, 0, request.Limit)
+	seen := map[string]bool{}
+	for _, continuityID := range request.ContinuityIDs {
+		matches, err := retriever.store.SearchEligibleConversationMemoryAt(
+			ctx, retriever.tenantID, continuityID, request.Query, request.Limit, request.EligibilityAsOf,
+		)
+		if err != nil {
+			return runtime.RetrievalResult{}, err
+		}
+		for _, memory := range matches {
+			if !seen[memory.ID] {
+				seen[memory.ID] = true
+				memories = append(memories, memory)
+			}
+			if len(memories) == request.Limit {
+				break
+			}
+		}
+		if len(memories) == request.Limit {
+			break
+		}
+	}
+	return runtime.RetrievalResult{Memories: memories, Effective: runtime.RetrievalLexical, EligibilityAsOf: request.EligibilityAsOf}, nil
+}
+
 func seedAcceptanceConversationMemory(t *testing.T, store *runtime.Store, operationPrefix string, anchor runtime.ConversationAnchor, content string) (string, string) {
 	t.Helper()
 	ctx := context.Background()
@@ -819,10 +1010,41 @@ func assertSemanticDefaultPacket(t *testing.T, packet, content, memoryID string)
 	if !strings.Contains(packet, "Global defaults:\n"+content) {
 		t.Fatalf("packet is missing semantic default: %s", packet)
 	}
-	for _, forbidden := range []string{"reply_language", memoryID, "lifecycle_status", "memory_key"} {
+	assertSemanticContextOnly(t, packet, memoryID)
+}
+
+func assertSemanticContextOnly(t *testing.T, packet string, memoryIDs ...string) {
+	t.Helper()
+	forbiddenValues := []string{
+		"lifecycle_status", "memory_key", "effective_state", "valid_from", "valid_until", "eligibility_as_of",
+	}
+	forbiddenValues = append(forbiddenValues, memoryIDs...)
+	for _, forbidden := range forbiddenValues {
 		if strings.Contains(packet, forbidden) {
-			t.Fatalf("packet exposed internal default metadata %q: %s", forbidden, packet)
+			t.Fatalf("packet exposed internal metadata %q: %s", forbidden, packet)
 		}
+	}
+}
+
+func assertClientEligibilitySnapshot(t *testing.T, tenantID, deliveryID string, request runtime.RetrievalRequest) {
+	t.Helper()
+	if request.EligibilityAsOf.IsZero() {
+		t.Fatal("client retrieval omitted eligibility_as_of")
+	}
+	pool, err := pgxpool.New(context.Background(), os.Getenv("VERMORY_TEST_DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	var stored time.Time
+	if err := pool.QueryRow(context.Background(), `
+SELECT eligibility_as_of
+FROM memory_deliveries
+WHERE tenant_id = $1 AND id = $2::uuid`, tenantID, deliveryID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if !stored.Equal(request.EligibilityAsOf) {
+		t.Fatalf("delivery eligibility_as_of=%s retrieval=%s", stored, request.EligibilityAsOf)
 	}
 }
 

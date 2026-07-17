@@ -311,7 +311,9 @@ func (s *ConversationService) prepareConversationTurn(ctx context.Context, reque
 	}
 	var recent []ConversationObservation
 	if includeRecent {
-		recent, err = s.store.ListRecentConversationObservations(ctx, s.tenantID, resolution.ContinuityID, turn.UserObservationID, s.config.RecentLimit)
+		recent, err = s.store.ListRecentConversationObservationsAt(
+			ctx, s.tenantID, resolution.ContinuityID, turn.UserObservationID, s.config.RecentLimit, snapshot.AsOf,
+		)
 		if err != nil {
 			return s.failPreparedTurn(ctx, turn, "history_retrieval_error", err)
 		}

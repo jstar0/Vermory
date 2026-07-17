@@ -34,6 +34,39 @@ describe("VermoryClient", () => {
     });
   });
 
+  it("uses each server-filtered context without retaining an earlier eligible fact", async () => {
+    let prepareCount = 0;
+    await withServer(async (request, response) => {
+      const body = JSON.parse(await readRequest(request));
+      prepareCount += 1;
+      if (prepareCount === 1) {
+        writeJSON(
+          response,
+          prepareReceipt(body.operation_id, "Temporary workaround: set VERMORY_CACHE_DISABLED=1.\nRun go test -p 1 -count=1 ./..."),
+        );
+        return;
+      }
+      writeJSON(response, prepareReceipt(body.operation_id, "Run go test -p 1 -count=1 ./..."));
+    }, async (baseUrl) => {
+      const client = new VermoryClient({ baseUrl, timeoutMs: 1000 });
+      const before = await client.prepare({
+        operationId: "openclaw:eligibility-before",
+        sessionKey: "agent:main:w03",
+        message: "How should verification run?",
+      });
+      const after = await client.prepare({
+        operationId: "openclaw:eligibility-after",
+        sessionKey: "agent:main:w03",
+        message: "How should verification run now?",
+      });
+
+      expect(before.context).toContain("VERMORY_CACHE_DISABLED=1");
+      expect(after.context).toBe("Run go test -p 1 -count=1 ./...");
+      expect(after.context).not.toContain("VERMORY_CACHE_DISABLED=1");
+      expect(prepareCount).toBe(2);
+    });
+  });
+
   it("adds one exact bearer header without exposing it elsewhere", async () => {
     await withServer(async (request, response) => {
       expect(request.headers.authorization).toBe(`Bearer ${TEST_API_TOKEN}`);
