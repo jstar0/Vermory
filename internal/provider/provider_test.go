@@ -16,7 +16,8 @@ func TestOpenAICompatibleProviderSendsDirectChatCompletionRequest(t *testing.T) 
 			Role    string `json:"role"`
 			Content string `json:"content"`
 		} `json:"messages"`
-		MaxTokens int `json:"max_tokens"`
+		MaxTokens      int   `json:"max_tokens"`
+		EnableThinking *bool `json:"enable_thinking"`
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +61,9 @@ func TestOpenAICompatibleProviderSendsDirectChatCompletionRequest(t *testing.T) 
 	if captured.MaxTokens != 77 {
 		t.Fatalf("unexpected max tokens: %d", captured.MaxTokens)
 	}
+	if captured.EnableThinking != nil {
+		t.Fatalf("default request unexpectedly set enable_thinking: %v", *captured.EnableThinking)
+	}
 	if len(captured.Messages) != 2 {
 		t.Fatalf("expected system and user messages, got %d", len(captured.Messages))
 	}
@@ -81,6 +85,39 @@ func TestOpenAICompatibleProviderSendsDirectChatCompletionRequest(t *testing.T) 
 		TotalTokens:       135,
 	}) {
 		t.Fatalf("unexpected OpenAI-compatible usage: %#v", resp.Usage)
+	}
+}
+
+func TestOpenAICompatibleProviderCanDisableThinking(t *testing.T) {
+	var enableThinking *bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			EnableThinking *bool `json:"enable_thinking"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		enableThinking = body.EnableThinking
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"model":"direct-model","choices":[{"message":{"content":"direct ok"}}]}`))
+	}))
+	defer server.Close()
+
+	client := NewOpenAICompatible(Config{
+		BaseURL:         server.URL + "/v1",
+		APIKey:          "test-key",
+		Client:          server.Client(),
+		DisableThinking: true,
+	})
+	if _, err := client.Generate(context.Background(), GenerateRequest{
+		Model:     "direct-model",
+		Prompt:    "extract facts",
+		MaxTokens: 1024,
+	}); err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+	if enableThinking == nil || *enableThinking {
+		t.Fatalf("expected enable_thinking=false, got %v", enableThinking)
 	}
 }
 

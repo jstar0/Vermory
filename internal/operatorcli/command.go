@@ -236,6 +236,7 @@ func NewMemoryCommand() *cobra.Command {
 
 	var matchRoot, matchOperationID, matchContent, matchSourceRef string
 	var matchProvider, matchModel, matchBaseURL, matchAPIKeyEnv, matchGrokCommand string
+	var matchDisableThinking bool
 	matchSource := &cobra.Command{
 		Use:   "match-source",
 		Short: "Match an unkeyed trusted source fact to the current closed set",
@@ -247,6 +248,7 @@ func NewMemoryCommand() *cobra.Command {
 				matchBaseURL,
 				matchAPIKeyEnv,
 				matchGrokCommand,
+				matchDisableThinking,
 			)
 			if err != nil {
 				return err
@@ -273,6 +275,7 @@ func NewMemoryCommand() *cobra.Command {
 	matchSource.Flags().StringVar(&matchBaseURL, "base-url", "", "direct provider base URL")
 	matchSource.Flags().StringVar(&matchAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	matchSource.Flags().StringVar(&matchGrokCommand, "grok-command", "", "authenticated Grok CLI command")
+	matchSource.Flags().BoolVar(&matchDisableThinking, "disable-thinking", false, "request non-thinking mode from compatible providers")
 	markRequired(matchSource, "repo-root", "operation-id", "content", "source-ref")
 
 	var inspectMatchRoot, inspectMatchOperationID string
@@ -296,6 +299,7 @@ func NewMemoryCommand() *cobra.Command {
 
 	var formRoot, formOperationID, formSourceFile, formSourceRef string
 	var formProvider, formModel, formBaseURL, formAPIKeyEnv, formGrokCommand string
+	var formDisableThinking bool
 	formDocument := &cobra.Command{
 		Use:   "form-document",
 		Short: "Form reviewable memory candidates from one trusted document",
@@ -311,6 +315,7 @@ func NewMemoryCommand() *cobra.Command {
 				formBaseURL,
 				formAPIKeyEnv,
 				formGrokCommand,
+				formDisableThinking,
 			)
 			if err != nil {
 				return err
@@ -337,6 +342,7 @@ func NewMemoryCommand() *cobra.Command {
 	formDocument.Flags().StringVar(&formBaseURL, "base-url", "", "direct provider base URL")
 	formDocument.Flags().StringVar(&formAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	formDocument.Flags().StringVar(&formGrokCommand, "grok-command", "", "authenticated Grok CLI command")
+	formDocument.Flags().BoolVar(&formDisableThinking, "disable-thinking", false, "request non-thinking mode from compatible providers")
 	markRequired(formDocument, "repo-root", "operation-id", "source-file", "source-ref")
 
 	var inspectFormationRoot, inspectFormationOperationID string
@@ -362,6 +368,7 @@ func NewMemoryCommand() *cobra.Command {
 	var formConversationObservationIDs []string
 	var formConversationRecentLimit int
 	var formConversationProvider, formConversationModel, formConversationBaseURL, formConversationAPIKeyEnv, formConversationGrokCommand string
+	var formConversationDisableThinking bool
 	formConversation := &cobra.Command{
 		Use:   "form-conversation",
 		Short: "Form reviewable memory candidates from bounded user conversation observations",
@@ -373,6 +380,7 @@ func NewMemoryCommand() *cobra.Command {
 				formConversationBaseURL,
 				formConversationAPIKeyEnv,
 				formConversationGrokCommand,
+				formConversationDisableThinking,
 			)
 			if err != nil {
 				return err
@@ -402,6 +410,7 @@ func NewMemoryCommand() *cobra.Command {
 	formConversation.Flags().StringVar(&formConversationBaseURL, "base-url", "", "direct provider base URL")
 	formConversation.Flags().StringVar(&formConversationAPIKeyEnv, "api-key-env", "", "environment variable containing provider API key")
 	formConversation.Flags().StringVar(&formConversationGrokCommand, "grok-command", "", "authenticated Grok CLI command")
+	formConversation.Flags().BoolVar(&formConversationDisableThinking, "disable-thinking", false, "request non-thinking mode from compatible providers")
 	markRequired(formConversation, "operation-id", "channel", "thread-id")
 
 	var inspectConversationFormationOperationID, inspectConversationFormationChannel, inspectConversationFormationThreadID string
@@ -1079,7 +1088,7 @@ func withConversation(
 	return run(store, runtime.NewConversationService(store, options.tenantID, nil, "", runtime.ConversationServiceConfig{}))
 }
 
-func buildDirectProvider(name, model, baseURL, apiKeyEnv, grokCommand string) (provider.Provider, string, string, error) {
+func buildDirectProvider(name, model, baseURL, apiKeyEnv, grokCommand string, disableThinking bool) (provider.Provider, string, string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		name = "grok-cli"
@@ -1124,7 +1133,11 @@ func buildDirectProvider(name, model, baseURL, apiKeyEnv, grokCommand string) (p
 		if apiKey == "" {
 			return nil, "", "", fmt.Errorf("%s provider requires non-empty env %s", name, apiKeyEnv)
 		}
-		return provider.NewOpenAICompatible(provider.Config{BaseURL: baseURL, APIKey: apiKey}), name, model, nil
+		return provider.NewOpenAICompatible(provider.Config{
+			BaseURL:         baseURL,
+			APIKey:          apiKey,
+			DisableThinking: disableThinking,
+		}), name, model, nil
 	default:
 		return nil, "", "", fmt.Errorf("unsupported direct provider %q", name)
 	}

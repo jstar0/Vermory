@@ -19,15 +19,17 @@ const (
 )
 
 type Config struct {
-	BaseURL string
-	APIKey  string
-	Client  *http.Client
+	BaseURL         string
+	APIKey          string
+	Client          *http.Client
+	DisableThinking bool
 }
 
 type OpenAICompatible struct {
-	baseURL string
-	apiKey  string
-	client  *http.Client
+	baseURL         string
+	apiKey          string
+	client          *http.Client
+	disableThinking bool
 }
 
 func NewOpenAICompatible(config Config) *OpenAICompatible {
@@ -36,9 +38,10 @@ func NewOpenAICompatible(config Config) *OpenAICompatible {
 		client = &http.Client{Timeout: 90 * time.Second}
 	}
 	return &OpenAICompatible{
-		baseURL: strings.TrimRight(strings.TrimSpace(config.BaseURL), "/"),
-		apiKey:  strings.TrimSpace(config.APIKey),
-		client:  client,
+		baseURL:         strings.TrimRight(strings.TrimSpace(config.BaseURL), "/"),
+		apiKey:          strings.TrimSpace(config.APIKey),
+		client:          client,
+		disableThinking: config.DisableThinking,
 	}
 }
 
@@ -53,11 +56,16 @@ func (p *OpenAICompatible) Generate(ctx context.Context, req GenerateRequest) (G
 		return GenerateResponse{}, errors.New("provider: model is required")
 	}
 
-	body, err := json.Marshal(openAICompatibleRequest{
+	request := openAICompatibleRequest{
 		Model:     req.Model,
 		Messages:  buildMessages(req),
 		MaxTokens: req.MaxTokens,
-	})
+	}
+	if p.disableThinking {
+		enabled := false
+		request.EnableThinking = &enabled
+	}
+	body, err := json.Marshal(request)
 	if err != nil {
 		return GenerateResponse{}, err
 	}
@@ -125,9 +133,10 @@ func (p *OpenAICompatible) doChatCompletion(ctx context.Context, body []byte) ([
 }
 
 type openAICompatibleRequest struct {
-	Model     string                `json:"model"`
-	Messages  []openAICompatibleMsg `json:"messages"`
-	MaxTokens int                   `json:"max_tokens,omitempty"`
+	Model          string                `json:"model"`
+	Messages       []openAICompatibleMsg `json:"messages"`
+	MaxTokens      int                   `json:"max_tokens,omitempty"`
+	EnableThinking *bool                 `json:"enable_thinking,omitempty"`
 }
 
 type openAICompatibleMsg struct {

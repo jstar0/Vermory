@@ -316,7 +316,7 @@ func TestOperatorSourceMatchCommandsAreRegistered(t *testing.T) {
 			if child.Name() != "match-source" {
 				continue
 			}
-			for _, flag := range []string{"repo-root", "operation-id", "source-ref", "content", "provider", "model", "base-url", "api-key-env", "grok-command"} {
+			for _, flag := range []string{"repo-root", "operation-id", "source-ref", "content", "provider", "model", "base-url", "api-key-env", "grok-command", "disable-thinking"} {
 				if child.Flags().Lookup(flag) == nil {
 					t.Fatalf("match-source is missing --%s", flag)
 				}
@@ -339,16 +339,17 @@ func TestOperatorSourceFormationCommandsAreRegistered(t *testing.T) {
 		found := map[string]bool{}
 		for _, child := range parent.Commands() {
 			found[child.Name()] = true
-			if child.Name() != "form-document" {
-				continue
-			}
-			for _, flag := range []string{"repo-root", "operation-id", "source-file", "source-ref", "provider", "model", "base-url", "api-key-env", "grok-command"} {
+			expectedFlags := map[string][]string{
+				"form-document":     {"repo-root", "operation-id", "source-file", "source-ref", "provider", "model", "base-url", "api-key-env", "grok-command", "disable-thinking"},
+				"form-conversation": {"operation-id", "channel", "thread-id", "observation-id", "recent-user-observations", "provider", "model", "base-url", "api-key-env", "grok-command", "disable-thinking"},
+			}[child.Name()]
+			for _, flag := range expectedFlags {
 				if child.Flags().Lookup(flag) == nil {
-					t.Fatalf("form-document is missing --%s", flag)
+					t.Fatalf("%s is missing --%s", child.Name(), flag)
 				}
 			}
 		}
-		if !found["form-document"] || !found["inspect-source-formation"] {
+		if !found["form-document"] || !found["form-conversation"] || !found["inspect-source-formation"] {
 			t.Fatalf("source formation commands are missing: %#v", found)
 		}
 		return
