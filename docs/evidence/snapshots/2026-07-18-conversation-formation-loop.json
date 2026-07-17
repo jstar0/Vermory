@@ -239,6 +239,11 @@
       "id": "F-12",
       "failure": "model-generated appointment memory_key retained a stale temporal token after correction",
       "resolution": "retain content/lifecycle evidence; require stable concept-key review in later formation-quality work"
+    },
+    {
+      "id": "F-13",
+      "failure": "first protected artifact stream was observed at 10092544 of 21657451 bytes and failed ZIP validation",
+      "resolution": "reject the partial transport, resume the remaining 11564907 bytes, and accept only the stable file matching the Artifact API size and SHA-256"
     }
   ],
   "privacy": {
@@ -248,6 +253,28 @@
     "direct_credential_assignments": 0,
     "full_environment_dumps": 0,
     "sudo_processes": 0
+  },
+  "protected_delivery": {
+    "source_head": "cb78aed2335f115a85ed422b7ac099535dd6418f",
+    "ci_run_id": 29609943989,
+    "ci_job_id": 87981998623,
+    "ci_conclusion": "success",
+    "ci_duration_seconds": 293,
+    "artifact_id": 8418419540,
+    "artifact_name": "vermory-pr-snapshot-66c9aa96dfcd3b7d244b74f792ebceab60264c92",
+    "artifact_size_bytes": 21657451,
+    "artifact_sha256": "36d4d41ce080d7c7a7316160fd45094d680615ab3a3c592fbddde9d1b081f277",
+    "synthetic_merge": "66c9aa96dfcd3b7d244b74f792ebceab60264c92",
+    "synthetic_merge_verified": true,
+    "synthetic_merge_second_parent": "cb78aed2335f115a85ed422b7ac099535dd6418f",
+    "go_archives_verified": 4,
+    "openclaw_package_sha256": "e2833e6a5d5cbaf72af244b7c1650532fd81b0dfcb435c84f2462dd1906c3950",
+    "openclaw_package_files": 12,
+    "hermes_package_sha256": "99dd0c2c99cbf5703eec8cbc4a7e84442e2662af8becb81985d8b481ec90dfe6",
+    "hermes_package_files": 6,
+    "mac_mini_manifest_entries": 45,
+    "mac_mini_manifest_sha256": "39c6204479be5767f4dce2718033a2752c21a08ba4caff22c688c12ceffaf556",
+    "mac_mini_verification_sha256": "045b5438966c8ef65d1d56c3ead786fecf7624645a6f997954490ed111c6c35b"
   },
   "checksums": {
     "entries": 6458,

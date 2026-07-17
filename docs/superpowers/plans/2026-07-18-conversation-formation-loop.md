@@ -66,8 +66,8 @@ Design: [Conversation Formation Loop Design](../specs/2026-07-18-conversation-fo
 
 - [x] Write the W21 evidence report and update the evaluation matrix and public
   documentation with only proven claims.
-- [ ] Commit without amending earlier delivery commits.
-- [ ] Push the branch and run protected CI on the exact head.
-- [ ] Verify artifact inventory and checksums on Mac mini without writing
+- [x] Commit without amending earlier delivery commits.
+- [x] Push the branch and run protected CI on the exact head.
+- [x] Verify artifact inventory and checksums on Mac mini without writing
   credentials or environment dumps.
-- [ ] Update the existing PR body with one W21 delivery section.
+- [x] Update the existing PR body with one W21 delivery section.

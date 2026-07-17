@@ -16,7 +16,7 @@ Date: 2026-07-18
 | Formation endpoint | `https://api.siliconflow.cn/v1` |
 | Formation model | `deepseek-ai/DeepSeek-V4-Flash` |
 | Normalized snapshot | [`snapshots/2026-07-18-conversation-formation-loop.json`](snapshots/2026-07-18-conversation-formation-loop.json) |
-| Snapshot SHA-256 | `ab32b23a8f83e46f6eeb925843ca8d0fc9651bf9f7b3110d50aa5bbdafd1eb33` |
+| Snapshot SHA-256 | `eacb74652c2830c97a40a70d1d0a1f37906be6fb1dfff7ae654aa2aa74e29db6` |
 | Qualification gates | `18 / 18 PASS` |
 
 The accepted trajectory uses a real OpenClaw client, a real Grok conversation
@@ -259,6 +259,50 @@ The full PostgreSQL suite, W21/F01 lifecycle, provider tests, OpenClaw O01,
 Hermes H01, RLS, deletion, projection rebuild, retrieval, recovery, and
 operations regressions remain green.
 
+## Protected Delivery
+
+The first protected delivery for the complete W21 source head passed all 23
+main CI steps:
+
+| Field | Value |
+|---|---|
+| Source head | `cb78aed2335f115a85ed422b7ac099535dd6418f` |
+| Run / job | `29609943989 / 87981998623` |
+| Result / duration | `SUCCESS / 293 seconds` |
+| Artifact | `8418419540` / `vermory-pr-snapshot-66c9aa96dfcd3b7d244b74f792ebceab60264c92` |
+| Artifact bytes | `21,657,451` |
+| Artifact API and transport SHA-256 | `36d4d41ce080d7c7a7316160fd45094d680615ab3a3c592fbddde9d1b081f277` |
+| Synthetic merge | `66c9aa96dfcd3b7d244b74f792ebceab60264c92` |
+| Merge verification | `verified=true`, `reason=valid` |
+| Merge second parent | `cb78aed2335f115a85ed422b7ac099535dd6418f` |
+
+The artifact was streamed to the Mac mini without a persistent local copy. The
+first stream was observed at `10,092,544 / 21,657,451` bytes and failed ZIP
+validation, so it was rejected. A range resume supplied the remaining
+`11,564,907` bytes. The accepted stable ZIP matched both the Artifact API byte
+count and digest and passed central-directory validation.
+
+Independent Mac mini verification passed all four Go archive checksums and
+layouts. Every binary reported the expected `GOOS` and `GOARCH`,
+`CGO_ENABLED=0`, `-trimpath=true`, `vcs.modified=false`, and synthetic-merge
+revision. Both Linux binaries were statically linked. The Darwin arm64 binary
+executed `version` and `memory form-conversation --help`.
+
+The OpenClaw `0.1.0` package contained exactly 12 files and had SHA-256
+`e2833e6a5d5cbaf72af244b7c1650532fd81b0dfcb435c84f2462dd1906c3950`.
+The deterministic Hermes `0.1.0` package sidecar passed, the package contained
+exactly six files, and its SHA-256 was
+`99dd0c2c99cbf5703eec8cbc4a7e84442e2662af8becb81985d8b481ec90dfe6`.
+The extracted packages contained zero environment or key files, dependency or
+cache directories, credential-shaped values, or bearer-token values.
+
+Protected-delivery evidence is stored under
+`~/Library/Application Support/Vermory/evidence/w21-conversation-formation/5d488f5/protected-delivery-cb78aed-29609943989`.
+Its checksum manifest covers 45 files and has SHA-256
+`39c6204479be5767f4dce2718033a2752c21a08ba4caff22c688c12ceffaf556`.
+The structured verification record has SHA-256
+`045b5438966c8ef65d1d56c3ead786fecf7624645a6f997954490ed111c6c35b`.
+
 ## Integrity And Privacy
 
 The Mac mini raw evidence checksum manifest covers 6,458 files. It was created
@@ -307,6 +351,9 @@ and the run did not claim otherwise.
     substitution;
 12. the model-generated appointment `memory_key` retained a stale temporal
     token after the content was corrected from Friday to Saturday.
+13. the first protected artifact stream was truncated and rejected before a
+    range-resumed transport matched the Artifact API size, digest, and ZIP
+    integrity checks.
 
 No failed attempt was deleted, relabeled as a pass, or used as accepted
 answer-quality evidence.
