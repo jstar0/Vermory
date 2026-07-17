@@ -47,24 +47,24 @@ Design: [Conversation Formation Loop Design](../specs/2026-07-18-conversation-fo
   packages.
 - [x] Run OpenClaw O01, Hermes H01, retrieval, RLS, deletion, projection,
   recovery, and operations regressions.
-- [ ] Record all failures rather than removing inconvenient cases.
+- [x] Record all failures rather than removing inconvenient cases.
 
 ## Task 6: Mac Mini Real-Client Evidence
 
-- [ ] Deploy the protected build and fixture to Mac mini user-owned paths.
-- [ ] Persist the F01 trajectory through a real OpenClaw or Hermes client.
-- [ ] Form candidates with a real configured model.
-- [ ] Accept the initial candidates, form and accept the correction, forget the
+- [x] Deploy the protected build and fixture to Mac mini user-owned paths.
+- [x] Persist the F01 trajectory through a real OpenClaw or Hermes client.
+- [x] Form candidates with a real configured model.
+- [x] Accept the initial candidates, form and accept the correction, forget the
   temporary code, and rebuild projections.
-- [ ] Prove a fresh real-client delivery contains Saturday and concierge, but
+- [x] Prove a fresh real-client delivery contains Saturday and concierge, but
   not Friday, the code, rain, lunch, sibling history, or a permanent English
   default.
-- [ ] Prove invalid evidence, cross-continuity input, replay, fail-open, and
+- [x] Prove invalid evidence, cross-continuity input, replay, fail-open, and
   deletion gates from database and client evidence.
 
 ## Task 7: Protected Delivery
 
-- [ ] Write the W21 evidence report and update the evaluation matrix and public
+- [x] Write the W21 evidence report and update the evaluation matrix and public
   documentation with only proven claims.
 - [ ] Commit without amending earlier delivery commits.
 - [ ] Push the branch and run protected CI on the exact head.

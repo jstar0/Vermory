@@ -487,6 +487,41 @@ raw session-A transcript. The failure ledger retains an invalid
 Vermory delivery was empty; that attempt is explicitly rejected. See
 [the W20 evidence](evidence/2026-07-18-hermes-real-client.md).
 
+## Conversation Formation Loop W21
+
+W21 executes the frozen `F01-conversation-formation-loop` case through real
+OpenClaw user turns, `grok-cli/grok-4.5`, and a direct SiliconFlow
+`deepseek-ai/DeepSeek-V4-Flash` formation route. The model is a compatibility
+target, not a model-ranking result.
+
+| Gate | Result |
+|---|---:|
+| real Session A user turns persisted | pass |
+| real Session B/C continuities isolated | `2 / 2` rejected before provider execution |
+| accepted initial candidates | `3` |
+| rejected lifecycle candidate | `1` |
+| rain/lunch candidates | `0` |
+| accepted correction updates | `1` |
+| turn-local language candidates | `0` |
+| active Global Defaults | `0` |
+| fresh OpenClaw answer | Saturday at 10:00 + concierge |
+| deleted-value residual surfaces | `0 / 7` nonzero |
+| external OpenClaw state exact-value matches | `0` |
+| offline provider replay | `0 s`, one run, no duplicate candidates |
+| outside-manifest provider output | `evidence_observation_outside_manifest`, 0 items |
+| input / active-snapshot drift | `input_manifest_changed / active_snapshot_changed`, 0 items |
+| fail-open answer / false binding | `FAIL_OPEN_OK / 0` |
+| provider-key, `.env`, direct assignment, env-dump leaks | `0 / 0 / 0 / 0` |
+| qualification gates | `18 / 18 PASS` |
+
+The accepted direct formation took 14 seconds in explicit non-thinking mode
+after the OpenAI-compatible adapter was corrected to include the required JSON
+schema. A default-thinking timeout, invalid pre-schema output, an extra model
+candidate, an ambiguous client answer, two incomplete deletion-probe answers,
+a 179-second Grok timeout, and a failed-audit redaction defect remain in the
+failure ledger. See
+[the W21 evidence](evidence/2026-07-18-conversation-formation-loop.md).
+
 ## Projection Outbox Fault Profile W11
 
 W11 starts a disposable PostgreSQL 18 cluster and exercises the production

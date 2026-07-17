@@ -122,6 +122,19 @@ Vermory 没有生成虚假持久化 receipt。模型审计、Mac mini 用户级 
 重启、确定性发布包和隐私门均通过。详见
 [Hermes 真实客户端连续性实证](docs/evidence/2026-07-18-hermes-real-client.md)。
 
+W21 完成了一条真实 conversation write-back 闭环。OpenClaw 持久化用户 turn，
+直连硅基流动 `deepseek-ai/DeepSeek-V4-Flash` 形成可审查 candidate；operator
+接受三条事实并拒绝一条仅用于生命周期控制的额外 candidate。后续纠正把 Friday
+替换为 Saturday 10:00；仅本轮使用英文的要求没有形成 candidate，也没有污染
+Global Defaults。删除合成 access code 后，governed memory、observation、answer、
+delivery history、lexical projection、formation run、formation item 与检查过的
+OpenClaw 隔离 state 中精确残留均为 0。新的真实 OpenClaw/Grok turn 正确回答
+Saturday 10:00 与 concierge 要求。Mac mini 上还验证了跨 continuity 拒绝、
+manifest 外证据拒绝、离线 replay、input drift、active snapshot drift 与 fail-open。
+报告保留 provider timeout、无效输出、客户端回答失败，以及本轮发现并修复的
+failed-audit 删除缺口。详见
+[Conversation Formation Loop 实证](docs/evidence/2026-07-18-conversation-formation-loop.md)。
+
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
 ## 快速开始

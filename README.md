@@ -132,6 +132,21 @@ a visible model answer while Vermory recorded no false persistence receipt.
 The model audit, user-level Mac mini LaunchAgent restart, deterministic package,
 and privacy gates all passed. See [Hermes Real-Client Continuity Qualification](docs/evidence/2026-07-18-hermes-real-client.md).
 
+W21 closes one real conversation write-back loop. OpenClaw persisted the user
+turns, direct SiliconFlow `deepseek-ai/DeepSeek-V4-Flash` formed reviewable
+candidates, the operator accepted three and rejected one lifecycle-only item,
+and a later correction superseded Friday with Saturday at 10:00. A turn-local
+English request produced no candidate and no Global Default. After forgetting
+the synthetic access code, exact occurrences were zero across governed memory,
+observations, answers, delivery history, lexical projection, formation runs,
+formation items, and the checked isolated OpenClaw state. A fresh real
+OpenClaw/Grok turn answered with Saturday at 10:00 and the concierge
+requirement. Cross-continuity input, outside-manifest evidence, offline replay,
+input drift, active-snapshot drift, and fail-open behavior were also exercised
+on the Mac mini. The report retains provider timeouts, invalid output,
+client-answer failures, and the deletion-audit defect that was found and fixed.
+See [Conversation Formation Loop Qualification](docs/evidence/2026-07-18-conversation-formation-loop.md).
+
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
 ## Architecture Direction
