@@ -825,7 +825,7 @@ Require exact 10,000-state arithmetic, 320 scoped queries, zero cross-scope
 results, zero stale/archive/deleted delivery, all sixteen gates, and one direct
 `BAAI/bge-m3` projection/query probe.
 
-- [ ] **Step 6: Run offline replay.**
+- [x] **Step 6: Run offline replay.**
 
 Unset the provider credential and use invalid PostgreSQL roots/binary paths.
 Replay must validate the completed report before any database or network
