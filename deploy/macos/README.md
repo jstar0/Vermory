@@ -77,3 +77,29 @@ URL when installing. Non-loopback and credential-bearing proxy URLs are rejected
 VERMORY_GROK_PROXY_URL=http://127.0.0.1:6152 \
   ./deploy/macos/install-grok-runtime.sh /path/to/grok /path/to/auth.json
 ```
+
+## W19 Formal Qualification
+
+The macOS formal runner reads the direct SiliconFlow credential from Keychain,
+requires a clean exact Git revision, starts a disposable PostgreSQL 18 cluster,
+and keeps the database and reports under the target Mac's Vermory application
+support directory. The credential is never accepted as a command-line flag or
+written to the report.
+
+Add or update the Keychain item interactively. Keep `-w` as the final option so
+the value is entered through the hidden prompt:
+
+```bash
+security add-generic-password -U -a "$USER" -s vermory-siliconflow -w
+```
+
+Run the profile from the exact checkout that will be reported:
+
+```bash
+VERMORY_W19_RUN_ID=w19-formal-20260717 \
+VERMORY_W19_POSTGRES_ROOT="$HOME/Library/Application Support/Vermory/evidence/w19/w19-formal-20260717/postgres" \
+  ./deploy/macos/run-w19-formal.sh
+```
+
+The runner refuses dirty worktrees, unsafe run identifiers, existing report
+paths, missing PostgreSQL 18 binaries, and missing or empty Keychain items.
