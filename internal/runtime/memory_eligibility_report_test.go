@@ -27,6 +27,7 @@ func TestMemoryEligibilityReportWritesDeterministicArtifactsAndReplays(t *testin
 	if !strings.HasSuffix(string(jsonFirst), "\n") ||
 		!strings.Contains(string(markdownFirst), "16 / 16") ||
 		!strings.Contains(string(markdownFirst), "vermory_eligibility") ||
+		!strings.Contains(string(markdownFirst), "codex-cli 0.144.3") ||
 		!strings.Contains(string(markdownFirst), "provider_unavailable") {
 		t.Fatalf("unexpected memory eligibility artifacts:\nJSON=%s\nMarkdown=%s", jsonFirst, markdownFirst)
 	}
@@ -100,7 +101,10 @@ func TestMemoryEligibilityReportRejectsInvalidArithmeticLatencyReceiptsClientsPr
 			report.Operations.Receipts = append(report.Operations.Receipts, report.Operations.Receipts[0])
 		},
 		"missing client hash": func(report *MemoryEligibilityReport) { report.RealClients[0].ArtifactSHA256 = "" },
-		"provider requests":   func(report *MemoryEligibilityReport) { report.Provider.Requests = 1 },
+		"missing Codex client": func(report *MemoryEligibilityReport) {
+			report.RealClients = report.RealClients[:2]
+		},
+		"provider requests": func(report *MemoryEligibilityReport) { report.Provider.Requests = 1 },
 		"hard gate order": func(report *MemoryEligibilityReport) {
 			report.HardGates[0], report.HardGates[1] = report.HardGates[1], report.HardGates[0]
 		},
@@ -212,6 +216,7 @@ func validMemoryEligibilityReport(mode string) MemoryEligibilityReport {
 		RealClients: []MemoryEligibilityClientEvidence{
 			{Surface: "web_chat", Client: "grok-cli", ClientVersion: "0.2.101", Model: "grok-4.5", Completed: true, EvidenceSHA256: strings.Repeat("e", 64), ArtifactSHA256: strings.Repeat("f", 64)},
 			{Surface: "mcp_workspace", Client: "grok-cli", ClientVersion: "0.2.101", Model: "grok-4.5", Completed: true, EvidenceSHA256: strings.Repeat("1", 64), ArtifactSHA256: strings.Repeat("2", 64)},
+			{Surface: "mcp_workspace", Client: "codex-cli", ClientVersion: "0.144.3", Model: "gpt-5.5", Completed: true, EvidenceSHA256: strings.Repeat("5", 64), ArtifactSHA256: strings.Repeat("6", 64)},
 		},
 		Provider:  MemoryEligibilityProviderEvidence{Claimed: formal},
 		HardGates: passingMemoryEligibilityHardGates(),

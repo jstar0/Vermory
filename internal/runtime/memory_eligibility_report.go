@@ -500,8 +500,9 @@ func validateMemoryEligibilityClients(clients []MemoryEligibilityClientEvidence)
 		return errors.New("memory eligibility real-client evidence is incomplete")
 	}
 	seen := map[string]struct{}{}
-	webChatCompleted := false
-	mcpCompleted := false
+	webChatGrokCompleted := false
+	mcpGrokCompleted := false
+	mcpCodexCompleted := false
 	for _, client := range clients {
 		key := client.Surface + "\x00" + client.Client
 		if strings.TrimSpace(client.Surface) == "" || strings.TrimSpace(client.Client) == "" ||
@@ -513,17 +514,20 @@ func validateMemoryEligibilityClients(clients []MemoryEligibilityClientEvidence)
 			return errors.New("memory eligibility real-client evidence contains duplicates")
 		}
 		seen[key] = struct{}{}
-		if client.Completed && client.Surface == "web_chat" {
-			webChatCompleted = true
+		if client.Completed && client.Surface == "web_chat" && client.Client == "grok-cli" {
+			webChatGrokCompleted = true
 		}
-		if client.Completed && client.Surface == "mcp_workspace" {
-			mcpCompleted = true
+		if client.Completed && client.Surface == "mcp_workspace" && client.Client == "grok-cli" {
+			mcpGrokCompleted = true
+		}
+		if client.Completed && client.Surface == "mcp_workspace" && client.Client == "codex-cli" {
+			mcpCodexCompleted = true
 		}
 		if client.Completed && client.FailureCode != "" {
 			return errors.New("memory eligibility completed client has a failure code")
 		}
 	}
-	if !webChatCompleted || !mcpCompleted {
+	if !webChatGrokCompleted || !mcpGrokCompleted || !mcpCodexCompleted {
 		return errors.New("memory eligibility real-client surfaces are incomplete")
 	}
 	return nil

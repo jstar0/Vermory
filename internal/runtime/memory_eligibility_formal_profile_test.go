@@ -23,6 +23,8 @@ const (
 	memoryEligibilityWebChatArtifactSHA256 = "58daaf2625869eab44508fecfcfccc9b51a06fd0a3eb95d4bc25bd22252fe350"
 	memoryEligibilityMCPEvidenceSHA256     = "cb5041363fd58c4cdeb606e5cdc454e2a3b85ab52b1c358846c52afed3f9d886"
 	memoryEligibilityMCPArtifactSHA256     = "ab97a28882afbcbb7bc7b7e78ec1f50b46494fe23c654ea15878cd1f44417a95"
+	memoryEligibilityCodexEvidenceSHA256   = "1570aa87f321e0d9f4785cc14abab0bfa684af2b490d36f59d90335dbce88cfc"
+	memoryEligibilityCodexArtifactSHA256   = "067031a5ae9c73b86a3f409236a851d1abeaa5a240b3a8b1045bdcf3c936cc1f"
 )
 
 type memoryEligibilityProfileDatabase struct {
@@ -504,6 +506,12 @@ func memoryEligibilityRealClientEvidence() []MemoryEligibilityClientEvidence {
 			EvidenceSHA256: memoryEligibilityMCPEvidenceSHA256,
 			ArtifactSHA256: memoryEligibilityMCPArtifactSHA256,
 		},
+		{
+			Surface: "mcp_workspace", Client: "codex-cli", ClientVersion: "0.144.3",
+			Model: "gpt-5.5", Completed: true,
+			EvidenceSHA256: memoryEligibilityCodexEvidenceSHA256,
+			ArtifactSHA256: memoryEligibilityCodexArtifactSHA256,
+		},
 	}
 }
 
@@ -529,7 +537,6 @@ func memoryEligibilityBaselineOutcomes() []MemoryEligibilityBaselineOutcome {
 }
 
 func memoryEligibilityFailureLedger(startedAt time.Time) []MemoryEligibilityFailure {
-	base := startedAt.Add(-10 * time.Minute)
 	entries := []struct {
 		phase, code, message string
 	}{
@@ -537,19 +544,24 @@ func memoryEligibilityFailureLedger(startedAt time.Time) []MemoryEligibilityFail
 		{"validity", "invalid_timestamp", "the first C02 validity request was rejected before a database write"},
 		{"conversation", "stale_sibling_history", "the first C02 exact-boundary replay exposed sibling assistant history and was fixed before acceptance"},
 		{"operator", "unknown_command", "a nonexistent projection rebuild command was rejected without changing authority"},
-		{"codex", "usage_limit", "the official Codex attempt stopped before MCP execution and is not counted as successful"},
+		{"codex", "usage_limit", "the first official Codex account route stopped before MCP execution; a later isolated direct-provider run completed"},
+		{"mcp_transport", "remote_command_quoting", "the initial SSH stdio command lost quoting around the socket query parameter and was corrected before acceptance"},
+		{"mcp_transport", "idle_ssh_closed", "the first direct-provider Codex run lost its idle FRP SSH transport and was repeated with bounded keepalive"},
 		{"evidence", "helper_failure", "two evidence-only helper attempts failed without changing product authority"},
 		{"profile_environment", "postgres_version_mismatch", "the first miniature profile rejected PostgreSQL 17 before migration"},
 		{"profile_schema", "public_acl_probe", "the first PUBLIC privilege probe treated PUBLIC as a role and was replaced by direct ACL inspection"},
 		{"profile_boundary", "overstrict_empty_result", "the first boundary assertion confused absence of the target with an empty retrieval result"},
 		{"profile_retrieval", "overstrict_topk_shape", "the first vector assertion confused target presence with a single-result requirement"},
+		{"profile_environment", "module_proxy_timeout", "the first full-profile preflight stopped while an uncached module proxy selected an unreachable IPv6 route"},
+		{"profile_provider", "invalid_preflight_credential", "the full 10000 fact preflight reached the direct provider gate and rejected the deliberate invalid credential"},
 		{"degradation", "provider_unavailable", "the forced embedding outage degraded to eligible lexical serving"},
 	}
+	base := startedAt.Add(-time.Duration(len(entries)) * time.Minute)
 	failures := make([]MemoryEligibilityFailure, len(entries))
 	for index, entry := range entries {
 		failures[index] = MemoryEligibilityFailure{
 			Sequence: index + 1, At: base.Add(time.Duration(index) * time.Minute),
-			Phase: entry.phase, Attempt: 1, Code: entry.code, Message: entry.message, Retried: index != 4,
+			Phase: entry.phase, Attempt: 1, Code: entry.code, Message: entry.message, Retried: true,
 		}
 	}
 	return failures

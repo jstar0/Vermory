@@ -250,6 +250,8 @@ Selected evidence:
 | after-boundary artifact | `9c543f5ac961d741be974677a77e0d3b82521bfde5e5b1fddf06ffac6d6d407f` |
 | after-boundary Codex event stream | `e0b96d1485965f14773953e69344dc642c744dd9d2145c402fb9fff00d5f7220` |
 | after-boundary final message | `6f3026096c467d0f568f3b7311fc859eac3f21ebd45437b56aafdd646ef842f4` |
+| ordered before/after event-stream aggregate | `1570aa87f321e0d9f4785cc14abab0bfa684af2b490d36f59d90335dbce88cfc` |
+| ordered before/after artifact aggregate | `067031a5ae9c73b86a3f409236a851d1abeaa5a240b3a8b1045bdcf3c936cc1f` |
 
 The raw bounded evidence and checksum manifest are stored with the other W19
 real-client evidence on the Mac mini, outside Git.
