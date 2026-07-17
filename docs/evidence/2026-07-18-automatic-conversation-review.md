@@ -9,7 +9,7 @@ Date: 2026-07-18
 | Run ID | `w22-f02-20260718-b6c6154` |
 | Frozen case | `F02-automatic-conversation-review` |
 | Fixture lock SHA-256 | `7b8556cc3ad3d52f4729aebb7fdfbbf46c89bb966c85423b53442dedafc59be2` |
-| Implementation revision | `SOURCE_HEAD_PENDING` |
+| Implementation revision | `6038cece6c9c949e5006de1f0145c11b431f2899` |
 | Vermory schema | `20` |
 | OpenClaw | `2026.6.11 / e085fa1` |
 | OpenClaw conversation model | `grok-cli/grok-4.5` |

@@ -4,7 +4,7 @@
   "run_id": "w22-f02-20260718-b6c6154",
   "case_id": "F02-automatic-conversation-review",
   "fixture_lock_sha256": "7b8556cc3ad3d52f4729aebb7fdfbbf46c89bb966c85423b53442dedafc59be2",
-  "implementation_revision": "SOURCE_HEAD_PENDING",
+  "implementation_revision": "6038cece6c9c949e5006de1f0145c11b431f2899",
   "schema_version": 20,
   "hard_gates": {
     "passed": 23,
