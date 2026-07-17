@@ -8,7 +8,7 @@ Date: 2026-07-18
 |---|---|
 | Run ID | `w22-f02-20260718-b6c6154` |
 | Frozen case | `F02-automatic-conversation-review` |
-| Fixture lock SHA-256 | `7b8556cc3ad3d52f4729aebb7fdfbbf46c89bb966c85423b53442dedafc59be2` |
+| Fixture lock SHA-256 | `e5f5762885b2372742412f7f9499f49de08c7a854d59dae4babb4875a79c8231` |
 | Implementation revision | `6038cece6c9c949e5006de1f0145c11b431f2899` |
 | Vermory schema | `20` |
 | OpenClaw | `2026.6.11 / e085fa1` |
@@ -289,6 +289,8 @@ The external evidence root retains every failed or rejected path, including:
 - the observation-sequence polling assumption;
 - the first honest Hermes formation abstention;
 - the rejected `pg_tables.forcerowsecurity` evidence query;
+- the first protected CI failure after fixture EOF normalization changed two
+  frozen bytes without regenerating the manifest and lock;
 - non-fatal package-only OpenClaw channel setup warnings.
 
 The accepted path did not delete failed evidence or reinterpret it as success.
