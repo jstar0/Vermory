@@ -113,6 +113,15 @@ expiry 与 archive 保留可审查历史，不等于 deletion；普通 working i
 单独治理后才能成为 durable memory。详见
 [记忆有效性与保留实证](docs/evidence/2026-07-16-memory-eligibility-retention.md)。
 
+W20 随后把官方 Hermes `v0.18.2` CLI 作为真实 conversation client 完成资格
+验证。两个隔离 Hermes session 在显式 Vermory link 前互不可见；link 后，直连
+硅基流动 `deepseek-ai/DeepSeek-V4-Flash` 的真实 turn 只消费一条已确认当前
+memory，并返回当前合成论文包名。reverse 后对 session B 的全新 delivery 为 0
+字节。只停止 Hermes 专用 Vermory canary 时，Hermes 仍返回可见模型答案，而
+Vermory 没有生成虚假持久化 receipt。模型审计、Mac mini 用户级 LaunchAgent
+重启、确定性发布包和隐私门均通过。详见
+[Hermes 真实客户端连续性实证](docs/evidence/2026-07-18-hermes-real-client.md)。
+
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
 ## 快速开始
@@ -250,7 +259,8 @@ UV_PROJECT_ENVIRONMENT=/tmp/vermory-hermes \
 `H01-hermes-linked-sessions` 要求真实模型调用、显式跨 session link、旧事实排除、
 reverse 后直接检查新 delivery、无关 continuity 隔离、Vermory 不可用时 Hermes
 仍返回可见答案，以及凭据泄漏数严格为 0。具体见
-[Hermes 接入指南](integrations/hermes/README.md)。
+[Hermes 接入指南](integrations/hermes/README.md)与
+[Hermes 真实客户端连续性实证](docs/evidence/2026-07-18-hermes-real-client.md)。
 
 authenticated 部署、token 生命周期、runtime role 授权、TLS 规则、RLS 验证、备份、恢复、投影重建与撤销边界见[身份授权与 PostgreSQL RLS 指南](docs/integrations/identity-authorization-rls.md)。[身份授权实证](docs/evidence/2026-07-14-identity-authorization-rls.md)包含确定性租户隔离硬门和真实 OpenClaw/Grok 认证回放；[PostgreSQL 运维恢复实证](docs/evidence/2026-07-14-postgresql-operations-recovery.md)记录原生 dump/restore、投影丢失与重建、数据库中断恢复；[PostgreSQL HA/PITR 实证](docs/evidence/2026-07-16-postgresql-ha-pitr.md)记录 streaming standby 提升、精确 LSN 恢复、历史状态隔离、投影重建和凭据再治理。
 

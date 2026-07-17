@@ -122,6 +122,16 @@ Expiry and archive preserve inspectable history and are not deletion claims;
 working input still requires separate governance before it becomes durable
 memory. See [Memory Eligibility And Retention Evidence](docs/evidence/2026-07-16-memory-eligibility-retention.md).
 
+W20 qualified the official Hermes `v0.18.2` CLI as a real conversation client.
+Two isolated Hermes sessions remained separate until an explicit Vermory link;
+after linking, a direct SiliconFlow `deepseek-ai/DeepSeek-V4-Flash` turn used
+exactly one confirmed current memory and returned the current synthetic thesis
+bundle. Reversing the link reduced a fresh session-B delivery to zero bytes.
+When only the Hermes-specific Vermory canary was stopped, Hermes still returned
+a visible model answer while Vermory recorded no false persistence receipt.
+The model audit, user-level Mac mini LaunchAgent restart, deterministic package,
+and privacy gates all passed. See [Hermes Real-Client Continuity Qualification](docs/evidence/2026-07-18-hermes-real-client.md).
+
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
 ## Architecture Direction
@@ -422,7 +432,8 @@ UV_PROJECT_ENVIRONMENT=/tmp/vermory-hermes \
 `H01-hermes-linked-sessions` case requires a real model turn, explicit
 cross-session linking, stale-fact rejection, direct post-reversal delivery
 inspection, unrelated-continuity isolation, fail-open answer availability, and
-zero credential leakage. See the [Hermes integration guide](integrations/hermes/README.md).
+zero credential leakage. See the [Hermes integration guide](integrations/hermes/README.md)
+and [real-client qualification evidence](docs/evidence/2026-07-18-hermes-real-client.md).
 
 For authenticated deployment, token lifecycle, runtime-role provisioning, TLS rules, RLS verification, backup, restore, projection rebuild, and revocation, see [Identity, Authorization, And PostgreSQL RLS](docs/integrations/identity-authorization-rls.md). The [identity evidence](docs/evidence/2026-07-14-identity-authorization-rls.md) includes deterministic tenant-isolation gates and a real authenticated OpenClaw/Grok replay; the [operations recovery evidence](docs/evidence/2026-07-14-postgresql-operations-recovery.md) records native dump/restore, projection loss/rebuild, and database outage recovery; the [HA/PITR evidence](docs/evidence/2026-07-16-postgresql-ha-pitr.md) records streaming standby promotion, exact-LSN recovery, historical-state quarantine, projection rebuild, and credential re-governance.
 

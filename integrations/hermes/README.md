@@ -107,3 +107,18 @@ The frozen `H01-hermes-linked-sessions` contract additionally requires two
 independent real Hermes sessions, explicit link and reversal evidence, direct
 post-reversal delivery inspection, fail-open model availability, and a privacy
 scan. Unit tests alone do not satisfy that contract.
+
+## Qualified Real-Client Run
+
+The accepted W20 run used official Hermes `v0.18.2`, a fresh isolated
+`HERMES_HOME` for session B, and direct SiliconFlow
+`deepseek-ai/DeepSeek-V4-Flash`. Session B received the confirmed current fact
+only after an explicit Vermory link, returned `thesis-defense-v7.zip`, and
+received zero context bytes after reversal. With only the Hermes-specific
+Vermory canary unavailable, Hermes returned `FAIL-OPEN-OK` while Vermory wrote
+no false persistence receipt. The model audit, user-level LaunchAgent restart,
+deterministic six-file package, and zero-credential-leak gates passed.
+
+See [Hermes Real-Client Continuity Qualification](../../docs/evidence/2026-07-18-hermes-real-client.md)
+for the accepted trajectory, rejected false positive, failure ledger, package
+inventory, and explicit non-claims.

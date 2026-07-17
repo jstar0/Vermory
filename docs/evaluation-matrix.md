@@ -457,6 +457,36 @@ content. This supports an orthogonal retention model based on continuity
 location, lifecycle, validity, and policy rather than one mandatory
 `retention_class`. See [the W19 evidence](evidence/2026-07-16-memory-eligibility-retention.md).
 
+## Hermes Real-Client Continuity W20
+
+W20 executes the frozen `H01-hermes-linked-sessions` case through the official
+Hermes `v0.18.2` CLI and a direct SiliconFlow
+`deepseek-ai/DeepSeek-V4-Flash` model route. This is client and continuity
+qualification, not a model ranking.
+
+| Gate | Result |
+|---|---:|
+| official Hermes CLI and real model turn | pass |
+| session B filename occurrences before link | `0` |
+| automatic cross-session merge | `0` |
+| explicit link required | pass |
+| linked current answer | `thesis-defense-v7.zip` |
+| obsolete filename presented as current | `0` |
+| unrelated Hermes/OpenClaw context in delivery | `0` |
+| client-reported model audited | `deepseek-ai/DeepSeek-V4-Flash` |
+| post-reverse context bytes | `0` |
+| fail-open visible answer | `FAIL-OPEN-OK` |
+| fail-open binding / turn delta | `0 / 0` |
+| credential leak count | `0` |
+| LaunchAgent restart and loopback listener | pass |
+| hard gates | `16 / 16 PASS` |
+
+The accepted delivery contained exactly one confirmed governed memory and no
+raw session-A transcript. The failure ledger retains an invalid
+`--oneshot --resume` false positive whose Hermes answer was nonempty while the
+Vermory delivery was empty; that attempt is explicitly rejected. See
+[the W20 evidence](evidence/2026-07-18-hermes-real-client.md).
+
 ## Projection Outbox Fault Profile W11
 
 W11 starts a disposable PostgreSQL 18 cluster and exercises the production
