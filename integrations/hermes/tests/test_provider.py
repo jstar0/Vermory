@@ -123,6 +123,28 @@ class VermoryMemoryProviderTest(unittest.TestCase):
         self.assertEqual(complete["body"]["model"], "hermes/test-model")
         self.assertEqual(provider.get_tool_schemas(), [])
 
+    def test_process_model_fallback_is_recorded_when_hook_omits_model(self):
+        os.environ["HERMES_INFERENCE_MODEL"] = "deepseek-ai/DeepSeek-V4-Flash"
+        provider = VermoryMemoryProvider()
+        provider.initialize("cli-session-model-fallback", platform="cli")
+        provider.on_turn_start(1, "Continue without model kwargs.")
+
+        provider.prefetch(
+            "Continue without model kwargs.",
+            session_id="cli-session-model-fallback",
+        )
+        provider.sync_turn(
+            "Continue without model kwargs.",
+            "Completed with the process-selected model.",
+            session_id="cli-session-model-fallback",
+        )
+
+        complete = RecordingHandler.requests[1]
+        self.assertEqual(
+            complete["body"]["model"],
+            "deepseek-ai/DeepSeek-V4-Flash",
+        )
+
     def test_gateway_anchor_survives_internal_session_switch(self):
         provider = VermoryMemoryProvider()
         provider.initialize(

@@ -205,6 +205,8 @@ func TestH01HermesCaseIsFrozen(t *testing.T) {
 	requireStrings(t, c.Manifest.Pressures,
 		"real_hermes_cli",
 		"domestic_openai_compatible_model",
+		"resume_semantics",
+		"built_in_memory_isolation",
 		"explicit_link",
 		"transcript_isolation",
 		"unrelated_continuity_isolation",

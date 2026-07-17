@@ -253,7 +253,9 @@ class VermoryMemoryProvider(MemoryProvider):
             raise ValueError("invalid Vermory timeout")
         self._timeout_seconds = timeout
         self._default_model = str(
-            config.get("model") or "hermes/unreported"
+            os.environ.get("HERMES_INFERENCE_MODEL")
+            or config.get("model")
+            or "hermes/unreported"
         ).strip()
         if not self._default_model:
             self._default_model = "hermes/unreported"

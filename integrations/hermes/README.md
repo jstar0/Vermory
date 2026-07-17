@@ -75,6 +75,19 @@ non-secret settings to `$HERMES_HOME/vermory.json`; an optional client token is
 read from `VERMORY_API_TOKEN`. URLs containing embedded credentials, query
 parameters, or fragments are rejected.
 
+Hermes currently invokes `MemoryProvider.on_turn_start` without the documented
+model keyword on its CLI path. A wrapper that already selects the model should
+also set `HERMES_INFERENCE_MODEL` in the same process so Vermory can record the
+actual client-reported model. If neither the hook, process environment, nor
+provider config reports a model, Vermory records `hermes/unreported` rather
+than guessing.
+
+For the pinned Hermes v0.18.2 CLI, top-level `--oneshot` enters the one-shot
+runner before processing `--resume`. Continuity tests must create the first
+turn normally and use `hermes chat -Q --resume <session-id> --query <prompt>`
+for the resumed turn. Using `--oneshot --resume` creates a new session and is
+not valid continuity evidence.
+
 ## Failure Behavior
 
 Prepare failures return no external context and do not block the Hermes turn.

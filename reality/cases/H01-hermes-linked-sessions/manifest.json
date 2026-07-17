@@ -4,7 +4,7 @@
   "title": "Hermes real-model cross-session continuity, reversal, isolation, and fail-open behavior",
   "evidence_level": "public",
   "continuity_lines": ["conversation", "bridge", "security"],
-  "pressures": ["real_hermes_cli", "domestic_openai_compatible_model", "new_session", "stale_fact", "explicit_link", "transcript_isolation", "unrelated_continuity_isolation", "link_reversal", "fail_open", "credential_hygiene"],
+  "pressures": ["real_hermes_cli", "domestic_openai_compatible_model", "new_session", "resume_semantics", "built_in_memory_isolation", "stale_fact", "explicit_link", "transcript_isolation", "unrelated_continuity_isolation", "link_reversal", "fail_open", "credential_hygiene"],
   "sources": [
     {
       "id": "h01-trajectory",
@@ -22,7 +22,7 @@
       "fixture_path": "fixtures/acceptance-contract.md",
       "original_ref": "vermory-design:hermes-h01",
       "original_revision": "2026-07-17",
-      "sha256": "74ab4d47591d80b7be2067dcfe04867363640f94c7517f4d761dc01d2d8570b4",
+      "sha256": "fb6d6379777ac365b13f35eb4207e793496abcddd02406912d3dbd75a99d75c4",
       "authorized": true,
       "anonymization": "All session anchors, operation identifiers, filenames, and evidence paths in the public contract are synthetic."
     }
