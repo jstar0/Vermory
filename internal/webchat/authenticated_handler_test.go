@@ -80,6 +80,19 @@ func TestAuthenticatedHandlerUsesPrincipalTenantAndRolePolicy(t *testing.T) {
 		t.Fatalf("principal tenant was not persisted: resolution=%#v err=%v", resolution, err)
 	}
 
+	hermes := performAuthenticatedJSON(t, handler, "client-a", http.MethodPost, "/v1/integrations/hermes/turns/prepare", `{
+  "operation_id":"authenticated-hermes-a",
+  "session_key":"profile:personal:thread-a",
+  "message":"continue"
+}`)
+	if hermes.Code != http.StatusOK {
+		t.Fatalf("client Hermes prepare failed: %d %s", hermes.Code, hermes.Body.String())
+	}
+	hermesResolution, err := store.ResolveConversation(context.Background(), "identity-a", runtime.ConversationAnchor{Channel: "hermes", ThreadID: "profile:personal:thread-a"})
+	if err != nil || hermesResolution.Status != runtime.ResolutionResolved {
+		t.Fatalf("authenticated Hermes anchor was not tenant-scoped: resolution=%#v err=%v", hermesResolution, err)
+	}
+
 	clientGovernance := performAuthenticatedJSON(t, handler, "client-a", http.MethodPost, "/v1/defaults/set", `{
   "operation_id":"client-default-denied",
   "key":"reply_language",

@@ -145,6 +145,67 @@ func TestOpenClawTurnEndpointsUseServerOwnedAnchorAndLifecycle(t *testing.T) {
 	}
 }
 
+func TestHermesTurnEndpointsUseHermesAnchorAndStayIsolatedFromOpenClaw(t *testing.T) {
+	handler, store := testHandler(t, nil)
+	const sessionKey = "profile:personal:thread-a"
+
+	hermesPrepare := performJSON(t, handler, http.MethodPost, "/v1/integrations/hermes/turns/prepare", `{
+  "operation_id":"hermes:http-run-1",
+  "session_key":"profile:personal:thread-a",
+  "message":"Continue the current household task."
+}`)
+	if hermesPrepare.Code != http.StatusOK {
+		t.Fatalf("Hermes prepare returned %d: %s", hermesPrepare.Code, hermesPrepare.Body.String())
+	}
+	var prepared runtime.PreparedConversationTurn
+	decodeResponse(t, hermesPrepare, &prepared)
+	if prepared.Status != runtime.ChatTurnInProgress || prepared.DeliveryID == "" {
+		t.Fatalf("unexpected Hermes prepare receipt: %#v", prepared)
+	}
+
+	hermesResolution, err := store.ResolveConversation(context.Background(), "local", runtime.ConversationAnchor{
+		Channel:  "hermes",
+		ThreadID: sessionKey,
+	})
+	if err != nil || hermesResolution.Status != runtime.ResolutionResolved {
+		t.Fatalf("Hermes anchor was not persisted: resolution=%#v err=%v", hermesResolution, err)
+	}
+
+	openClawPrepare := performJSON(t, handler, http.MethodPost, "/v1/integrations/openclaw/turns/prepare", `{
+  "operation_id":"openclaw:same-key",
+  "session_key":"profile:personal:thread-a",
+  "message":"Continue the current household task."
+}`)
+	if openClawPrepare.Code != http.StatusOK {
+		t.Fatalf("OpenClaw control prepare returned %d: %s", openClawPrepare.Code, openClawPrepare.Body.String())
+	}
+	openClawResolution, err := store.ResolveConversation(context.Background(), "local", runtime.ConversationAnchor{
+		Channel:  "openclaw",
+		ThreadID: sessionKey,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if openClawResolution.ContinuityID == hermesResolution.ContinuityID {
+		t.Fatalf("Hermes and OpenClaw anchors were merged: hermes=%s openclaw=%s", hermesResolution.ContinuityID, openClawResolution.ContinuityID)
+	}
+
+	hermesComplete := performJSON(t, handler, http.MethodPost, "/v1/integrations/hermes/turns/complete", `{
+  "operation_id":"hermes:http-run-1",
+  "session_key":"profile:personal:thread-a",
+  "answer":"The task remains scheduled for Saturday.",
+  "model":"hermes/test-model"
+}`)
+	if hermesComplete.Code != http.StatusOK {
+		t.Fatalf("Hermes complete returned %d: %s", hermesComplete.Code, hermesComplete.Body.String())
+	}
+	var completed runtime.ChatTurnReceipt
+	decodeResponse(t, hermesComplete, &completed)
+	if completed.Status != runtime.ChatTurnCompleted || completed.AssistantObservationID == "" {
+		t.Fatalf("unexpected Hermes completion receipt: %#v", completed)
+	}
+}
+
 func TestOpenClawTurnEndpointsRejectClientAuthorityAndConflictingReplay(t *testing.T) {
 	handler, _ := testHandler(t, nil)
 	for name, body := range map[string]string{

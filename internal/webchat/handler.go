@@ -38,6 +38,9 @@ func newHandler(service *runtime.ConversationService, defaults *runtime.GlobalDe
 	handler.mux.HandleFunc("POST /v1/integrations/openclaw/turns/prepare", handler.prepareOpenClawTurn)
 	handler.mux.HandleFunc("POST /v1/integrations/openclaw/turns/complete", handler.completeOpenClawTurn)
 	handler.mux.HandleFunc("POST /v1/integrations/openclaw/turns/fail", handler.failOpenClawTurn)
+	handler.mux.HandleFunc("POST /v1/integrations/hermes/turns/prepare", handler.prepareHermesTurn)
+	handler.mux.HandleFunc("POST /v1/integrations/hermes/turns/complete", handler.completeHermesTurn)
+	handler.mux.HandleFunc("POST /v1/integrations/hermes/turns/fail", handler.failHermesTurn)
 	handler.mux.HandleFunc("POST /v1/memories/confirm", handler.confirmMemory)
 	handler.mux.HandleFunc("POST /v1/memories/correct", handler.correctMemory)
 	handler.mux.HandleFunc("POST /v1/memories/forget", handler.forgetMemory)
@@ -189,13 +192,21 @@ func (h *Handler) chatTurn(response http.ResponseWriter, request *http.Request) 
 }
 
 func (h *Handler) prepareOpenClawTurn(response http.ResponseWriter, request *http.Request) {
+	h.prepareExternalTurn(response, request, "openclaw")
+}
+
+func (h *Handler) prepareHermesTurn(response http.ResponseWriter, request *http.Request) {
+	h.prepareExternalTurn(response, request, "hermes")
+}
+
+func (h *Handler) prepareExternalTurn(response http.ResponseWriter, request *http.Request, channel string) {
 	var input prepareOpenClawTurnInput
 	if !decodeRequestJSON(response, request, &input) {
 		return
 	}
 	receipt, err := h.service.PrepareExternalTurn(request.Context(), runtime.ExternalConversationTurnRequest{
 		OperationID: input.OperationID,
-		Anchor:      runtime.ConversationAnchor{Channel: "openclaw", ThreadID: input.SessionKey},
+		Anchor:      runtime.ConversationAnchor{Channel: channel, ThreadID: input.SessionKey},
 		Message:     input.Message,
 	})
 	if err != nil {
@@ -210,13 +221,21 @@ func (h *Handler) prepareOpenClawTurn(response http.ResponseWriter, request *htt
 }
 
 func (h *Handler) completeOpenClawTurn(response http.ResponseWriter, request *http.Request) {
+	h.completeExternalTurn(response, request, "openclaw")
+}
+
+func (h *Handler) completeHermesTurn(response http.ResponseWriter, request *http.Request) {
+	h.completeExternalTurn(response, request, "hermes")
+}
+
+func (h *Handler) completeExternalTurn(response http.ResponseWriter, request *http.Request, channel string) {
 	var input completeOpenClawTurnInput
 	if !decodeRequestJSON(response, request, &input) {
 		return
 	}
 	receipt, err := h.service.CompleteExternalTurn(request.Context(), runtime.CompleteExternalConversationTurnRequest{
 		OperationID: input.OperationID,
-		Anchor:      runtime.ConversationAnchor{Channel: "openclaw", ThreadID: input.SessionKey},
+		Anchor:      runtime.ConversationAnchor{Channel: channel, ThreadID: input.SessionKey},
 		Answer:      input.Answer,
 		Model:       input.Model,
 	})
@@ -228,13 +247,21 @@ func (h *Handler) completeOpenClawTurn(response http.ResponseWriter, request *ht
 }
 
 func (h *Handler) failOpenClawTurn(response http.ResponseWriter, request *http.Request) {
+	h.failExternalTurn(response, request, "openclaw")
+}
+
+func (h *Handler) failHermesTurn(response http.ResponseWriter, request *http.Request) {
+	h.failExternalTurn(response, request, "hermes")
+}
+
+func (h *Handler) failExternalTurn(response http.ResponseWriter, request *http.Request, channel string) {
 	var input failOpenClawTurnInput
 	if !decodeRequestJSON(response, request, &input) {
 		return
 	}
 	receipt, err := h.service.FailExternalTurn(request.Context(), runtime.FailExternalConversationTurnRequest{
 		OperationID:    input.OperationID,
-		Anchor:         runtime.ConversationAnchor{Channel: "openclaw", ThreadID: input.SessionKey},
+		Anchor:         runtime.ConversationAnchor{Channel: channel, ThreadID: input.SessionKey},
 		FailureCode:    input.FailureCode,
 		FailureMessage: input.FailureMessage,
 	})
