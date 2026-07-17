@@ -154,10 +154,20 @@ func buildMessages(req GenerateRequest) []openAICompatibleMsg {
 }
 
 func buildUserPrompt(req GenerateRequest) string {
-	if strings.TrimSpace(req.ContextPacket) == "" {
+	contextPacket := strings.TrimSpace(req.ContextPacket)
+	jsonSchema := strings.TrimSpace(req.JSONSchema)
+	if contextPacket == "" && jsonSchema == "" {
 		return req.Prompt
 	}
-	return "Context packet:\n" + req.ContextPacket + "\n\nTask:\n" + req.Prompt
+	sections := make([]string, 0, 3)
+	if contextPacket != "" {
+		sections = append(sections, "Context packet:\n"+req.ContextPacket)
+	}
+	sections = append(sections, "Task:\n"+req.Prompt)
+	if jsonSchema != "" {
+		sections = append(sections, "Required JSON schema:\n"+jsonSchema)
+	}
+	return strings.Join(sections, "\n\n")
 }
 
 func chatCompletionsURL(baseURL string) string {

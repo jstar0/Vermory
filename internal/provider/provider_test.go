@@ -47,6 +47,7 @@ func TestOpenAICompatibleProviderSendsDirectChatCompletionRequest(t *testing.T) 
 		Prompt:        "finish the task",
 		ContextPacket: "confirmed context packet",
 		MaxTokens:     77,
+		JSONSchema:    `{"type":"object","required":["result"]}`,
 	})
 	if err != nil {
 		t.Fatalf("Generate returned error: %v", err)
@@ -73,6 +74,9 @@ func TestOpenAICompatibleProviderSendsDirectChatCompletionRequest(t *testing.T) 
 	userContent := captured.Messages[1].Content
 	if !strings.Contains(userContent, "confirmed context packet") || !strings.Contains(userContent, "finish the task") {
 		t.Fatalf("user message did not combine packet and prompt: %q", userContent)
+	}
+	if !strings.Contains(userContent, "Required JSON schema:") || !strings.Contains(userContent, `"required":["result"]`) {
+		t.Fatalf("user message omitted the required JSON schema: %q", userContent)
 	}
 	if !json.Valid(resp.RawArtifact) {
 		t.Fatalf("raw artifact should be response JSON")
