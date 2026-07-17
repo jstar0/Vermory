@@ -19,16 +19,23 @@ provider request bodies.
 |---|---|
 | Vermory | `0.1.0-alpha.1`, revision `f8696b96a2792c11299e6ce735877d8e7e1dbd58-dirty` |
 | Vermory binary SHA-256 | `624875f615c7963836e2f5532b9bf066746a335c4e23aa544572948a77413f36` |
+| Vermory Codex replay | exact revision `1da8318b8b90f555d2d0012ac0b5513aa77c0ee0` |
+| Codex replay binary SHA-256 | `46050e2a3e45ade21fd2ce82dbf8378ffad0f390d62146cff67475cda5146ad0` |
 | PostgreSQL | `18`, schema `18`, Unix socket under `/tmp` |
 | W19 database | `vermory_w19_real_20260717` |
 | Grok CLI | `0.2.101 (5bc4b5dfadcf)` |
 | Grok binary SHA-256 | `8431538dbd99379240f558b48b779c651d668b06d793c87311ad532c4395a4e2` |
 | Grok model | `grok-4.5` |
+| Codex CLI | official `0.144.3`, isolated ephemeral runtime |
+| Codex model transport | direct DuoJie Responses API, `gpt-5.5` |
 | OpenClaw | `2026.6.11`, loopback Gateway with Vermory plugin `0.1.0` |
 
 The Grok wrapper used an isolated runtime home and the existing authenticated
 CLI state. Cross-session memory, plan mode, subagents, and web search were
-disabled. Provider traffic did not use NewAPI.
+disabled. The accepted Codex replay used the official Codex CLI with a separate
+isolated configuration and a direct DuoJie Responses transport. Neither client
+used the Mac mini NewAPI route. The model route is compatibility evidence, not
+a model ranking or promotion decision.
 
 ## G01: Task-Local Language Override
 
@@ -164,26 +171,88 @@ Selected evidence:
 | normalized runtime gates | `bbaf5adbc21dc5b6e53692d49ab9d0742b4d3b80c29f51557d06181a0c377416` |
 | local trace archive | `c9520c401a9e5f21f261f8527d4541a82b5450658b7ea6b1637e0ec83ad124b6` |
 
-## Official Codex Attempt
+## W03: Official Codex MCP Boundary Replay
 
-Official Codex CLI `0.144.3` was started with an ephemeral configuration and a
-temporary SSH-stdio Vermory MCP server. The run failed before the model could
-perform the workspace task because the authenticated ChatGPT account had
-reached its usage limit.
+Official Codex CLI `0.144.3` ran with an isolated ephemeral configuration,
+direct DuoJie `gpt-5.5`, and one temporary SSH-stdio MCP registration pointing
+to the exact Codex-replay Vermory binary above. MCP negotiation returned
+protocol `2025-06-18` and exactly two tools: `prepare_context` and
+`commit_observation`.
 
-This failure is not counted as a successful client trajectory:
+The prompt did not state the expected workspace facts. It required Codex to use
+the returned semantic context as its only authority, preserve exact technical
+strings, create one bounded artifact, verify it locally, and write the result
+back with the delivery receipt.
 
-- no repository artifact was created;
-- neither MCP tool completed;
-- no delivery was recorded;
-- no observation or proposed memory was created.
+Before the boundary, the real client completed:
 
-The retained event stream has SHA-256
-`a46b9aa453d5dca3e48c50ca31fc5d4d72d4c68da23b81985f4f5064df366d86`.
-The empty final-output file has SHA-256
-`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
-A later Codex retry must use a fresh operation ID and must independently call
-both MCP tools; the successful Grok control cannot substitute for it.
+```text
+prepare_context
+-> receive the current temporary workaround
+-> receive the durable verification command
+-> receive the durable security constraint
+-> create workspace-before-boundary.md
+-> verify every delivered constraint and reject credential syntax
+-> commit_observation
+-> retain the result as proposed
+```
+
+The bounded artifact was:
+
+```markdown
+# Workspace Boundary
+
+- Use VERMORY_CACHE_DISABLED=1 only while the temporary workaround is current.
+- .env files and secret-bearing local configuration must never be committed.
+- The durable verification command is go test -p 1 -count=1 ./....
+```
+
+After an explicit operator validity update moved the same workaround past its
+half-open eligibility boundary, a fresh Codex session completed the same MCP
+lifecycle. Its delivery and artifact retained only the two durable constraints:
+
+```markdown
+# Current Durable Constraints
+
+- The durable verification command is `go test -p 1 -count=1 ./...`.
+- .env files and secret-bearing local configuration must never be committed.
+```
+
+The second client also executed
+`GOCACHE=<disposable-workspace-cache> go test -p 1 -count=1 ./...`; the test
+passed. The cache was evidence-only and is not part of the committed artifact.
+
+PostgreSQL assertions for each accepted run showed exactly one delivery, the
+same confirmed continuity, one `agent_result` observation, the approved
+artifact source reference, and one proposed memory. Before the boundary the
+delivery contained all three eligible constraints. After the boundary it
+contained the durable verification and security constraints but not the
+workaround. Neither delivery, artifact, final message, nor event result
+contained the forgotten synthetic secret. Both write-backs remained proposed.
+
+All normalized Codex gates passed:
+
+```text
+MCP protocol and tool surface: 3 / 3 true
+before-boundary database/artifact gates: 12 / 12 true
+after-boundary database/artifact gates: 12 / 12 true
+governance: 2 proposed write-backs, 0 automatic promotion
+forgetting: deleted synthetic secret absent from both deliveries
+```
+
+Selected evidence:
+
+| Artifact | SHA-256 |
+|---|---|
+| before-boundary artifact | `4543b0538f7007ab698bbdb8669e7439db7636003271d8586af13a4ca0e486e8` |
+| before-boundary Codex event stream | `ea3ab1de2b461f542d699a299842756465f5a7c40fb22b18005170960e8ceed4` |
+| before-boundary final message | `4ccabbba0762fe9bfe58258f20bd4076d2776cd0d240d1b3ebe74b23f0fb386c` |
+| after-boundary artifact | `9c543f5ac961d741be974677a77e0d3b82521bfde5e5b1fddf06ffac6d6d407f` |
+| after-boundary Codex event stream | `e0b96d1485965f14773953e69344dc642c744dd9d2145c402fb9fff00d5f7220` |
+| after-boundary final message | `6f3026096c467d0f568f3b7311fc859eac3f21ebd45437b56aafdd646ef842f4` |
+
+The raw bounded evidence and checksum manifest are stored with the other W19
+real-client evidence on the Mac mini, outside Git.
 
 ## Preserved Failure Ledger
 
@@ -202,9 +271,23 @@ artifacts:
 4. A nonexistent `memory rebuild-projection` CLI command was attempted during
    W03 setup and rejected without changing authority. W19 lexical forget already
    updates authority and projection transactionally.
-5. The official Codex attempt stopped at the external usage-limit gate and is
-   retained as failed client evidence.
-6. Two evidence-only helper attempts failed after the successful Grok run: one
+5. The first official Codex attempt stopped at the external ChatGPT
+   usage-limit gate before a successful MCP call. Its event stream is retained
+   as failed client evidence.
+6. The initial SSH-stdio registration did not preserve quoting around the
+   PostgreSQL socket query parameter. The remote shell rejected the command;
+   an independent MCP handshake exposed the transport defect before retrying.
+7. The first direct-provider Codex run reached the model but its idle FRP SSH
+   transport closed before `prepare_context`. Three tool attempts failed. The
+   registration was corrected with bounded SSH keepalive options, then a fresh
+   session completed both tools.
+8. The accepted before-boundary run had one non-mutating discovery command
+   return no matches before the artifact existed. The later deterministic
+   artifact checks passed.
+9. The accepted after-boundary run had one concurrent exact-text check observe
+   the pre-final artifact state. The same check was repeated after the write and
+   passed, followed by a successful Go test.
+10. Two evidence-only helper attempts failed after the successful Grok run: one
    shell-quoted SQL gate command and one non-login-shell verification that could
    not resolve `go`. Neither touched product authority. The corrected SQL and
    absolute Go-path replay produced the accepted gates above.
@@ -224,5 +307,6 @@ pnpm -C integrations/openclaw build
 pnpm -C integrations/openclaw pack --dry-run
 ```
 
-These tests prove the lifecycle and transport contracts. They do not convert
-the failed official Codex attempt into a successful Codex trajectory.
+These tests prove the deterministic lifecycle and transport contracts. The
+separate event streams, artifacts, and PostgreSQL ledgers prove that the
+official Codex client also completed the real before/after-boundary trajectory.

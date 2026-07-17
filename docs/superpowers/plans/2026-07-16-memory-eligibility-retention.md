@@ -712,7 +712,7 @@ durable budget remains available
 no internal metadata exposed
 ```
 
-- [ ] **Step 6: Run the real Codex MCP workspace trajectory.**
+- [x] **Step 6: Run the real Codex MCP workspace trajectory.**
 
 Use a disposable W03 workspace and a temporary MCP registration. Require the
 official Codex CLI to call `prepare_context`, inspect the real workspace, create
