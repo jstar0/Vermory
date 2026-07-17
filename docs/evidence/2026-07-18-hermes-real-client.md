@@ -176,9 +176,10 @@ configuration, or transcript data.
 
 ## Integrity And Privacy
 
-The Mac mini evidence root contained 116 files at final normalization. The
-relative checksum manifest verified `115 / 115` entries. Key normalized hashes
-were:
+At accepted-trajectory normalization, before final documentation-delivery
+metadata was appended, the Mac mini evidence root contained 116 files and the
+relative checksum manifest verified `115 / 115` entries. The point-in-time
+trajectory hashes were:
 
 | Artifact | SHA-256 |
 |---|---|
@@ -186,6 +187,11 @@ were:
 | `failure-ledger.md` | `2dbeee92b90d3ff41e13f667c771cff2241c9ab3e4a58d313bebfb7cca3bdc58` |
 | `privacy-report.json` | `69a533b944c53002ae61e74dc9504933ea6b0b55996b41565d2f6802cedea7d8` |
 | `checksums.sha256` | `7405e685b0fbb4f88dc841234b8be0704ef3d7fd917abc6f1da73ab441bfbc84` |
+
+The external `summary.json`, privacy report, and checksum manifest are updated
+again when the final protected documentation artifact is attached. That
+delivery metadata does not alter the accepted Hermes sessions, memory,
+delivery, bridge, model answer, or failure ledger recorded above.
 
 The privacy scan covered credential token shapes, bearer authorization values,
 inline password assignments, environment files, and full environment dumps.
