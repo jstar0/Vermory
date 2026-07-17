@@ -1079,8 +1079,37 @@ func validateSourceFormationSHA256(value, label string) error {
 }
 
 func redactSourceFormationMemoryTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, memoryID string) error {
+	evidenceRows, err := tx.Query(ctx, `
+SELECT DISTINCT evidence_observation_id::text
+FROM source_formation_items
+WHERE tenant_id = $1 AND continuity_id = $2::uuid
+  AND candidate_memory_id = $3::uuid
+  AND evidence_observation_id IS NOT NULL`, tenantID, continuityID, memoryID)
+	if err != nil {
+		return fmt.Errorf("list source formation evidence observations for redaction: %w", err)
+	}
+	evidenceObservationIDs := make([]string, 0)
+	for evidenceRows.Next() {
+		var observationID string
+		if err := evidenceRows.Scan(&observationID); err != nil {
+			evidenceRows.Close()
+			return fmt.Errorf("scan source formation evidence observation for redaction: %w", err)
+		}
+		evidenceObservationIDs = append(evidenceObservationIDs, observationID)
+	}
+	if err := evidenceRows.Err(); err != nil {
+		evidenceRows.Close()
+		return fmt.Errorf("iterate source formation evidence observations for redaction: %w", err)
+	}
+	evidenceRows.Close()
+	for _, observationID := range evidenceObservationIDs {
+		if err := redactConversationObservationTx(ctx, tx, tenantID, continuityID, observationID); err != nil {
+			return err
+		}
+	}
+
 	rows, err := tx.Query(ctx, `
-SELECT run.id::text, run.active_snapshot, run.status
+SELECT run.id::text, run.active_snapshot, run.status, run.failure_code
 FROM source_formation_runs run
 WHERE run.tenant_id = $1 AND run.continuity_id = $2::uuid
   AND (
@@ -1093,21 +1122,30 @@ WHERE run.tenant_id = $1 AND run.continuity_id = $2::uuid
         AND item.run_id = run.id
         AND (item.target_memory_id = $3::uuid OR item.candidate_memory_id = $3::uuid)
     )
+    OR (
+      run.input_kind = 'conversation'
+      AND EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(run.input_manifest) manifest
+        WHERE manifest->>'id' = ANY($4::text[])
+      )
+    )
   )
-FOR UPDATE`, tenantID, continuityID, memoryID)
+FOR UPDATE`, tenantID, continuityID, memoryID, evidenceObservationIDs)
 	if err != nil {
 		return fmt.Errorf("list source formation audit rows for redaction: %w", err)
 	}
 	type affectedRun struct {
-		id       string
-		snapshot []SourceMatchCandidate
-		status   SourceFormationStatus
+		id          string
+		snapshot    []SourceMatchCandidate
+		status      SourceFormationStatus
+		failureCode string
 	}
 	affected := make([]affectedRun, 0)
 	for rows.Next() {
 		var run affectedRun
 		var snapshotJSON []byte
-		if err := rows.Scan(&run.id, &snapshotJSON, &run.status); err != nil {
+		if err := rows.Scan(&run.id, &snapshotJSON, &run.status, &run.failureCode); err != nil {
 			rows.Close()
 			return fmt.Errorf("scan source formation audit row for redaction: %w", err)
 		}
@@ -1149,34 +1187,6 @@ WHERE observation.tenant_id = $1
   )`, tenantID, continuityID, run.id, memoryID); err != nil {
 			return fmt.Errorf("redact source formation observations: %w", err)
 		}
-		evidenceRows, err := tx.Query(ctx, `
-SELECT DISTINCT evidence_observation_id::text
-FROM source_formation_items
-WHERE tenant_id = $1 AND continuity_id = $2::uuid AND run_id = $3::uuid
-  AND candidate_memory_id = $4::uuid
-  AND evidence_observation_id IS NOT NULL`, tenantID, continuityID, run.id, memoryID)
-		if err != nil {
-			return fmt.Errorf("list source formation evidence observations for redaction: %w", err)
-		}
-		evidenceObservationIDs := make([]string, 0)
-		for evidenceRows.Next() {
-			var observationID string
-			if err := evidenceRows.Scan(&observationID); err != nil {
-				evidenceRows.Close()
-				return fmt.Errorf("scan source formation evidence observation for redaction: %w", err)
-			}
-			evidenceObservationIDs = append(evidenceObservationIDs, observationID)
-		}
-		if err := evidenceRows.Err(); err != nil {
-			evidenceRows.Close()
-			return fmt.Errorf("iterate source formation evidence observations for redaction: %w", err)
-		}
-		evidenceRows.Close()
-		for _, observationID := range evidenceObservationIDs {
-			if err := redactConversationObservationTx(ctx, tx, tenantID, continuityID, observationID); err != nil {
-				return err
-			}
-		}
 		if _, err := tx.Exec(ctx, `
 UPDATE source_formation_items
 SET quote = '[redacted]',
@@ -1188,7 +1198,7 @@ WHERE tenant_id = $1 AND continuity_id = $2::uuid AND run_id = $3::uuid
 			return fmt.Errorf("redact source formation items: %w", err)
 		}
 		status := run.status
-		failureCode := ""
+		failureCode := run.failureCode
 		reason := "[redacted]"
 		completePending := false
 		if run.status == SourceFormationPending {

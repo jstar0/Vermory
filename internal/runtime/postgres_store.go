@@ -745,14 +745,13 @@ FOR UPDATE`, memoryID, tenantID, continuityID).Scan(&lifecycleStatus, &originObs
 	if len(afterTargetLock) > 0 && afterTargetLock[0] != nil {
 		afterTargetLock[0]()
 	}
-	if lifecycleStatus == "deleted" {
-		return nil
-	}
-	if _, err := tx.Exec(ctx, `
+	if lifecycleStatus != "deleted" {
+		if _, err := tx.Exec(ctx, `
 UPDATE governed_memories
 SET lifecycle_status = 'deleted', content = '[redacted]', updated_at = now()
 WHERE id = $1::uuid`, memoryID); err != nil {
-		return fmt.Errorf("redact governed memory: %w", err)
+			return fmt.Errorf("redact governed memory: %w", err)
+		}
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM memory_search_documents WHERE memory_id = $1::uuid`, memoryID); err != nil {
 		return fmt.Errorf("remove deleted search document: %w", err)

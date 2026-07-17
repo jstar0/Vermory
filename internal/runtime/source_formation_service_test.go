@@ -482,6 +482,18 @@ func TestConversationFormationServiceCompletesF01Lifecycle(t *testing.T) {
 	if !replay.Replayed || replay.ID != initial.ID || len(llm.calls) != 1 {
 		t.Fatalf("formation replay was not idempotent: first=%#v replay=%#v calls=%d", initial, replay, len(llm.calls))
 	}
+	llm.response.Output = fmt.Sprintf(`{"candidates":[{"decision":"new","memory_key":"maintenance.access.invalid_audit","source_observation_id":%q,"quote":"The temporary access code is CEDAR-4826.","occurrence":"single","content":"The temporary access code is CEDAR-4826.","reason":"invalid provider audit"}],"reason":"invalid provider audit CEDAR-4826"}`, code.UserObservationID)
+	failedAudit, err := formation.FormConversation(ctx, ConversationFormationRequest{
+		OperationID:    "f01-formation-failed-audit",
+		Anchor:         anchor,
+		ObservationIDs: []string{code.UserObservationID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failedAudit.Status != SourceFormationFailed || failedAudit.FailureCode != "invalid_provider_output" || !strings.Contains(failedAudit.ProviderOutput, "CEDAR-4826") {
+		t.Fatalf("failed formation audit fixture was not persisted: %#v", failedAudit)
+	}
 
 	for index, item := range initial.Items {
 		if _, err := conversation.AcceptCandidate(ctx, ReviewConversationCandidateRequest{
@@ -599,6 +611,26 @@ func TestConversationFormationServiceCompletesF01Lifecycle(t *testing.T) {
 	}
 	if strings.Contains(string(encodedFormation), "CEDAR-4826") || !strings.Contains(string(encodedFormation), "[redacted]") {
 		t.Fatalf("formation audit retained forgotten code: %s", encodedFormation)
+	}
+	if _, err := store.pool.Exec(ctx, `
+UPDATE source_formation_runs
+SET provider_output = '{"stale":"CEDAR-4826"}', reason = 'stale failed audit CEDAR-4826'
+WHERE tenant_id = $1 AND id = $2::uuid`, tenantID, failedAudit.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversation.Forget(ctx, ForgetConversationMemoryRequest{
+		OperationID: "f01-forget-code-repair",
+		Anchor:      anchor,
+		MemoryID:    codeMemory.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	failedAuditInspection, err := formation.InspectConversationFormation(ctx, anchor, failedAudit.OperationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failedAuditInspection.ProviderOutput != "[redacted]" || strings.Contains(failedAuditInspection.Reason, "CEDAR-4826") {
+		t.Fatalf("failed formation provider audit retained forgotten code: %#v", failedAuditInspection)
 	}
 	for _, query := range []string{"CEDAR-4826", "temporary access code", "cedar style visit credential"} {
 		matches, err := store.SearchActiveMemory(ctx, tenantID, initial.ContinuityID, query, 10)
