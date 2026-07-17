@@ -831,7 +831,7 @@ Unset the provider credential and use invalid PostgreSQL roots/binary paths.
 Replay must validate the completed report before any database or network
 startup and preserve artifact bytes.
 
-- [ ] **Step 7: Commit the profile and report layer.**
+- [x] **Step 7: Commit the profile and report layer.**
 
 ```bash
 git add internal/runtime/memory_eligibility_*
@@ -926,7 +926,7 @@ git commit -m "docs: record memory eligibility evidence"
 - Produces: clean final checklist head, protected CI, independently verified
   release artifact and synthetic merge, and exactly one W19 PR section.
 
-- [ ] **Step 1: Run formatting and complete local gates.**
+- [x] **Step 1: Run formatting and complete local gates.**
 
 ```bash
 gofmt -w $(rg --files cmd/vermory internal -g '*.go')
@@ -960,7 +960,7 @@ pnpm -C integrations/openclaw pack --dry-run
 
 Expected: PASS with no unintentional diff.
 
-- [ ] **Step 2: Verify operations and release build.**
+- [x] **Step 2: Verify operations and release build.**
 
 Run schema-18 migration replay, immediate-stop recovery, dump/restore,
 projection rebuild, trimpath migration outside the repository, GoReleaser
