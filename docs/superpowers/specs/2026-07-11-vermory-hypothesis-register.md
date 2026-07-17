@@ -88,14 +88,13 @@ The system may adopt fewer kinds, multi-label facets, structured attributes, or 
 
 ### H-007: Retention classes
 
-- Status: `testing`
-- Candidate concepts: working, continuity-durable, and global-default retention.
-- Reason: same-session usefulness, continuity reuse, and cross-context defaults have different promotion and expiry risks.
-- Experiment 0 signal: `G01-language-default-local-override` requires a local English override to expire without rewriting a stable Chinese default; `S01-deletion-and-source-injection` rejects promotion from an untrusted source into Global Defaults.
-- Evidence artifact: `artifacts/experiment-0/experiment-0-v1/report.json` and `report.md` under the same run directory.
-- Evidence needed: positive and negative promotion, expiry, and deletion cases across all three continuity lines.
-- Falsifier: retention is better expressed by policy, validity, and continuity without a separate class.
-- Decision gate: after same-session and global-default experiments.
+- Status: `supported` with an orthogonal representation; no separate `retention_class` column adopted.
+- Decision: distinguish request-local working input, workspace continuity, conversation continuity, and thin Global Defaults by location and promotion policy; represent current reuse separately through lifecycle state and half-open temporal validity.
+- Reason: same-session usefulness, continuity reuse, and cross-context defaults have different promotion and expiry risks, but W19 represented those differences without forcing one multi-purpose class label.
+- Accepted evidence: W19 ran 10,000 governed memories and 320 scoped queries with 16/16 hard gates, zero scheduled/expired/archived/deleted misuse, zero Global Default pollution, and real Grok Web Chat, Grok MCP, and Codex MCP trajectories.
+- Evidence artifact: `docs/evidence/2026-07-16-memory-eligibility-retention.md` and `docs/evidence/snapshots/2026-07-16-memory-eligibility-retention.json`.
+- Falsifier: a real cross-deployment, privacy, legal-retention, or erasure requirement cannot be represented by continuity location, lifecycle, validity, source authority, and policy without introducing contradictory exceptions.
+- Remaining boundary: this does not accept a universal compliance or deletion policy; expiry and archive remain explicitly different from deletion.
 
 ### H-008: Lifecycle state machine
 

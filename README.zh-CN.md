@@ -101,6 +101,18 @@ incumbent 与 authority。直连硅基流动 `Qwen/Qwen3-Embedding-4B` 用两次
 返回并实际使用 2,560 维。candidate 仍未 promotion，lexical 仍是默认。
 详见 [Active-Backlog 维度迁移实证](docs/evidence/2026-07-16-active-backlog-dimensional-migration.md)。
 
+W19 随后把“当前是否可用”与“历史是否保留”分开完成资格验证。正式
+PostgreSQL 18 profile 在 4 个 tenant、20 条 continuity 中创建 10,000 条
+governed memory，完成 `320 / 320` 次 scoped query，返回全部 4,000 条当前
+事实；scheduled 提前使用、expired/archived/deleted 误用、Global Default
+污染和 cross-scope 泄漏均为 0。projection rebuild、immediate restart 与
+restore 保持有效状态 fingerprint 一致，forgotten 内容没有复活。报告同时
+绑定真实 Grok Web Chat、Grok MCP 和官方 Codex MCP 轨迹；直连硅基流动
+`BAAI/bge-m3` 用两次请求返回并使用 1,024 维。16 个 hard gate 全部通过。
+expiry 与 archive 保留可审查历史，不等于 deletion；普通 working input 仍需
+单独治理后才能成为 durable memory。详见
+[记忆有效性与保留实证](docs/evidence/2026-07-16-memory-eligibility-retention.md)。
+
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
 ## 快速开始

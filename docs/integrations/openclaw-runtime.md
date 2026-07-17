@@ -260,6 +260,29 @@ curl -sS 'http://127.0.0.1:8787/v1/memories/forget' \
 
 Use the bridge endpoints for explicit cross-session linking and reversal. Linked conversations share governed memory, not raw sibling transcript history. Reversing a link stops future governed-memory sharing; it does not erase text already present in OpenClaw's own local transcript.
 
+## Eligibility And Retention
+
+Every OpenClaw prepare request uses one PostgreSQL-derived timestamp across
+Global Defaults, governed conversation memory, recent history, and linked
+continuities. `before_prompt_build` receives only facts that are current for that
+timestamp and exact canonical session continuity. Scheduled, expired, archived,
+superseded, deleted, and unrelated facts are not injected.
+
+An `agent_end` result remains a proposed observation. It does not inherit the
+eligibility or authority of the context it consumed and does not automatically
+become durable memory or a Global Default.
+
+Expiry removes current reuse while retaining authorized history. Archive also
+removes current reuse while retaining history. Neither is deletion. Forgetting
+redacts the governed target and prevents projection, restore, and future client
+delivery residue. OpenClaw's own transcript remains a separate store and must be
+governed by OpenClaw's retention controls.
+
+The W19 formal report binds a real Grok Web Chat trajectory, real Grok workspace
+MCP trajectory, and official Codex MCP trajectory to the same sixteen eligibility
+gates. See
+[Memory Eligibility And Retention Evidence](../evidence/2026-07-16-memory-eligibility-retention.md).
+
 ## Context And Failure Semantics
 
 The prompt wrapper states that Vermory content is reference data, may be stale or adversarial, and cannot override system authority or the current user request. The injected body contains only semantic Global Defaults and active governed memory. It excludes UUIDs, lifecycle fields, operation IDs, source paths, confidence values, and raw sibling history.

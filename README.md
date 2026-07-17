@@ -109,6 +109,19 @@ SiliconFlow `Qwen/Qwen3-Embedding-4B` probe returned and used 2,560 dimensions
 in two requests. The candidate remains unpromoted and lexical remains default.
 See [Active-Backlog Dimensional Migration Evidence](docs/evidence/2026-07-16-active-backlog-dimensional-migration.md).
 
+W19 then qualified current-use eligibility independently from durable history.
+The formal PostgreSQL 18 profile created 10,000 governed memories across four
+tenants and twenty continuities, completed `320 / 320` scoped queries, returned
+all 4,000 current facts, and produced zero scheduled, expired, archived,
+deleted, Global Default, or cross-scope misuse. Projection rebuild, immediate
+restart, and restore preserved effective fingerprints without reviving
+forgotten content. Real Grok Web Chat, Grok MCP, and official Codex MCP
+trajectories were bound into the report; a direct SiliconFlow `BAAI/bge-m3`
+probe used 1,024 dimensions in exactly two requests. All sixteen gates passed.
+Expiry and archive preserve inspectable history and are not deletion claims;
+working input still requires separate governance before it becomes durable
+memory. See [Memory Eligibility And Retention Evidence](docs/evidence/2026-07-16-memory-eligibility-retention.md).
+
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
 ## Architecture Direction

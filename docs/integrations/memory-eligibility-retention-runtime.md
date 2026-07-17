@@ -37,6 +37,32 @@ isolated configuration and a direct DuoJie Responses transport. Neither client
 used the Mac mini NewAPI route. The model route is compatibility evidence, not
 a model ranking or promotion decision.
 
+## Formal Qualification
+
+The accepted formal profile is `w19-formal-2e97280-20260717-v1` at exact
+implementation revision `2e9728043cc2c4f39e296fd2612c23299c5a541f`.
+PostgreSQL `18.3` with pgvector `0.8.5` created 10,000 governed memories across
+four tenants and twenty continuities. All `320 / 320` scoped queries completed;
+all 4,000 current facts were returned; scheduled, expired, archived, deleted,
+Global Default, and cross-scope misuse were zero. All sixteen hard gates passed.
+
+The profile bound the real Grok Web Chat, Grok MCP, and official Codex MCP hashes
+below, then performed one direct SiliconFlow `BAAI/bge-m3` projection/query probe
+at 1,024 dimensions and exactly two requests. The normalized report contains
+only provider response hashes, not raw bodies or vectors.
+
+Report hashes:
+
+| Artifact | SHA-256 |
+|---|---|
+| JSON | `a61ddbcd2f5c49a7843ad206b694b38b13027739574e68abc54a487e45b47e0d` |
+| Markdown | `c5a2d0f6798470488b1c6e15338a6efc331cd6f4ea29947c8d2a2459a9d43005` |
+
+With the provider credential unset and invalid PostgreSQL paths, offline replay
+validated the report before database or network startup and preserved both
+hashes. See
+[Memory Eligibility And Retention Evidence](../evidence/2026-07-16-memory-eligibility-retention.md).
+
 ## G01: Task-Local Language Override
 
 The real Web Chat service ran against the W19 database with the authenticated

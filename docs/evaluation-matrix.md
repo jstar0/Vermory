@@ -423,6 +423,40 @@ qualifies mechanics and recovery for the named class; it does not rank models,
 measure half-precision quality, or promote the candidate. See
 [the W17 evidence](evidence/2026-07-16-active-backlog-dimensional-migration.md).
 
+## Memory Eligibility And Retention W19
+
+W19 evaluates current-use eligibility separately from durable history. The
+formal profile created 10,000 governed memories across four tenants and twenty
+continuities, then ran 320 production-shaped scoped queries through the shared
+runtime.
+
+| Gate | Result |
+|---|---:|
+| current facts returned | `4,000 / 4,000` |
+| scoped queries | `320 / 320` successful |
+| query p50 / p95 / p99 | `23 / 40 / 53 ms` |
+| scheduled premature use | `0` |
+| expired / archived misuse | `0 / 0` |
+| deletion residue | `0` |
+| Global Default pollution | `0` |
+| cross-scope leakage | `0` |
+| lexical / vector eligible rows | `7,000 / 7,000` |
+| provider model / dimensions / requests | `BAAI/bge-m3 / 1024 / 2` |
+| hard gates | `16 / 16 PASS` |
+
+The frozen four-task baseline produced `0/4` success without context, `1/4`
+with full history, `2/4` with lifecycle-only filtering, and `4/4` with Vermory
+eligibility. Full history made six invalid reuses and lifecycle-only filtering
+made three; Vermory eligibility made zero while delivering four memories in 48
+context tokens. These are deterministic case outcomes, not a model-judge score.
+
+The accepted report binds real Grok Web Chat, Grok MCP, and official Codex MCP
+artifacts. Rebuild, restart, restore, idempotency, conflict rejection, concurrent
+forget, and provider-outage degradation all passed without reviving ineligible
+content. This supports an orthogonal retention model based on continuity
+location, lifecycle, validity, and policy rather than one mandatory
+`retention_class`. See [the W19 evidence](evidence/2026-07-16-memory-eligibility-retention.md).
+
 ## Projection Outbox Fault Profile W11
 
 W11 starts a disposable PostgreSQL 18 cluster and exercises the production

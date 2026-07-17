@@ -130,6 +130,28 @@ Workspace deliveries remain attached to the resolved workspace continuity. Conve
 - workspace source import creates workspace-scoped memory only.
 - neither path can silently promote data into Global Defaults.
 
+## Temporal Eligibility
+
+Global Defaults are durable only after their stronger governance action. A
+task-local instruction remains working input and takes precedence for that task
+without rewriting the stored default.
+
+At context assembly time, the runtime obtains one PostgreSQL timestamp and uses
+it for Global Defaults, workspace or conversation memory, recent history, and
+bridge-derived context. Scheduled defaults are not visible before `valid_from`;
+expired defaults are not visible at or after `valid_until`; archived,
+superseded, and deleted defaults are also excluded from current use.
+
+Expiry preserves authorized inspection history and is not deletion. Archive
+also preserves history and is not deletion. `forget` remains the operation that
+redacts the targeted semantic content and prevents it from returning through
+normal context, projection rebuild, or restored delivery history.
+
+W19 confirmed that a local English instruction did not mutate the stable
+Chinese Global Default, while all current-use surfaces applied the same
+eligibility boundary. See
+[Memory Eligibility And Retention Evidence](../evidence/2026-07-16-memory-eligibility-retention.md).
+
 ## Acceptance Cases
 
 Automated acceptance covers:
