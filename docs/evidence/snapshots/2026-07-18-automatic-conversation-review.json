@@ -85,5 +85,44 @@
     "credential_hits": 0,
     "sudo_used": false,
     "provider_credentials_persisted": false
+  },
+  "protected_delivery": {
+    "failed_run": {
+      "run_id": 29618465089,
+      "job_id": 88008485535,
+      "reason": "normalized_fixtures_not_refrozen"
+    },
+    "source_head": "3e1f7b9c9a0e6eb5de902db96ec0c28218f54bcb",
+    "run_id": 29618745068,
+    "job_id": 88009318831,
+    "conclusion": "success",
+    "artifact": {
+      "id": 8421515213,
+      "name": "vermory-pr-snapshot-53f16117762ab05cf26f56f33524b102604f5637",
+      "bytes": 21753983,
+      "sha256": "6b4600fa4c7b5c59d94fd2f73f9f84f5e030c9e99bd554291ef0f3b854cf2772"
+    },
+    "synthetic_merge": {
+      "revision": "53f16117762ab05cf26f56f33524b102604f5637",
+      "verified": true,
+      "reason": "valid",
+      "second_parent": "3e1f7b9c9a0e6eb5de902db96ec0c28218f54bcb"
+    },
+    "packages": {
+      "go_archives": 4,
+      "go_archive_files_each": 4,
+      "linux_static_archives": 2,
+      "darwin_arm64_execution": true,
+      "openclaw_sha256": "dc3f2489b3a3260739d0675d75c238c25dbdf83cb2b35e75e72baa063f220c63",
+      "openclaw_entries": 14,
+      "hermes_sha256": "c06b4112161c07be1dc4e2f8b858e28801a5c7345a315fefbb57c92313d9c7b9",
+      "hermes_files": 6,
+      "hermes_sidecar": true,
+      "privacy_hits": 0
+    },
+    "mac_mini_manifest": {
+      "entries": 43,
+      "sha256": "9146537930fc97894fe342c5fd20ada7ac4118eb26a5442bd794cf91ba588e92"
+    }
   }
 }

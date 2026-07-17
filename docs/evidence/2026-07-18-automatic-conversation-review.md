@@ -291,6 +291,12 @@ The external evidence root retains every failed or rejected path, including:
 - the rejected `pg_tables.forcerowsecurity` evidence query;
 - the first protected CI failure after fixture EOF normalization changed two
   frozen bytes without regenerating the manifest and lock;
+- the first artifact metadata verifier passed `-trimpath=true` to `grep`
+  without `--`, so the pattern was parsed as an option;
+- the first package verifier inherited W21's twelve-entry OpenClaw inventory
+  even though W22 intentionally adds `governance.js` and `governance.d.ts`;
+- two PR-body orchestration cleanup failures that happened outside product
+  execution and did not alter the accepted artifact or runtime evidence;
 - non-fatal package-only OpenClaw channel setup warnings.
 
 The accepted path did not delete failed evidence or reinterpret it as success.
@@ -311,6 +317,63 @@ The checksum manifest passed full verification. Its SHA-256 is:
 The OpenClaw package contains fourteen files: six JavaScript files, six TypeScript
 declarations, `openclaw.plugin.json`, and `package.json`. It contains no tests,
 dependency tree, environment file, token, or user state.
+
+## Protected Delivery
+
+The first protected run, `29618465089` / job `88008485535`, failed after two
+F02 fixture files were normalized without regenerating the frozen manifest and
+lock. The scenario semantics were unchanged; the fixtures were refrozen under
+lock SHA-256
+`e5f5762885b2372742412f7f9499f49de08c7a854d59dae4babb4875a79c8231`.
+The failure remains in the public and Mac mini ledgers.
+
+Protected CI then passed on exact source head
+`3e1f7b9c9a0e6eb5de902db96ec0c28218f54bcb`:
+
+| Field | Value |
+|---|---|
+| Run / job | `29618745068` / `88009318831` |
+| Conclusion | `SUCCESS` in `5m4s` |
+| Artifact | `8421515213` |
+| Artifact name | `vermory-pr-snapshot-53f16117762ab05cf26f56f33524b102604f5637` |
+| Artifact bytes | `21,753,983` |
+| API and streamed ZIP SHA-256 | `6b4600fa4c7b5c59d94fd2f73f9f84f5e030c9e99bd554291ef0f3b854cf2772` |
+| Synthetic merge | `53f16117762ab05cf26f56f33524b102604f5637` |
+| Merge verification | `verified=true`, `reason=valid` |
+| Synthetic merge second parent | exact source head `3e1f7b9c9a0e6eb5de902db96ec0c28218f54bcb` |
+
+The independently streamed artifact remained on the Mac mini. Verification
+proved:
+
+- all four release checksums and exact four-file Go archive layouts;
+- expected `GOOS` / `GOARCH`, `CGO_ENABLED=0`, `-trimpath=true`,
+  `vcs.modified=false`, and the synthetic merge revision;
+- static Linux amd64 and arm64 binaries;
+- real Darwin arm64 execution of `version` and
+  `conversation-formation-worker --help`;
+- OpenClaw package SHA-256
+  `dc3f2489b3a3260739d0675d75c238c25dbdf83cb2b35e75e72baa063f220c63`
+  with the exact fourteen-entry inventory;
+- Hermes package SHA-256
+  `c06b4112161c07be1dc4e2f8b858e28801a5c7345a315fefbb57c92313d9c7b9`,
+  an exact six-file inventory, and a passing sidecar;
+- zero package credential-pattern, sensitive-name, or local-runtime-path
+  hits.
+
+The protected-delivery checksum manifest covers `43` files. Its SHA-256 is:
+
+```text
+9146537930fc97894fe342c5fd20ada7ac4118eb26a5442bd794cf91ba588e92
+```
+
+The accepted protected evidence remains under:
+
+```text
+~/Library/Application Support/Vermory/evidence/
+  w22-automatic-conversation-review/
+  w22-f02-20260718-b6c6154/
+  protected-delivery-3e1f7b9-29618745068
+```
 
 ## Scope
 
