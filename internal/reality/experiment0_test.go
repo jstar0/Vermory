@@ -17,15 +17,15 @@ func TestBuildExperiment0ReportsFrozenPublicCoverage(t *testing.T) {
 	if !report.Pass || !report.PublicValidation.Pass {
 		t.Fatalf("expected public evidence to pass: %#v", report)
 	}
-	if len(report.PublicValidation.Results) != 15 {
-		t.Fatalf("expected fifteen cases, got %d", len(report.PublicValidation.Results))
+	if len(report.PublicValidation.Results) != 16 {
+		t.Fatalf("expected sixteen cases, got %d", len(report.PublicValidation.Results))
 	}
 	for _, result := range report.PublicValidation.Results {
 		if result.LockSHA256 == "" {
 			t.Fatalf("case %s has no fixture lock hash", result.CaseID)
 		}
 	}
-	if len(report.ContinuityCoverage[string(LineWorkspace)]) != 4 || len(report.ContinuityCoverage[string(LineConversation)]) != 10 {
+	if len(report.ContinuityCoverage[string(LineWorkspace)]) != 4 || len(report.ContinuityCoverage[string(LineConversation)]) != 11 {
 		t.Fatalf("unexpected continuity coverage: %#v", report.ContinuityCoverage)
 	}
 	if len(report.ContinuityCoverage[string(LineBridge)]) != 6 {
@@ -34,7 +34,7 @@ func TestBuildExperiment0ReportsFrozenPublicCoverage(t *testing.T) {
 	if len(report.PressureCoverage["explicit_deletion"]) != 1 {
 		t.Fatalf("expected deletion pressure coverage: %#v", report.PressureCoverage)
 	}
-	if report.EvidenceLevels[string(EvidencePublic)] != 15 || report.SealedStatus != "unavailable" {
+	if report.EvidenceLevels[string(EvidencePublic)] != 16 || report.SealedStatus != "unavailable" {
 		t.Fatalf("unexpected evidence status: levels=%#v sealed=%q", report.EvidenceLevels, report.SealedStatus)
 	}
 	if !containsText(report.Limitations, "target discovery coverage remains incomplete") {
@@ -48,6 +48,19 @@ func TestBuildExperiment0ReportsFrozenPublicCoverage(t *testing.T) {
 	}
 	if got := report.HypothesisSignals["hermes_client_seed"]; len(got) != 1 || got[0] != "H01-hermes-linked-sessions" {
 		t.Fatalf("unexpected Hermes client seed: %#v", got)
+	}
+	if got := report.HypothesisSignals["H-005"]; len(got) != 4 ||
+		got[0] != "C01-device-maintenance-continuity" ||
+		got[1] != "F03-verified-tool-outcome-formation" ||
+		got[2] != "S01-deletion-and-source-injection" ||
+		got[3] != "W01-synapseloom-continuity" {
+		t.Fatalf("unexpected revision hypothesis signal: %#v", got)
+	}
+	if got := report.HypothesisSignals["H-008"]; len(got) != 3 ||
+		got[0] != "C01-device-maintenance-continuity" ||
+		got[1] != "F03-verified-tool-outcome-formation" ||
+		got[2] != "S01-deletion-and-source-injection" {
+		t.Fatalf("unexpected lifecycle hypothesis signal: %#v", got)
 	}
 	if got := report.HypothesisSignals["H-007"]; len(got) != 4 ||
 		got[0] != "C02-housing-viewing-validity" ||

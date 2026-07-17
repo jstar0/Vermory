@@ -113,8 +113,8 @@ func TestLoadMinimumV1MainCaseMatrix(t *testing.T) {
 		loaded++
 	}
 
-	if loaded < 15 {
-		t.Fatalf("expected at least 15 V1 main cases, got %d", loaded)
+	if loaded < 16 {
+		t.Fatalf("expected at least 16 V1 main cases, got %d", loaded)
 	}
 }
 
