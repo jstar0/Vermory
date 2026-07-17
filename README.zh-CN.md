@@ -207,7 +207,7 @@ Web Chat、shadow 字节等价、cursor lag、HTTP 503、vector 清空重建、R
 
 ## 发布产物
 
-每个 Pull Request 都会生成保留 7 天的可下载 snapshot，包括带 SHA-256 校验的 `linux/amd64`、`linux/arm64`、`darwin/amd64`、`darwin/arm64` 归档，以及独立的 `@vermory/openclaw` 包。每个 Go 归档固定包含 `vermory`、`LICENSE`、`README.md` 和 `README.zh-CN.md`。
+每个 Pull Request 都会生成保留 7 天的可下载 snapshot，包括带 SHA-256 校验的 `linux/amd64`、`linux/arm64`、`darwin/amd64`、`darwin/arm64` 归档，以及独立的 `@vermory/openclaw` 包和确定性的 `vermory-hermes-0.1.0.tar.gz` provider 包。每个 Go 归档固定包含 `vermory`、`LICENSE`、`README.md` 和 `README.zh-CN.md`。
 
 ```bash
 vermory version
@@ -227,6 +227,30 @@ PATH="/opt/homebrew/opt/node@24/bin:$PATH" \
 ```
 
 loopback 部署、OpenClaw trust 配置、runtime inspection、确认/纠正/删除、显式 link、故障语义、隔离状态重放和卸载步骤见 [OpenClaw 运行接入指南](docs/integrations/openclaw-runtime.md)。
+
+## Hermes 接入
+
+Hermes 的 `vermory` `MemoryProvider` 使用 Hermes 持久化的 CLI 或 gateway
+session 标识：在模型 turn 前准备当前有效的治理上下文，在 turn 完成后记录用户与
+助手 observation。确认、纠正、删除和桥接仍由 Vermory 显式治理接口负责，不暴露
+为模型工具。不同 Hermes session 默认隔离，只有操作者显式 link 后才共享 governed
+memory。
+
+以下命令把 uv 环境放在 `/tmp`，并禁止 Python bytecode 污染工作区：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 \
+UV_PROJECT_ENVIRONMENT=/tmp/vermory-hermes \
+  uv run --project integrations/hermes --locked \
+  python -m unittest discover -s integrations/hermes/tests -v
+```
+
+`integrations/hermes/package.sh` 生成确定性的
+`vermory-hermes-0.1.0.tar.gz` 发布包。冻结案例
+`H01-hermes-linked-sessions` 要求真实模型调用、显式跨 session link、旧事实排除、
+reverse 后直接检查新 delivery、无关 continuity 隔离、Vermory 不可用时 Hermes
+仍返回可见答案，以及凭据泄漏数严格为 0。具体见
+[Hermes 接入指南](integrations/hermes/README.md)。
 
 authenticated 部署、token 生命周期、runtime role 授权、TLS 规则、RLS 验证、备份、恢复、投影重建与撤销边界见[身份授权与 PostgreSQL RLS 指南](docs/integrations/identity-authorization-rls.md)。[身份授权实证](docs/evidence/2026-07-14-identity-authorization-rls.md)包含确定性租户隔离硬门和真实 OpenClaw/Grok 认证回放；[PostgreSQL 运维恢复实证](docs/evidence/2026-07-14-postgresql-operations-recovery.md)记录原生 dump/restore、投影丢失与重建、数据库中断恢复；[PostgreSQL HA/PITR 实证](docs/evidence/2026-07-16-postgresql-ha-pitr.md)记录 streaming standby 提升、精确 LSN 恢复、历史状态隔离、投影重建和凭据再治理。
 

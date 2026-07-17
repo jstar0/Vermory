@@ -32,6 +32,24 @@ The default service intentionally listens only on loopback. Remote clients
 should use SSH stdio or an operator-controlled SSH tunnel instead of exposing
 the unauthenticated local Web Chat profile to a LAN or public network.
 
+Run an independent loopback instance without replacing the stable binary or
+sharing log files by setting a separate label, tenant, listen address, install
+path, and log basename:
+
+```bash
+VERMORY_TENANT_ID=hermes-canary \
+VERMORY_LISTEN=127.0.0.1:8789 \
+VERMORY_PROVIDER=external \
+VERMORY_LAUNCHD_LABEL=org.vermory.hermes-canary \
+VERMORY_INSTALL_BINARY="$HOME/.vermory/vermory-hermes/vermory" \
+VERMORY_LOG_BASENAME=hermes-canary \
+  ./deploy/macos/install-user-service.sh /path/to/vermory
+```
+
+Every install path must remain inside the current user's home directory. The
+installer only operates in the user's `gui/<uid>` launchd domain and never
+invokes `sudo`.
+
 ## OpenClaw Gateway
 
 After installing dependencies and building `integrations/openclaw`, install the

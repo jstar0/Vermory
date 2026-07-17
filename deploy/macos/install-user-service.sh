@@ -26,6 +26,9 @@ esac
 case "$TENANT_ID" in
   *[!A-Za-z0-9._-]*|'') echo "invalid VERMORY_TENANT_ID" >&2; exit 2 ;;
 esac
+case "$LABEL" in
+  *[!A-Za-z0-9._-]*|'') echo "invalid VERMORY_LAUNCHD_LABEL" >&2; exit 2 ;;
+esac
 case "$LISTEN" in
   127.0.0.1:[0-9]*|localhost:[0-9]*) ;;
   *) echo "VERMORY_LISTEN must be loopback" >&2; exit 2 ;;
@@ -35,12 +38,24 @@ BIN_DIR="$HOME/.local/bin"
 APP_DIR="$HOME/Library/Application Support/Vermory"
 LOG_DIR="$HOME/Library/Logs/Vermory"
 LAUNCH_AGENTS="$HOME/Library/LaunchAgents"
-INSTALL_BINARY="$BIN_DIR/vermory"
+INSTALL_BINARY=${VERMORY_INSTALL_BINARY:-"$BIN_DIR/vermory"}
+LOG_BASENAME=${VERMORY_LOG_BASENAME:-$LABEL}
 PLIST_PATH="$LAUNCH_AGENTS/$LABEL.plist"
 DATABASE_URL="postgresql:///$DATABASE_NAME?host=/tmp"
 USER_DOMAIN="gui/$(id -u)"
 
-/usr/bin/install -d -m 0755 "$BIN_DIR" "$APP_DIR" "$LOG_DIR" "$LAUNCH_AGENTS"
+case "$INSTALL_BINARY" in
+  "$HOME"/*) ;;
+  *) echo "VERMORY_INSTALL_BINARY must be inside HOME" >&2; exit 2 ;;
+esac
+case "$INSTALL_BINARY" in
+  */../*|*/./*|*/..|*/.) echo "VERMORY_INSTALL_BINARY must not contain dot path segments" >&2; exit 2 ;;
+esac
+case "$LOG_BASENAME" in
+  *[!A-Za-z0-9._-]*|'') echo "invalid VERMORY_LOG_BASENAME" >&2; exit 2 ;;
+esac
+
+/usr/bin/install -d -m 0755 "$(dirname "$INSTALL_BINARY")" "$APP_DIR" "$LOG_DIR" "$LAUNCH_AGENTS"
 /usr/bin/install -m 0755 "$SOURCE_BINARY" "$INSTALL_BINARY.new"
 /bin/mv "$INSTALL_BINARY.new" "$INSTALL_BINARY"
 
@@ -89,9 +104,9 @@ cat >"$TEMP_PLIST" <<EOF
   <key>ThrottleInterval</key>
   <integer>5</integer>
   <key>StandardOutPath</key>
-  <string>$LOG_DIR/web-chat.stdout.log</string>
+  <string>$LOG_DIR/$LOG_BASENAME.stdout.log</string>
   <key>StandardErrorPath</key>
-  <string>$LOG_DIR/web-chat.stderr.log</string>
+  <string>$LOG_DIR/$LOG_BASENAME.stderr.log</string>
 </dict>
 </plist>
 EOF
@@ -119,5 +134,5 @@ done
 
 echo "Vermory did not become healthy at $HEALTH_URL" >&2
 /bin/launchctl print "$USER_DOMAIN/$LABEL" >&2 || true
-/usr/bin/tail -n 80 "$LOG_DIR/web-chat.stderr.log" >&2 || true
+/usr/bin/tail -n 80 "$LOG_DIR/$LOG_BASENAME.stderr.log" >&2 || true
 exit 1

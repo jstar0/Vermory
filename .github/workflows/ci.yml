@@ -42,6 +42,9 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: integrations/openclaw/pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: 0.11.28
       - name: Install PostgreSQL 18 client tools
         run: |
           sudo install -d -m 0755 /usr/share/postgresql-common/pgdg
@@ -87,6 +90,15 @@ jobs:
         run: pnpm -C integrations/openclaw check
       - name: Verify OpenClaw package
         run: pnpm -C integrations/openclaw pack --dry-run
+      - name: Test Hermes integration without workspace pollution
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          UV_PROJECT_ENVIRONMENT: /tmp/vermory-hermes-ci
+        run: |
+          uv run --project integrations/hermes --locked --python 3.12 \
+            python -m unittest discover -s integrations/hermes/tests -v
+          test ! -e integrations/hermes/.venv
+          test -z "$(find integrations/hermes -type d -name __pycache__ -print -quit)"
       - name: Build release snapshot
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
@@ -95,6 +107,29 @@ jobs:
           args: release --snapshot --clean --skip=publish --config .goreleaser.yaml
       - name: Pack OpenClaw release artifact
         run: pnpm -C integrations/openclaw pack --pack-destination ../../dist
+      - name: Pack and verify deterministic Hermes release artifact
+        run: |
+          integrations/hermes/package.sh /tmp/hermes-package-a
+          integrations/hermes/package.sh /tmp/hermes-package-b
+          cmp \
+            /tmp/hermes-package-a/vermory-hermes-0.1.0.tar.gz \
+            /tmp/hermes-package-b/vermory-hermes-0.1.0.tar.gz
+          cmp \
+            /tmp/hermes-package-a/vermory-hermes-0.1.0.tar.gz.sha256 \
+            /tmp/hermes-package-b/vermory-hermes-0.1.0.tar.gz.sha256
+          (cd /tmp/hermes-package-a && sha256sum --check vermory-hermes-0.1.0.tar.gz.sha256)
+          tar -tzf /tmp/hermes-package-a/vermory-hermes-0.1.0.tar.gz \
+            | grep -v '/$' | sort > /tmp/hermes-package.actual
+          cat > /tmp/hermes-package.expected <<'EOF'
+          vermory-hermes-0.1.0/LICENSE
+          vermory-hermes-0.1.0/integrations/hermes/README.md
+          vermory-hermes-0.1.0/integrations/hermes/pyproject.toml
+          vermory-hermes-0.1.0/integrations/hermes/uv.lock
+          vermory-hermes-0.1.0/integrations/hermes/vermory/__init__.py
+          vermory-hermes-0.1.0/integrations/hermes/vermory/plugin.yaml
+          EOF
+          diff -u /tmp/hermes-package.expected /tmp/hermes-package.actual
+          cp /tmp/hermes-package-a/vermory-hermes-0.1.0.tar.gz* dist/
       - name: Upload release snapshot
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -103,6 +138,7 @@ jobs:
             dist/*.tar.gz
             dist/checksums.txt
             dist/*.tgz
+            dist/vermory-hermes-*.sha256
           if-no-files-found: error
           retention-days: 7
       - name: Verify clean diff

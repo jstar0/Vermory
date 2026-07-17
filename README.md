@@ -314,15 +314,16 @@ or scale qualification. See
 [Production Retrieval Runtime Evidence](docs/evidence/2026-07-14-production-retrieval-runtime.md).
 
 See [CI Release Gates Evidence](docs/evidence/2026-07-14-ci-release-gates.md)
-for the clean-runner PostgreSQL, race, release-build, and OpenClaw pull-request
-gates.
+for the clean-runner PostgreSQL, race, release-build, OpenClaw, and Hermes
+pull-request gates.
 
 ## Release Packaging
 
 Every pull request now builds a seven-day downloadable snapshot containing
 checksummed `linux/amd64`, `linux/arm64`, `darwin/amd64`, and `darwin/arm64`
-archives plus the independent `@vermory/openclaw` package. Each Go archive
-contains `vermory`, `LICENSE`, `README.md`, and `README.zh-CN.md`.
+archives plus the independent `@vermory/openclaw` package and deterministic
+`vermory-hermes-0.1.0.tar.gz` provider package. Each Go archive contains
+`vermory`, `LICENSE`, `README.md`, and `README.zh-CN.md`.
 
 ```bash
 vermory version
@@ -397,6 +398,31 @@ PATH="/opt/homebrew/opt/node@24/bin:$PATH" \
 ```
 
 See the [OpenClaw runtime integration guide](docs/integrations/openclaw-runtime.md) for loopback deployment, trust configuration, runtime inspection, governance actions, failure behavior, isolated-state replay, and uninstall steps.
+
+## Hermes Integration
+
+The `vermory` Hermes `MemoryProvider` uses Hermes' durable CLI or gateway
+session identity. It prepares governed context before a turn and records the
+completed user/assistant lifecycle afterward, while keeping confirmation,
+correction, deletion, and bridge operations outside model tools. Independent
+Hermes sessions remain isolated unless an operator explicitly links them.
+
+Run the provider tests without writing a virtual environment or Python bytecode
+into the repository:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 \
+UV_PROJECT_ENVIRONMENT=/tmp/vermory-hermes \
+  uv run --project integrations/hermes --locked \
+  python -m unittest discover -s integrations/hermes/tests -v
+```
+
+`integrations/hermes/package.sh` produces the deterministic
+`vermory-hermes-0.1.0.tar.gz` release artifact. The frozen
+`H01-hermes-linked-sessions` case requires a real model turn, explicit
+cross-session linking, stale-fact rejection, direct post-reversal delivery
+inspection, unrelated-continuity isolation, fail-open answer availability, and
+zero credential leakage. See the [Hermes integration guide](integrations/hermes/README.md).
 
 For authenticated deployment, token lifecycle, runtime-role provisioning, TLS rules, RLS verification, backup, restore, projection rebuild, and revocation, see [Identity, Authorization, And PostgreSQL RLS](docs/integrations/identity-authorization-rls.md). The [identity evidence](docs/evidence/2026-07-14-identity-authorization-rls.md) includes deterministic tenant-isolation gates and a real authenticated OpenClaw/Grok replay; the [operations recovery evidence](docs/evidence/2026-07-14-postgresql-operations-recovery.md) records native dump/restore, projection loss/rebuild, and database outage recovery; the [HA/PITR evidence](docs/evidence/2026-07-16-postgresql-ha-pitr.md) records streaming standby promotion, exact-LSN recovery, historical-state quarantine, projection rebuild, and credential re-governance.
 

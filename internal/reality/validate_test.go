@@ -181,6 +181,55 @@ func TestO01OpenClawCaseIsFrozen(t *testing.T) {
 	}
 }
 
+func TestH01HermesCaseIsFrozen(t *testing.T) {
+	c, err := LoadCase("../../reality/cases/H01-hermes-linked-sessions")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ValidateCase(c); len(got) != 0 {
+		t.Fatalf("expected valid H01 case, got violations: %#v", got)
+	}
+
+	for _, expected := range []ContinuityLine{LineConversation, LineBridge, LineSecurity} {
+		found := false
+		for _, line := range c.Manifest.ContinuityLines {
+			if line == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("H01 does not declare continuity line %q: %#v", expected, c.Manifest.ContinuityLines)
+		}
+	}
+	requireStrings(t, c.Manifest.Pressures,
+		"real_hermes_cli",
+		"domestic_openai_compatible_model",
+		"explicit_link",
+		"transcript_isolation",
+		"unrelated_continuity_isolation",
+		"link_reversal",
+		"fail_open",
+		"credential_hygiene",
+	)
+	for _, anchor := range []string{
+		"session:<runtime-session-a>",
+		"session:<runtime-session-b>",
+		"session:<unrelated-session-c>",
+	} {
+		found := false
+		for _, candidate := range c.Manifest.Anchors {
+			if candidate.Value == anchor && !candidate.Ambiguous {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("missing unambiguous H01 anchor %q", anchor)
+		}
+	}
+}
+
 func TestI01AuthenticatedMultiTenantCaseIsFrozen(t *testing.T) {
 	c, err := LoadCase("../../reality/cases/I01-authenticated-multitenant-rls")
 	if err != nil {

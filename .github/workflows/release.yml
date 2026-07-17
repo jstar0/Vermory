@@ -30,8 +30,18 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: integrations/openclaw/pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: 0.11.28
       - name: Install OpenClaw integration dependencies
         run: pnpm -C integrations/openclaw install --frozen-lockfile
+      - name: Test Hermes integration
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          UV_PROJECT_ENVIRONMENT: /tmp/vermory-hermes-release
+        run: >-
+          uv run --project integrations/hermes --locked --python 3.12
+          python -m unittest discover -s integrations/hermes/tests -v
       - name: Build release snapshot
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
@@ -40,6 +50,8 @@ jobs:
           args: release --snapshot --clean --skip=publish --config .goreleaser.yaml
       - name: Pack OpenClaw release artifact
         run: pnpm -C integrations/openclaw pack --pack-destination ../../dist
+      - name: Pack Hermes release artifact
+        run: integrations/hermes/package.sh dist
       - name: Upload release snapshot
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -48,6 +60,7 @@ jobs:
             dist/*.tar.gz
             dist/checksums.txt
             dist/*.tgz
+            dist/vermory-hermes-*.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -73,8 +86,18 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: integrations/openclaw/pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: 0.11.28
       - name: Install OpenClaw integration dependencies
         run: pnpm -C integrations/openclaw install --frozen-lockfile
+      - name: Test Hermes integration
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+          UV_PROJECT_ENVIRONMENT: /tmp/vermory-hermes-release
+        run: >-
+          uv run --project integrations/hermes --locked --python 3.12
+          python -m unittest discover -s integrations/hermes/tests -v
       - name: Publish Go archives and checksums
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
@@ -85,10 +108,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Pack OpenClaw release artifact
         run: pnpm -C integrations/openclaw pack --pack-destination ../../dist
+      - name: Pack Hermes release artifact
+        run: integrations/hermes/package.sh dist
       - name: Attach OpenClaw package to draft release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$GITHUB_REF_NAME" dist/*.tgz --clobber
+      - name: Attach Hermes package to draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          gh release upload "$GITHUB_REF_NAME"
+          dist/vermory-hermes-*.tar.gz
+          dist/vermory-hermes-*.sha256
+          --clobber
       - name: Upload release workflow artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -97,5 +130,6 @@ jobs:
             dist/*.tar.gz
             dist/checksums.txt
             dist/*.tgz
+            dist/vermory-hermes-*.sha256
           if-no-files-found: error
           retention-days: 7

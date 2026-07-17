@@ -577,6 +577,95 @@ func TestO01OpenClawContinuityAcceptance(t *testing.T) {
 	}
 }
 
+func TestH01HermesLinkedSessionsAcceptance(t *testing.T) {
+	caseDir := filepath.Join("..", "..", "reality", "cases", "H01-hermes-linked-sessions")
+	manifest := loadFrozenManifest(t, filepath.Join(caseDir, "manifest.json"))
+	if manifest.ID != "H01-hermes-linked-sessions" {
+		t.Fatalf("unexpected H01 manifest: %#v", manifest)
+	}
+
+	const (
+		tenantID   = "h01"
+		model      = "deepseek-ai/DeepSeek-V4-Flash"
+		current    = "thesis-defense-v7.zip"
+		obsolete   = "thesis-defense-v6.zip"
+		rawMarker  = "SESSION_A_RAW_TRANSCRIPT_MARKER"
+		sessionAID = "session:h01-runtime-a"
+		sessionBID = "session:h01-runtime-b"
+	)
+	ctx := context.Background()
+	anchorA := runtime.ConversationAnchor{Channel: "hermes", ThreadID: sessionAID}
+	anchorB := runtime.ConversationAnchor{Channel: "hermes", ThreadID: sessionBID}
+	anchorC := runtime.ConversationAnchor{Channel: "hermes", ThreadID: "session:h01-unrelated-c"}
+	openClawSameRawKey := runtime.ConversationAnchor{Channel: "openclaw", ThreadID: sessionAID}
+
+	store := openAcceptanceStore(t, true)
+	service := runtime.NewConversationService(store, tenantID, nil, "", runtime.ConversationServiceConfig{})
+	bridges := runtime.NewBridgeService(store, tenantID)
+	handler := NewHandlerWithGovernance(service, runtime.NewGlobalDefaultsService(store, tenantID), bridges)
+
+	statement := "The current thesis upload bundle is " + current + "; " + obsolete + " is obsolete."
+	turnA := runHermesTurn(t, handler, "h01-session-a", sessionAID, statement, "Confirmed. "+rawMarker, model)
+	confirmed := confirmObservation(t, handler, "h01-confirm-session-a", conversationInput{
+		Channel: anchorA.Channel, ThreadID: anchorA.ThreadID,
+	}, turnA.UserObservationID)
+	if confirmed.MemoryID == "" || confirmed.Status != "active" {
+		t.Fatalf("H01 did not confirm the exact user fact: %#v", confirmed)
+	}
+
+	_ = runHermesTurn(t, handler, "h01-session-b-neutral", sessionBID, "Start a separate neutral thesis planning session.", "Session B is ready.", model)
+	inspectionB, err := service.Inspect(ctx, anchorB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedB, err := json.Marshal(inspectionB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encodedB), current) || strings.Contains(string(encodedB), obsolete) {
+		t.Fatalf("H01 session B transcript contained a thesis filename before linking: %s", encodedB)
+	}
+
+	unrelated := prepareHermesTurn(t, handler, "h01-unrelated", anchorC.ThreadID, "What is the current thesis upload filename?")
+	openClaw := prepareOpenClawTurn(t, handler, "h01-openclaw-same-key", openClawSameRawKey.ThreadID, "What is the current thesis upload filename?")
+	for name, packet := range map[string]string{"unrelated Hermes": unrelated.Context, "same-key OpenClaw": openClaw.Context} {
+		if strings.Contains(packet, current) || strings.Contains(packet, obsolete) {
+			t.Fatalf("H01 %s continuity leaked the thesis fact: %s", name, packet)
+		}
+	}
+
+	linked, err := bridges.LinkConversations(ctx, runtime.LinkConversationsRequest{
+		OperationID: "h01-link-a-b",
+		Primary:     anchorA,
+		Linked:      anchorB,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	linkedDelivery := prepareHermesTurn(t, handler, "h01-session-b-linked", sessionBID, "What is the exact current thesis upload filename?")
+	for _, expected := range []string{"Governed memory:", current, obsolete + " is obsolete"} {
+		if !strings.Contains(linkedDelivery.Context, expected) {
+			t.Fatalf("H01 linked delivery missing %q: %s", expected, linkedDelivery.Context)
+		}
+	}
+	for _, forbidden := range []string{"Recent conversation:", rawMarker} {
+		if strings.Contains(linkedDelivery.Context, forbidden) {
+			t.Fatalf("H01 linked delivery pooled raw transcript %q: %s", forbidden, linkedDelivery.Context)
+		}
+	}
+	_ = completeHermesTurn(t, handler, "h01-session-b-linked", sessionBID, "The current upload bundle is "+current+"; "+obsolete+" remains obsolete.", model)
+
+	if _, err := bridges.Reverse(ctx, runtime.ReverseBridgeRequest{OperationID: "h01-reverse-a-b", BridgeID: linked.ID}); err != nil {
+		t.Fatal(err)
+	}
+	separated := prepareHermesTurn(t, handler, "h01-session-b-separated", sessionBID, "What is the exact current thesis upload filename?")
+	for _, forbidden := range []string{current, obsolete, rawMarker} {
+		if strings.Contains(separated.Context, forbidden) {
+			t.Fatalf("H01 reversed link still delivered %q: %s", forbidden, separated.Context)
+		}
+	}
+}
+
 type frozenManifest struct {
 	ID   string `json:"id"`
 	Task struct {
@@ -806,11 +895,37 @@ func postChatTurn(t *testing.T, handler http.Handler, operationID string, anchor
 
 func runOpenClawTurn(t *testing.T, handler http.Handler, operationID, sessionKey, message, answer, model string) runtime.ChatTurnReceipt {
 	t.Helper()
-	_ = prepareOpenClawTurn(t, handler, operationID, sessionKey, message)
-	return completeOpenClawTurn(t, handler, operationID, sessionKey, answer, model)
+	_ = prepareExternalTurn(t, handler, "openclaw", operationID, sessionKey, message)
+	return completeExternalTurn(t, handler, "openclaw", operationID, sessionKey, answer, model)
 }
 
 func prepareOpenClawTurn(t *testing.T, handler http.Handler, operationID, sessionKey, message string) runtime.PreparedConversationTurn {
+	t.Helper()
+	return prepareExternalTurn(t, handler, "openclaw", operationID, sessionKey, message)
+}
+
+func completeOpenClawTurn(t *testing.T, handler http.Handler, operationID, sessionKey, answer, model string) runtime.ChatTurnReceipt {
+	t.Helper()
+	return completeExternalTurn(t, handler, "openclaw", operationID, sessionKey, answer, model)
+}
+
+func runHermesTurn(t *testing.T, handler http.Handler, operationID, sessionKey, message, answer, model string) runtime.ChatTurnReceipt {
+	t.Helper()
+	_ = prepareExternalTurn(t, handler, "hermes", operationID, sessionKey, message)
+	return completeExternalTurn(t, handler, "hermes", operationID, sessionKey, answer, model)
+}
+
+func prepareHermesTurn(t *testing.T, handler http.Handler, operationID, sessionKey, message string) runtime.PreparedConversationTurn {
+	t.Helper()
+	return prepareExternalTurn(t, handler, "hermes", operationID, sessionKey, message)
+}
+
+func completeHermesTurn(t *testing.T, handler http.Handler, operationID, sessionKey, answer, model string) runtime.ChatTurnReceipt {
+	t.Helper()
+	return completeExternalTurn(t, handler, "hermes", operationID, sessionKey, answer, model)
+}
+
+func prepareExternalTurn(t *testing.T, handler http.Handler, integration, operationID, sessionKey, message string) runtime.PreparedConversationTurn {
 	t.Helper()
 	payload, err := json.Marshal(map[string]string{
 		"operation_id": operationID,
@@ -820,16 +935,16 @@ func prepareOpenClawTurn(t *testing.T, handler http.Handler, operationID, sessio
 	if err != nil {
 		t.Fatal(err)
 	}
-	response := performJSON(t, handler, http.MethodPost, "/v1/integrations/openclaw/turns/prepare", string(payload))
+	response := performJSON(t, handler, http.MethodPost, "/v1/integrations/"+integration+"/turns/prepare", string(payload))
 	if response.Code != http.StatusOK {
-		t.Fatalf("OpenClaw prepare %s failed: %d %s", operationID, response.Code, response.Body.String())
+		t.Fatalf("%s prepare %s failed: %d %s", integration, operationID, response.Code, response.Body.String())
 	}
 	var receipt runtime.PreparedConversationTurn
 	decodeResponse(t, response, &receipt)
 	return receipt
 }
 
-func completeOpenClawTurn(t *testing.T, handler http.Handler, operationID, sessionKey, answer, model string) runtime.ChatTurnReceipt {
+func completeExternalTurn(t *testing.T, handler http.Handler, integration, operationID, sessionKey, answer, model string) runtime.ChatTurnReceipt {
 	t.Helper()
 	payload, err := json.Marshal(map[string]string{
 		"operation_id": operationID,
@@ -840,9 +955,9 @@ func completeOpenClawTurn(t *testing.T, handler http.Handler, operationID, sessi
 	if err != nil {
 		t.Fatal(err)
 	}
-	response := performJSON(t, handler, http.MethodPost, "/v1/integrations/openclaw/turns/complete", string(payload))
+	response := performJSON(t, handler, http.MethodPost, "/v1/integrations/"+integration+"/turns/complete", string(payload))
 	if response.Code != http.StatusOK {
-		t.Fatalf("OpenClaw complete %s failed: %d %s", operationID, response.Code, response.Body.String())
+		t.Fatalf("%s complete %s failed: %d %s", integration, operationID, response.Code, response.Body.String())
 	}
 	var receipt runtime.ChatTurnReceipt
 	decodeResponse(t, response, &receipt)

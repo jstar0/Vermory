@@ -40,7 +40,8 @@ VERMORY_HERMES_PROXY=http://127.0.0.1:6152 \
 The runner installs under `$HOME/.vermory/hermes`, never invokes `sudo`, uses
 the official staged installer to skip Node/browser/desktop dependencies and the
 interactive provider wizard, and verifies the exact upstream revision. Then
-copy the provider into the active `HERMES_HOME`:
+copy the provider from the repository or extracted release package into the
+active `HERMES_HOME`:
 
 ```bash
 mkdir -p "${HERMES_HOME:-$HOME/.hermes}/plugins/vermory"
@@ -48,6 +49,18 @@ cp integrations/hermes/vermory/__init__.py \
   integrations/hermes/vermory/plugin.yaml \
   "${HERMES_HOME:-$HOME/.hermes}/plugins/vermory/"
 ```
+
+Build the deterministic release package from a clean committed revision:
+
+```bash
+integrations/hermes/package.sh dist
+tar -tzf dist/vermory-hermes-0.1.0.tar.gz
+(cd dist && shasum -a 256 -c vermory-hermes-0.1.0.tar.gz.sha256)
+```
+
+The archive contains the repository license and the exact Hermes provider
+source, metadata, lock file, and integration guide. It contains no virtual
+environment, bytecode, credentials, user configuration, or transcript data.
 
 Start a loopback Vermory service with the external-provider mode, then select
 the provider:
@@ -71,6 +84,13 @@ bounded to 256 KiB, and raw HTTP bodies or credentials are never logged.
 ## Verify
 
 ```bash
-uv run --project integrations/hermes python -m unittest discover \
+PYTHONDONTWRITEBYTECODE=1 \
+UV_PROJECT_ENVIRONMENT=/tmp/vermory-hermes \
+uv run --project integrations/hermes --locked python -m unittest discover \
   -s integrations/hermes/tests -v
 ```
+
+The frozen `H01-hermes-linked-sessions` contract additionally requires two
+independent real Hermes sessions, explicit link and reversal evidence, direct
+post-reversal delivery inspection, fail-open model availability, and a privacy
+scan. Unit tests alone do not satisfy that contract.
