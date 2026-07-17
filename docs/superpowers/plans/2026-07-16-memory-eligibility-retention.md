@@ -807,7 +807,7 @@ VERMORY_W19_ARTIFACT_ROOT=/tmp/vermory-w19-mini \
 
 Expected: PASS with no direct-provider claim.
 
-- [ ] **Step 5: Run the full formal profile with direct provider proof.**
+- [x] **Step 5: Run the full formal profile with direct provider proof.**
 
 Use a fresh database and artifact root. The API key remains in the established
 environment variable and is never echoed.
@@ -857,12 +857,12 @@ git commit -m "test: add memory eligibility formal profile"
 - Produces: committed evidence, H-007 decision, user/operator documentation,
   and explicit non-claims.
 
-- [ ] **Step 1: Copy only normalized report evidence.**
+- [x] **Step 1: Copy only normalized report evidence.**
 
 Verify source report hashes before copying. Do not copy raw client transcripts,
 provider responses, database paths, credentials, or vectors.
 
-- [ ] **Step 2: Write the evidence narrative.**
+- [x] **Step 2: Write the evidence narrative.**
 
 Separate:
 
@@ -875,20 +875,20 @@ Separate:
 
 State clearly that expiry is not deletion and archive is not deletion.
 
-- [ ] **Step 3: Update H-007 only from accepted evidence.**
+- [x] **Step 3: Update H-007 only from accepted evidence.**
 
 If all gates pass, change H-007 to supported with the orthogonal interpretation
 from the design. Record the evidence artifact, falsifier, and remaining
 cross-deployment/privacy-policy boundaries. Do not mark a generic compliance
 or universal retention policy accepted.
 
-- [ ] **Step 4: Update README, evaluation matrix, and integration docs.**
+- [x] **Step 4: Update README, evaluation matrix, and integration docs.**
 
 Describe user-visible behavior and commands without exposing internal field
 names in normal product copy. Developer/operator sections may describe
 validity, archive, audit, and `eligibility_as_of`.
 
-- [ ] **Step 5: Run evidence scans and validate arithmetic.**
+- [x] **Step 5: Run evidence scans and validate arithmetic.**
 
 ```bash
 rg -n -i \
@@ -901,7 +901,7 @@ rg -n -i \
 Expected: no secret/private-path matches. Manually verify counts, gates,
 failure ordering, artifact hashes, and baseline outcomes against the manifest.
 
-- [ ] **Step 6: Commit normalized evidence.**
+- [x] **Step 6: Commit normalized evidence.**
 
 ```bash
 git add docs/evidence/2026-07-16-memory-eligibility-retention.md \
@@ -968,7 +968,7 @@ v2.17.0 config check and four-platform snapshot, four archive checksums/layouts,
 OpenClaw 12-entry package, Darwin arm64 `version` and
 `memory set-validity --help`, and static Linux binary inspection.
 
-- [ ] **Step 3: Mark completed checkboxes and commit the checklist.**
+- [x] **Step 3: Mark completed checkboxes and commit the checklist.**
 
 Do not mark a checkbox until its command and expected result have fresh
 evidence.
