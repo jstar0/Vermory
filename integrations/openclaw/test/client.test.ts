@@ -144,6 +144,94 @@ describe("VermoryClient", () => {
     ]);
   });
 
+  it("uses an operator token for scoped review and governance requests", async () => {
+	const requests: Array<{ method: string; path: string; authorization?: string; body?: unknown }> = [];
+	await withServer(async (request, response) => {
+		const body = request.method === "POST" ? JSON.parse(await readRequest(request)) : undefined;
+		requests.push({
+			method: request.method ?? "",
+			path: request.url ?? "",
+			...(request.headers.authorization ? { authorization: request.headers.authorization } : {}),
+			...(body === undefined ? {} : { body }),
+		});
+		if (request.url?.startsWith("/v1/memories/candidates?")) {
+			writeJSON(response, {
+				resolution: { status: "resolved", continuity_id: "continuity-a", channel: "openclaw", thread_id: "agent:main:a", created: false },
+				candidates: [{
+					candidate_memory_id: "11111111-1111-1111-1111-111111111111",
+					memory_key: "submission.bundle.current",
+					content: "The bundle is thesis-defense-v7.zip.",
+					source_quote: "The bundle is thesis-defense-v7.zip.",
+					source_observation_id: "22222222-2222-2222-2222-222222222222",
+					decision: "new",
+					created_at: "2026-07-18T00:00:00Z",
+				}],
+			});
+			return;
+		}
+		if (request.url?.startsWith("/v1/conversations/inspect?")) {
+			writeJSON(response, {
+				resolution: { status: "resolved", continuity_id: "continuity-a", channel: "openclaw", thread_id: "agent:main:a", created: false },
+				observations: [{ id: "private-observation", content: "must not be returned by the client" }],
+				memories: [{
+					id: "33333333-3333-3333-3333-333333333333",
+					memory_key: "submission.deadline.current",
+					lifecycle_status: "active",
+					content: "The deadline is Wednesday at 12:00.",
+					effective_state: "eligible",
+				}, {
+					id: "66666666-6666-6666-6666-666666666666",
+					lifecycle_status: "active",
+					content: "A directly confirmed unkeyed memory.",
+					effective_state: "eligible",
+				}],
+			});
+			return;
+		}
+		writeJSON(response, {
+			observation: { observation_id: "44444444-4444-4444-4444-444444444444", replayed: false },
+			memory: {
+				memory_id: request.url?.endsWith("/correct")
+					? "55555555-5555-5555-5555-555555555555"
+					: String((body as Record<string, unknown>).candidate_memory_id ?? (body as Record<string, unknown>).memory_id),
+				status: request.url?.endsWith("/reject") ? "rejected" : request.url?.endsWith("/forget") ? "deleted" : "active",
+				replayed: false,
+			},
+		});
+	}, async (baseUrl) => {
+		const client = new VermoryClient({ baseUrl, timeoutMs: 1000, apiToken: TEST_API_TOKEN });
+		const inbox = await client.listCandidates("agent:main:a");
+		expect(inbox.candidates).toHaveLength(1);
+		expect(inbox.candidates[0]?.sourceQuote).toBe("The bundle is thesis-defense-v7.zip.");
+		const memories = await client.listCurrentMemories("agent:main:a");
+		expect(memories).toEqual([{
+			memoryId: "33333333-3333-3333-3333-333333333333",
+			memoryKey: "submission.deadline.current",
+			content: "The deadline is Wednesday at 12:00.",
+		}, {
+			memoryId: "66666666-6666-6666-6666-666666666666",
+			memoryKey: "memory",
+			content: "A directly confirmed unkeyed memory.",
+		}]);
+		await client.acceptCandidate("agent:main:a", "11111111-1111-1111-1111-111111111111", "accept-op");
+		await client.rejectCandidate("agent:main:a", "11111111-1111-1111-1111-111111111111", "reject-op");
+		const corrected = await client.correctMemory("agent:main:a", "33333333-3333-3333-3333-333333333333", "The deadline is Friday.", "correct-op");
+		expect(corrected.memoryId).toBe("55555555-5555-5555-5555-555555555555");
+		await client.forgetMemory("agent:main:a", "33333333-3333-3333-3333-333333333333", "forget-op");
+	});
+
+	expect(requests).toHaveLength(6);
+	for (const request of requests) {
+		expect(request.authorization).toBe(`Bearer ${TEST_API_TOKEN}`);
+	}
+	expect(requests[0]).toMatchObject({ method: "GET", path: "/v1/memories/candidates?channel=openclaw&thread_id=agent%3Amain%3Aa" });
+	expect(requests[1]).toMatchObject({ method: "GET", path: "/v1/conversations/inspect?channel=openclaw&thread_id=agent%3Amain%3Aa" });
+	expect(requests[2]?.body).toEqual({ operation_id: "accept-op", channel: "openclaw", thread_id: "agent:main:a", candidate_memory_id: "11111111-1111-1111-1111-111111111111" });
+	expect(requests[3]?.body).toEqual({ operation_id: "reject-op", channel: "openclaw", thread_id: "agent:main:a", candidate_memory_id: "11111111-1111-1111-1111-111111111111" });
+	expect(requests[4]?.body).toEqual({ operation_id: "correct-op", channel: "openclaw", thread_id: "agent:main:a", memory_id: "33333333-3333-3333-3333-333333333333", content: "The deadline is Friday." });
+	expect(requests[5]?.body).toEqual({ operation_id: "forget-op", channel: "openclaw", thread_id: "agent:main:a", memory_id: "33333333-3333-3333-3333-333333333333" });
+  });
+
   it("aborts requests at the configured timeout", async () => {
     await withServer((_request, response) => {
       setTimeout(() => writeJSON(response, prepareReceipt("openclaw:slow", "late")), 500);

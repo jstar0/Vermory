@@ -28,6 +28,7 @@ var runtimeReadWriteTables = []string{
 	"source_match_decisions",
 	"source_formation_runs",
 	"source_formation_items",
+	"conversation_formation_schedules",
 	"memory_projection_events",
 	"memory_projection_cursors",
 	"memory_vector_documents",

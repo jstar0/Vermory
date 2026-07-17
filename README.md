@@ -56,7 +56,7 @@ Experiment 0 is complete. It provides:
 - deterministic `fixture-lock.json` generation and mutation detection;
 - public and `withheld_local` evidence levels without fake local sealing;
 - Ed25519 verification for attestations received from an external sealed evaluator;
-- ten frozen public cases covering workspace continuity, conversation continuity, Global Defaults, deletion, source injection, durable bridges, OpenClaw everyday-use continuity, authenticated multi-tenant RLS, logical PostgreSQL recovery, and physical PostgreSQL HA/PITR;
+- fifteen frozen public cases spanning workspace continuity, conversation continuity, Global Defaults, deletion, source injection, durable bridges, OpenClaw and Hermes real-client continuity, authenticated multi-tenant RLS, PostgreSQL recovery, and automatic conversation review;
 - JSON and Markdown Experiment 0 reports.
 
 The repository also contains production-shaped runtime slices for workspace and conversation continuity, Global Defaults, durable bridges, explicit source-authoritative revision, governed keyed source candidates, provider-assisted closed-set matching for unkeyed trusted source facts, bounded multi-fact formation from trusted documents, the OpenClaw external-turn lifecycle, an authenticated multi-tenant HTTP profile, native PostgreSQL recovery, an opt-in active-only pgvector runtime, versioned semantic projection generations with measured candidate promotion gates, a PostgreSQL transactional-outbox fault profile, and a qualified original LongMemEval oracle sample. A source candidate can be proposed without changing current AI context, rejected without changing the active fact, or accepted to atomically replace the still-current keyed target. When a trusted source lacks an internal key, a provider may select exactly one key from the current same-scope closed set or abstain. For one bounded trusted document, a provider may also propose up to sixteen exact-span `new`, `update`, or `unchanged` items; Vermory validates the entire frozen batch and still requires operator acceptance for every new or changed fact. A real Grok MCP task consumed only accepted facts after projection rebuild and wrote its result back as proposed. The production retrieval path uses durable PostgreSQL projection events, a fixed-tenant restricted worker, direct SiliconFlow `BAAI/bge-m3`, explicit lexical/shadow/vector modes, exact lexical degradation for projection lag or provider outage, and side-by-side active/candidate profiles with independent cursors, vectors, audits, rebuilds, and explicit cutover decisions; lexical remains the default and the measured v2 profile remains a candidate. A disposable-cluster W11 run additionally proves bounded backlog processing, provider retry, at-least-once replay, immediate PostgreSQL restart during embedding, same-pool recovery, deletion winning over late completion, and direct-provider recovery without requiring Redis. W12 qualifies the named `server-qualification-v1` profile with 550,000 governed memories, 100,000 current lexical and vector rows, 1,000,000 retained projection events, 1,000 concurrent deletions, competing tenant workers, zero final lag, zero scope leakage, and a direct-provider post-scale probe; current-authority bootstrap embeds only current facts instead of replaying obsolete history. All 1,000 scoped queries returned the expected current memory, but 412 of 550 requested vector queries used the controlled lexical fallback, so this is an operational and degradation qualification rather than a server-scale semantic-recall claim. The authenticated profile uses server-issued digest-only tokens, role-gated routes, a non-owner PostgreSQL runtime identity, tenant-aware foreign keys, and RLS on the served continuity graph. Recovery evidence covers migration replay, native dump/restore, projection rebuild, runtime-role re-provisioning, bounded database outage recovery, PostgreSQL 18 streaming standby promotion, and exact-LSN PITR with post-recovery credential governance. Pull-request CI starts PostgreSQL 18 and automatically runs the database-backed Go suite, runtime race gates, release build, and the OpenClaw install/check/package chain on a clean Ubuntu runner. The LongMemEval evidence runs six official records through no-context, full-history, plain-retrieval, and production Vermory-packet conditions with a real Grok reader; it is reported as `dataset_sample`, not a full benchmark score. Each evidence document is scoped to the exact client, model, failure mode, and deterministic hard gates it executed; no individual slice is treated as proof that the complete platform is finished.
@@ -146,6 +146,20 @@ input drift, active-snapshot drift, and fail-open behavior were also exercised
 on the Mac mini. The report retains provider timeouts, invalid output,
 client-answer failures, and the deletion-audit defect that was found and fixed.
 See [Conversation Formation Loop Qualification](docs/evidence/2026-07-18-conversation-formation-loop.md).
+
+W22 makes conversation formation asynchronous and reviewable inside the real
+client. Completed OpenClaw and Hermes turns enqueue durable same-continuity
+work without waiting for a model. A restricted fixed-tenant worker forms
+proposed candidates from exact user evidence; separate operator credentials
+drive `/vermory memories`, `accept`, `reject`, `correct`, and `forget` without
+registering a model tool. The accepted Mac mini run formed three thesis
+candidates, accepted bundle and deadline, rejected an office, superseded
+Tuesday with Wednesday, then forgot the deadline. Real OpenClaw/Grok recall
+returned only current accepted facts. A separate official Hermes session
+formed C-204 in its own inbox with zero OpenClaw leakage. Worker stop/restart,
+client-role denial, completion replay, RLS, package, checksum, and privacy
+gates passed without `sudo` or Mac mini NewAPI. See
+[Automatic Conversation Formation And Review Qualification](docs/evidence/2026-07-18-automatic-conversation-review.md).
 
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
@@ -411,7 +425,7 @@ See [LongMemEval-S Full Reader QA Evidence](docs/evidence/2026-07-15-longmemeval
 
 The local workspace MCP path has also been executed by the official Codex CLI. Codex called `prepare_context`, created and verified a repository artifact from the governed current fact, and called `commit_observation`; PostgreSQL retained the write-back as `proposed`. See [Codex MCP Real-Client Evidence](docs/evidence/2026-07-14-codex-mcp-real-client.md).
 
-The `@vermory/openclaw` lifecycle plugin uses OpenClaw's canonical `sessionKey` and `runId`, injects governed semantic context during `before_prompt_build`, and records the final turn lifecycle during `agent_end`. It does not replace OpenClaw transcript storage, memory slots, channels, or model routing.
+The `@vermory/openclaw` lifecycle plugin uses OpenClaw's canonical `sessionKey` and `runId`, injects governed semantic context during `before_prompt_build`, and records the final turn lifecycle during `agent_end`. Completed turns enqueue asynchronous formation. A direct `/vermory` command uses a separate operator token for review and governance; it is not registered as a model tool. The plugin does not replace OpenClaw transcript storage, memory slots, channels, or model routing.
 
 Build and check the plugin:
 
@@ -431,6 +445,8 @@ session identity. It prepares governed context before a turn and records the
 completed user/assistant lifecycle afterward, while keeping confirmation,
 correction, deletion, and bridge operations outside model tools. Independent
 Hermes sessions remain isolated unless an operator explicitly links them.
+Completed Hermes turns use the same durable asynchronous formation scheduler,
+but candidate review remains outside Hermes model tools.
 
 Run the provider tests without writing a virtual environment or Python bytecode
 into the repository:

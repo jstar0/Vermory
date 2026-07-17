@@ -191,6 +191,21 @@ func (s *ConversationService) RejectCandidate(ctx context.Context, request Revie
 	return s.store.RejectSourceCandidate(ctx, s.tenantID, resolution.ContinuityID, request.MemoryID, request.OperationID)
 }
 
+func (s *ConversationService) ReviewCandidates(ctx context.Context, anchor ConversationAnchor) (ConversationReviewInbox, error) {
+	if err := s.configured(); err != nil {
+		return ConversationReviewInbox{}, err
+	}
+	resolution, err := s.confirmedConversation(ctx, anchor)
+	if err != nil {
+		return ConversationReviewInbox{}, err
+	}
+	candidates, err := s.store.ListConversationReviewCandidates(ctx, s.tenantID, resolution.ContinuityID)
+	if err != nil {
+		return ConversationReviewInbox{}, err
+	}
+	return ConversationReviewInbox{Resolution: resolution, Candidates: candidates}, nil
+}
+
 func (s *ConversationService) Correct(ctx context.Context, request CorrectConversationMemoryRequest) (GovernedObservationReceipt, error) {
 	if err := s.configured(); err != nil {
 		return GovernedObservationReceipt{}, err

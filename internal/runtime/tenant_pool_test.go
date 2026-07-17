@@ -212,6 +212,14 @@ func TestTenantPoolRejectsCrossTenantForeignKeys(t *testing.T) {
               )`,
 			args: []any{graphA.continuityID},
 		},
+		{
+			name: "conversation formation schedule continuity",
+			sql: `INSERT INTO conversation_formation_schedules (
+                tenant_id, continuity_id, requested_through_sequence,
+                processed_through_sequence, schedule_state
+              ) VALUES ('identity-b', $1::uuid, 0, 0, 'idle')`,
+			args: []any{graphA.continuityID},
+		},
 	}
 	for _, attack := range attacks {
 		if _, err := runtimeStore.pool.Exec(tenantB, attack.sql, attack.args...); err == nil {

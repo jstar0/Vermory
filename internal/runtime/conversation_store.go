@@ -667,12 +667,12 @@ func (s *Store) CompleteConversationTurn(ctx context.Context, tenantID, turnID, 
 	}
 	defer tx.Rollback(ctx)
 
-	var operationID, continuityID, status string
+	var operationID, continuityID, status, userObservationID string
 	if err := tx.QueryRow(ctx, `
-SELECT operation_id, continuity_id::text, status
+SELECT operation_id, continuity_id::text, status, user_observation_id::text
 FROM conversation_turns
 WHERE id = $1::uuid AND tenant_id = $2
-FOR UPDATE`, turnID, tenantID).Scan(&operationID, &continuityID, &status); err != nil {
+FOR UPDATE`, turnID, tenantID).Scan(&operationID, &continuityID, &status, &userObservationID); err != nil {
 		return ChatTurnReceipt{}, fmt.Errorf("lock conversation turn: %w", err)
 	}
 	if ChatTurnStatus(status) != ChatTurnInProgress {
@@ -718,6 +718,9 @@ SET status = 'completed', delivery_id = $1::uuid, assistant_observation_id = $2:
     failure_code = '', failure_message = '', updated_at = now()
 WHERE id = $6::uuid`, deliveryID, assistant.ObservationID, answer, conversationContentFingerprint(answer), model, turnID); err != nil {
 		return ChatTurnReceipt{}, fmt.Errorf("complete conversation turn: %w", err)
+	}
+	if _, err := enqueueConversationFormationTx(ctx, tx, tenantID, continuityID, userObservationID); err != nil {
+		return ChatTurnReceipt{}, err
 	}
 	receipt, found, err := lookupConversationTurnTx(ctx, tx, tenantID, operationID)
 	if err != nil {

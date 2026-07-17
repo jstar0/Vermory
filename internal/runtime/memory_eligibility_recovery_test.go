@@ -108,7 +108,7 @@ func TestMemoryEligibilityDumpRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(target.Close)
-	if version, err := target.SchemaVersion(ctx); err != nil || version != 19 {
+	if version, err := target.SchemaVersion(ctx); err != nil || version != 20 {
 		t.Fatalf("restored schema version=%d err=%v", version, err)
 	}
 	if got := memoryEligibilityAuthorityFingerprint(t, target, tenantID); got != sourceAuthority {

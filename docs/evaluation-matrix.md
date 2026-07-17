@@ -173,6 +173,8 @@ go run ./cmd/vermory benchmark-coverage \
 - Governed source conflict candidate runtime with Grok MCP: completed
 - Provider-assisted unkeyed source target matching with Grok MCP: completed
 - Governed multi-fact trusted-document formation with Grok MCP: completed
+- Automatic conversation formation and direct OpenClaw review with Grok: completed
+- Official Hermes automatic-formation isolation control with direct DeepSeek-V4-Flash: completed
 
 ## Completed Runs
 
@@ -194,6 +196,23 @@ go run ./cmd/vermory benchmark-coverage \
 - Unkeyed source matching stale-probe session: `019f5fae-1a0e-7fb0-b72d-6a726f5e9815`
 - Governed document formation coder session: `019f6019-63fc-78e2-8eb6-41ddfabe62d8`
 - Governed document formation stale-probe session: `019f601a-fdfe-7bb0-96ac-376ba8b99515`
+- Automatic conversation review run ID: `w22-f02-20260718-b6c6154`
+
+## Automatic Conversation Review W22
+
+The frozen `F02-automatic-conversation-review` case executes a real
+OpenClaw/Grok conversation, durable asynchronous formation, exact-evidence
+review, explicit acceptance and rejection, a corrected deadline update,
+forgetting, worker restart, and completion replay. The same fixed-tenant worker
+also processes an official Hermes session while preserving exact OpenClaw and
+Hermes continuity isolation.
+
+The run is a client and governance qualification, not a model ranking. Grok
+and DeepSeek are compatibility targets on different parts of the trajectory.
+The accepted result is `23 / 23` hard gates with zero cross-client candidate
+leakage, zero model governance tools, HTTP `403` for client-token candidate
+access, and zero credential-pattern hits in normalized evidence. See
+[Automatic Conversation Formation And Review Qualification](evidence/2026-07-18-automatic-conversation-review.md).
 
 ## Explicit Source Revision Runtime
 

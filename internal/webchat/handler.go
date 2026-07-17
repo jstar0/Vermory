@@ -42,6 +42,9 @@ func newHandler(service *runtime.ConversationService, defaults *runtime.GlobalDe
 	handler.mux.HandleFunc("POST /v1/integrations/hermes/turns/complete", handler.completeHermesTurn)
 	handler.mux.HandleFunc("POST /v1/integrations/hermes/turns/fail", handler.failHermesTurn)
 	handler.mux.HandleFunc("POST /v1/memories/confirm", handler.confirmMemory)
+	handler.mux.HandleFunc("GET /v1/memories/candidates", handler.listMemoryCandidates)
+	handler.mux.HandleFunc("POST /v1/memories/candidates/accept", handler.acceptMemoryCandidate)
+	handler.mux.HandleFunc("POST /v1/memories/candidates/reject", handler.rejectMemoryCandidate)
 	handler.mux.HandleFunc("POST /v1/memories/correct", handler.correctMemory)
 	handler.mux.HandleFunc("POST /v1/memories/forget", handler.forgetMemory)
 	handler.mux.HandleFunc("GET /v1/conversations/inspect", handler.inspectConversation)
@@ -99,6 +102,11 @@ type failOpenClawTurnInput struct {
 type confirmMemoryInput struct {
 	conversationInput
 	ObservationID string `json:"observation_id"`
+}
+
+type reviewMemoryCandidateInput struct {
+	conversationInput
+	CandidateMemoryID string `json:"candidate_memory_id"`
 }
 
 type correctMemoryInput struct {
@@ -282,6 +290,50 @@ func (h *Handler) confirmMemory(response http.ResponseWriter, request *http.Requ
 		Anchor:        runtime.ConversationAnchor{Channel: input.Channel, ThreadID: input.ThreadID},
 		ObservationID: input.ObservationID,
 	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
+}
+
+func (h *Handler) listMemoryCandidates(response http.ResponseWriter, request *http.Request) {
+	inbox, err := h.service.ReviewCandidates(request.Context(), runtime.ConversationAnchor{
+		Channel:  request.URL.Query().Get("channel"),
+		ThreadID: request.URL.Query().Get("thread_id"),
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, inbox)
+}
+
+func (h *Handler) acceptMemoryCandidate(response http.ResponseWriter, request *http.Request) {
+	h.reviewMemoryCandidate(response, request, true)
+}
+
+func (h *Handler) rejectMemoryCandidate(response http.ResponseWriter, request *http.Request) {
+	h.reviewMemoryCandidate(response, request, false)
+}
+
+func (h *Handler) reviewMemoryCandidate(response http.ResponseWriter, request *http.Request, accept bool) {
+	var input reviewMemoryCandidateInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	review := runtime.ReviewConversationCandidateRequest{
+		OperationID: input.OperationID,
+		Anchor:      runtime.ConversationAnchor{Channel: input.Channel, ThreadID: input.ThreadID},
+		MemoryID:    input.CandidateMemoryID,
+	}
+	var receipt runtime.GovernedObservationReceipt
+	var err error
+	if accept {
+		receipt, err = h.service.AcceptCandidate(request.Context(), review)
+	} else {
+		receipt, err = h.service.RejectCandidate(request.Context(), review)
+	}
 	if err != nil {
 		writeServiceError(response, err)
 		return

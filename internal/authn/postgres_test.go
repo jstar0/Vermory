@@ -131,6 +131,7 @@ func TestRuntimeRoleCanLookupButCannotReadAuthOrLegacyTables(t *testing.T) {
 		"source_match_decisions",
 		"source_formation_runs",
 		"source_formation_items",
+		"conversation_formation_schedules",
 		"memory_vector_documents_2560",
 	} {
 		var canUseAudit bool

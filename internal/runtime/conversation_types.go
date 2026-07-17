@@ -3,6 +3,7 @@ package runtime
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 const (
@@ -205,6 +206,22 @@ type ReviewConversationCandidateRequest struct {
 	OperationID string             `json:"operation_id"`
 	Anchor      ConversationAnchor `json:"-"`
 	MemoryID    string             `json:"memory_id"`
+}
+
+type ConversationReviewCandidate struct {
+	CandidateMemoryID   string                  `json:"candidate_memory_id"`
+	MemoryKey           string                  `json:"memory_key"`
+	Content             string                  `json:"content"`
+	SourceQuote         string                  `json:"source_quote"`
+	SourceObservationID string                  `json:"source_observation_id"`
+	Decision            SourceFormationDecision `json:"decision"`
+	TargetMemoryID      string                  `json:"target_memory_id,omitempty"`
+	CreatedAt           time.Time               `json:"created_at"`
+}
+
+type ConversationReviewInbox struct {
+	Resolution ConversationResolution        `json:"resolution"`
+	Candidates []ConversationReviewCandidate `json:"candidates"`
 }
 
 func (r *ReviewConversationCandidateRequest) Validate() error {

@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "date": "2026-07-18",
+  "run_id": "w22-f02-20260718-b6c6154",
+  "case_id": "F02-automatic-conversation-review",
+  "fixture_lock_sha256": "7b8556cc3ad3d52f4729aebb7fdfbbf46c89bb966c85423b53442dedafc59be2",
+  "implementation_revision": "SOURCE_HEAD_PENDING",
+  "schema_version": 20,
+  "hard_gates": {
+    "passed": 23,
+    "failed": 0
+  },
+  "clients": {
+    "openclaw": {
+      "version": "2026.6.11",
+      "revision": "e085fa1",
+      "conversation_model": "grok-cli/grok-4.5",
+      "direct_commands": [
+        "memories",
+        "accept",
+        "reject",
+        "correct",
+        "forget"
+      ],
+      "model_tools": 0
+    },
+    "hermes": {
+      "version": "0.18.2",
+      "revision": "0f102fa4dc04b7dfdab048169aaaa640d09d7523",
+      "conversation_provider": "siliconflow-direct",
+      "conversation_model": "deepseek-ai/DeepSeek-V4-Flash",
+      "model_tools": 0
+    }
+  },
+  "formation": {
+    "provider": "grok-cli",
+    "model": "grok-4.5",
+    "mac_mini_newapi": false,
+    "initial_candidates": 3,
+    "correction_candidates": 1,
+    "hermes_candidates": 1,
+    "first_hermes_attempt": "abstained"
+  },
+  "governance": {
+    "accepted_initial": 2,
+    "rejected_initial": 1,
+    "accepted_updates": 1,
+    "forgotten": 1,
+    "client_candidate_list_http_status": 403
+  },
+  "current_result": {
+    "active_openclaw_memory_keys": [
+      "thesis-defense-upload-bundle"
+    ],
+    "final_openclaw_answer": "thesis-defense-v7.zip",
+    "forbidden_in_final_answer": [
+      "Wednesday",
+      "Tuesday",
+      "B-412",
+      "C-204"
+    ],
+    "cross_client_candidate_leakage": 0
+  },
+  "resilience": {
+    "worker_down_chat_completed": true,
+    "pending_before_restart": true,
+    "processed_after_restart": true,
+    "completion_replayed": true,
+    "duplicate_formation_runs": 0
+  },
+  "database": {
+    "restricted_runtime_role": true,
+    "row_security": true,
+    "schedule_rls": true,
+    "formation_run_rls": true,
+    "formation_item_rls": true,
+    "governed_memory_rls": true
+  },
+  "artifacts": {
+    "vermory_binary_sha256": "2a33536c73d2ea8da6500badb76a7471043514d733fe560611ecd8d179c9968f",
+    "openclaw_package_sha256": "26f1d729999f3fb16eb3626bea1864a065ba8867e84510bc66c89ea39dbc0ca0",
+    "evidence_manifest_sha256": "9acaae45d041fb8ed4f4755a79a3edaf0719bddb60e4e8d32a3c99b52c6508f1"
+  },
+  "privacy": {
+    "credential_hits": 0,
+    "sudo_used": false,
+    "provider_credentials_persisted": false
+  }
+}

@@ -45,6 +45,34 @@ export interface PreparedTurnReceipt extends TurnReceipt {
   context?: string;
 }
 
+export interface ReviewCandidate {
+  candidateMemoryId: string;
+  memoryKey: string;
+  content: string;
+  sourceQuote: string;
+  sourceObservationId: string;
+  decision: "new" | "update";
+  targetMemoryId?: string;
+  createdAt: string;
+}
+
+export interface ReviewInbox {
+  continuityId: string;
+  candidates: ReviewCandidate[];
+}
+
+export interface CurrentMemory {
+  memoryId: string;
+  memoryKey: string;
+  content: string;
+}
+
+export interface GovernanceReceipt {
+  memoryId: string;
+  status: "active" | "rejected" | "deleted";
+  replayed: boolean;
+}
+
 export class VermoryClient {
   private readonly config: ClientConfig;
 
@@ -81,22 +109,81 @@ export class VermoryClient {
     return parseReceipt(body, "fail", request.operationId, false);
   }
 
+  async listCandidates(sessionKey: string): Promise<ReviewInbox> {
+	const query = new URLSearchParams({ channel: "openclaw", thread_id: requireValue(sessionKey, "session key") });
+	const body = await this.request("GET", `/v1/memories/candidates?${query.toString()}`, undefined, "candidate list");
+	return parseReviewInbox(body);
+  }
+
+  async listCurrentMemories(sessionKey: string): Promise<CurrentMemory[]> {
+	const query = new URLSearchParams({ channel: "openclaw", thread_id: requireValue(sessionKey, "session key") });
+	const body = await this.request("GET", `/v1/conversations/inspect?${query.toString()}`, undefined, "memory list");
+	return parseCurrentMemories(body);
+  }
+
+  async acceptCandidate(sessionKey: string, candidateMemoryId: string, operationId: string): Promise<GovernanceReceipt> {
+	return this.reviewCandidate("accept", sessionKey, candidateMemoryId, operationId);
+  }
+
+  async rejectCandidate(sessionKey: string, candidateMemoryId: string, operationId: string): Promise<GovernanceReceipt> {
+	return this.reviewCandidate("reject", sessionKey, candidateMemoryId, operationId);
+  }
+
+  async correctMemory(sessionKey: string, memoryId: string, content: string, operationId: string): Promise<GovernanceReceipt> {
+	const body = await this.request("POST", "/v1/memories/correct", {
+		operation_id: requireValue(operationId, "operation ID"),
+		channel: "openclaw",
+		thread_id: requireValue(sessionKey, "session key"),
+		memory_id: requireValue(memoryId, "memory ID"),
+		content: requireValue(content, "replacement content"),
+	}, "memory correction");
+	return parseGovernanceReceipt(body, "memory correction");
+  }
+
+  async forgetMemory(sessionKey: string, memoryId: string, operationId: string): Promise<GovernanceReceipt> {
+	const body = await this.request("POST", "/v1/memories/forget", {
+		operation_id: requireValue(operationId, "operation ID"),
+		channel: "openclaw",
+		thread_id: requireValue(sessionKey, "session key"),
+		memory_id: requireValue(memoryId, "memory ID"),
+	}, "memory deletion");
+	return parseGovernanceReceipt(body, "memory deletion");
+  }
+
+  private async reviewCandidate(action: "accept" | "reject", sessionKey: string, candidateMemoryId: string, operationId: string): Promise<GovernanceReceipt> {
+	const phase = `candidate ${action}`;
+	const body = await this.request("POST", `/v1/memories/candidates/${action}`, {
+		operation_id: requireValue(operationId, "operation ID"),
+		channel: "openclaw",
+		thread_id: requireValue(sessionKey, "session key"),
+		candidate_memory_id: requireValue(candidateMemoryId, "candidate memory ID"),
+	}, phase);
+	return parseGovernanceReceipt(body, phase);
+  }
+
   private async post(phase: "prepare" | "complete" | "fail", body: unknown): Promise<unknown> {
+	return this.request("POST", `/v1/integrations/openclaw/turns/${phase}`, body, phase);
+  }
+
+  private async request(method: "GET" | "POST", path: string, body: unknown | undefined, phase: string): Promise<unknown> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
-    const url = `${this.config.baseUrl}/v1/integrations/openclaw/turns/${phase}`;
+	const url = `${this.config.baseUrl}${path}`;
 
     try {
       let response: Response;
       try {
-        const headers: Record<string, string> = { "content-type": "application/json" };
+		const headers: Record<string, string> = {};
+		if (body !== undefined) {
+			headers["content-type"] = "application/json";
+		}
         if (this.config.apiToken) {
           headers.authorization = `Bearer ${this.config.apiToken}`;
         }
         response = await fetch(url, {
-          method: "POST",
+		  method,
           headers,
-          body: JSON.stringify(body),
+		  ...(body === undefined ? {} : { body: JSON.stringify(body) }),
           signal: controller.signal,
         });
       } catch (error) {
@@ -125,6 +212,74 @@ export class VermoryClient {
       clearTimeout(timeout);
     }
   }
+}
+
+function parseReviewInbox(value: unknown): ReviewInbox {
+	if (!isRecord(value) || !isRecord(value.resolution) || typeof value.resolution.continuity_id !== "string" || !Array.isArray(value.candidates) || value.candidates.length > 100) {
+		throw new Error("Vermory candidate list returned an invalid receipt");
+	}
+	const candidates = value.candidates.map((raw): ReviewCandidate => {
+		if (!isRecord(raw) || !isUUID(raw.candidate_memory_id) || typeof raw.memory_key !== "string" || raw.memory_key === "" ||
+			typeof raw.content !== "string" || raw.content === "" || typeof raw.source_quote !== "string" || raw.source_quote === "" ||
+			!isUUID(raw.source_observation_id) || (raw.decision !== "new" && raw.decision !== "update") ||
+			typeof raw.created_at !== "string" || Number.isNaN(Date.parse(raw.created_at)) ||
+			(raw.target_memory_id !== undefined && !isUUID(raw.target_memory_id))) {
+			throw new Error("Vermory candidate list returned an invalid receipt");
+		}
+		return {
+			candidateMemoryId: raw.candidate_memory_id,
+			memoryKey: raw.memory_key,
+			content: raw.content,
+			sourceQuote: raw.source_quote,
+			sourceObservationId: raw.source_observation_id,
+			decision: raw.decision,
+			...(typeof raw.target_memory_id === "string" ? { targetMemoryId: raw.target_memory_id } : {}),
+			createdAt: raw.created_at,
+		};
+	});
+	return { continuityId: value.resolution.continuity_id, candidates };
+}
+
+function parseCurrentMemories(value: unknown): CurrentMemory[] {
+	if (!isRecord(value) || !Array.isArray(value.memories) || value.memories.length > 100) {
+		throw new Error("Vermory memory list returned an invalid receipt");
+	}
+	const memories: CurrentMemory[] = [];
+	for (const raw of value.memories) {
+		if (!isRecord(raw) || typeof raw.lifecycle_status !== "string") {
+			throw new Error("Vermory memory list returned an invalid receipt");
+		}
+		if (raw.lifecycle_status !== "active") {
+			continue;
+		}
+		if (!isUUID(raw.id) || (raw.memory_key !== undefined && typeof raw.memory_key !== "string") || typeof raw.content !== "string" || raw.content === "") {
+			throw new Error("Vermory memory list returned an invalid receipt");
+		}
+		const memoryKey = typeof raw.memory_key === "string" && raw.memory_key.trim() !== "" ? raw.memory_key : "memory";
+		memories.push({ memoryId: raw.id, memoryKey, content: raw.content });
+	}
+	return memories;
+}
+
+function parseGovernanceReceipt(value: unknown, phase: string): GovernanceReceipt {
+	if (!isRecord(value) || !isRecord(value.memory) || !isUUID(value.memory.memory_id) ||
+		(value.memory.status !== "active" && value.memory.status !== "rejected" && value.memory.status !== "deleted") ||
+		typeof value.memory.replayed !== "boolean") {
+		throw new Error(`Vermory ${phase} returned an invalid receipt`);
+	}
+	return { memoryId: value.memory.memory_id, status: value.memory.status, replayed: value.memory.replayed };
+}
+
+function requireValue(value: string, label: string): string {
+	const normalized = value.trim();
+	if (normalized === "") {
+		throw new Error(`Vermory ${label} is required`);
+	}
+	return normalized;
+}
+
+function isUUID(value: unknown): value is string {
+	return typeof value === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
 }
 
 export function normalizeApiToken(value: string | undefined): string | undefined {

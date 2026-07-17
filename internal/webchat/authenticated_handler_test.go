@@ -2,7 +2,9 @@ package webchat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -114,6 +116,141 @@ func TestAuthenticatedHandlerUsesPrincipalTenantAndRolePolicy(t *testing.T) {
 	if err != nil || len(inspection.Defaults) != 1 {
 		t.Fatalf("operator mutation was not tenant-scoped: inspection=%#v err=%v", inspection, err)
 	}
+}
+
+func TestAuthenticatedConversationCandidateReviewIsOperatorOnlyAndSessionScoped(t *testing.T) {
+	_, store := testHandler(t, provider.Mock{Output: "unused"})
+	tenantID := "review-http"
+	authenticator := staticAuthenticator{principals: map[string]authn.Principal{
+		"client-review":   principal(tenantID, authn.RoleClient),
+		"operator-review": principal(tenantID, authn.RoleOperator),
+	}}
+	handler := NewAuthenticatedHandler(store, nil, "", authenticator)
+	openClawAnchor := runtime.ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:review"}
+	hermesAnchor := runtime.ConversationAnchor{Channel: "hermes", ThreadID: "profile:personal:review"}
+	openClawItems := seedAuthenticatedReviewCandidates(t, store, tenantID, openClawAnchor, "review-http-openclaw", []reviewSeed{
+		{key: "submission.bundle.current", text: "The submission bundle is thesis-defense-v7.zip."},
+		{key: "submission.deadline.current", text: "The deadline is Tuesday at 18:00."},
+	})
+	hermesItems := seedAuthenticatedReviewCandidates(t, store, tenantID, hermesAnchor, "review-http-hermes", []reviewSeed{
+		{key: "printer.room.current", text: "The printer room is C-204."},
+	})
+
+	listPath := "/v1/memories/candidates?channel=openclaw&thread_id=agent%3Amain%3Areview"
+	clientList := performAuthenticatedJSON(t, handler, "client-review", http.MethodGet, listPath, "")
+	if clientList.Code != http.StatusForbidden {
+		t.Fatalf("client candidate list returned %d: %s", clientList.Code, clientList.Body.String())
+	}
+	clientAccept := performAuthenticatedJSON(t, handler, "client-review", http.MethodPost, "/v1/memories/candidates/accept", fmt.Sprintf(`{
+  "operation_id":"client-review-accept",
+  "channel":"openclaw",
+  "thread_id":"agent:main:review",
+  "candidate_memory_id":%q
+}`, openClawItems[0].CandidateMemoryID))
+	if clientAccept.Code != http.StatusForbidden {
+		t.Fatalf("client candidate acceptance returned %d: %s", clientAccept.Code, clientAccept.Body.String())
+	}
+
+	operatorList := performAuthenticatedJSON(t, handler, "operator-review", http.MethodGet, listPath, "")
+	if operatorList.Code != http.StatusOK {
+		t.Fatalf("operator candidate list returned %d: %s", operatorList.Code, operatorList.Body.String())
+	}
+	var inbox runtime.ConversationReviewInbox
+	decodeResponse(t, operatorList, &inbox)
+	if len(inbox.Candidates) != 2 {
+		t.Fatalf("operator inbox candidates=%d: %#v", len(inbox.Candidates), inbox)
+	}
+	for _, forbidden := range []string{"C-204", "printer.room.current", "fixture-provider", "provider_output", "request_fingerprint", "Explicit current fact"} {
+		if strings.Contains(operatorList.Body.String(), forbidden) {
+			t.Fatalf("operator inbox exposed %q: %s", forbidden, operatorList.Body.String())
+		}
+	}
+
+	crossSession := performAuthenticatedJSON(t, handler, "operator-review", http.MethodPost, "/v1/memories/candidates/accept", fmt.Sprintf(`{
+  "operation_id":"operator-review-cross-session",
+  "channel":"openclaw",
+  "thread_id":"agent:main:review",
+  "candidate_memory_id":%q
+}`, hermesItems[0].CandidateMemoryID))
+	if crossSession.Code != http.StatusBadRequest && crossSession.Code != http.StatusNotFound {
+		t.Fatalf("cross-session acceptance returned %d: %s", crossSession.Code, crossSession.Body.String())
+	}
+	if strings.Contains(crossSession.Body.String(), hermesItems[0].CandidateMemoryID) || strings.Contains(crossSession.Body.String(), "C-204") {
+		t.Fatalf("cross-session rejection leaked resource details: %s", crossSession.Body.String())
+	}
+
+	accepted := performAuthenticatedJSON(t, handler, "operator-review", http.MethodPost, "/v1/memories/candidates/accept", fmt.Sprintf(`{
+  "operation_id":"operator-review-accept",
+  "channel":"openclaw",
+  "thread_id":"agent:main:review",
+  "candidate_memory_id":%q
+}`, openClawItems[0].CandidateMemoryID))
+	if accepted.Code != http.StatusOK {
+		t.Fatalf("operator acceptance returned %d: %s", accepted.Code, accepted.Body.String())
+	}
+	rejected := performAuthenticatedJSON(t, handler, "operator-review", http.MethodPost, "/v1/memories/candidates/reject", fmt.Sprintf(`{
+  "operation_id":"operator-review-reject",
+  "channel":"openclaw",
+  "thread_id":"agent:main:review",
+  "candidate_memory_id":%q
+}`, openClawItems[1].CandidateMemoryID))
+	if rejected.Code != http.StatusOK {
+		t.Fatalf("operator rejection returned %d: %s", rejected.Code, rejected.Body.String())
+	}
+	after := performAuthenticatedJSON(t, handler, "operator-review", http.MethodGet, listPath, "")
+	if after.Code != http.StatusOK {
+		t.Fatalf("post-review list returned %d: %s", after.Code, after.Body.String())
+	}
+	decodeResponse(t, after, &inbox)
+	if len(inbox.Candidates) != 0 {
+		t.Fatalf("reviewed candidates remained pending: %#v", inbox)
+	}
+}
+
+type reviewSeed struct {
+	key  string
+	text string
+}
+
+func seedAuthenticatedReviewCandidates(t *testing.T, store *runtime.Store, tenantID string, anchor runtime.ConversationAnchor, operationPrefix string, seeds []reviewSeed) []runtime.SourceFormationItemReceipt {
+	t.Helper()
+	conversation := runtime.NewConversationService(store, tenantID, nil, "", runtime.ConversationServiceConfig{})
+	observationIDs := make([]string, len(seeds))
+	candidates := make([]map[string]any, len(seeds))
+	for index, seed := range seeds {
+		operationID := fmt.Sprintf("%s-turn-%d", operationPrefix, index)
+		_, err := conversation.PrepareExternalTurn(context.Background(), runtime.ExternalConversationTurnRequest{
+			OperationID: operationID, Anchor: anchor, Message: seed.text,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		completed, err := conversation.CompleteExternalTurn(context.Background(), runtime.CompleteExternalConversationTurnRequest{
+			OperationID: operationID, Anchor: anchor, Answer: "Acknowledged.", Model: "fixture-client",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		observationIDs[index] = completed.UserObservationID
+		candidates[index] = map[string]any{
+			"decision": "new", "memory_key": seed.key,
+			"source_observation_id": completed.UserObservationID,
+			"quote":                 seed.text, "occurrence": 1, "content": seed.text,
+			"reason": "Explicit current fact.",
+		}
+	}
+	payload, err := json.Marshal(map[string]any{"candidates": candidates, "reason": "Review candidates."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	formation := runtime.NewSourceFormationService(store, tenantID, provider.Mock{Output: string(payload)}, "fixture-provider", "fixture-model")
+	receipt, err := formation.FormConversation(context.Background(), runtime.ConversationFormationRequest{
+		OperationID: operationPrefix + "-formation", Anchor: anchor, ObservationIDs: observationIDs,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return receipt.Items
 }
 
 func TestAuthenticatedHandlerPassesPrincipalTenantToRetrieverWithoutExposingMetadata(t *testing.T) {

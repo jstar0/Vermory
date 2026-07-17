@@ -168,6 +168,13 @@ VALUES ($1, 0)`, tenantID); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := admin.pool.Exec(ctx, `
+INSERT INTO conversation_formation_schedules (
+  tenant_id, continuity_id, requested_through_sequence,
+  processed_through_sequence, schedule_state
+) VALUES ($1, $2::uuid, 0, 0, 'idle')`, tenantID, graph.continuityID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.pool.Exec(ctx, `
 INSERT INTO memory_projection_prune_runs (
   tenant_id, operation_id, request_fingerprint, cutoff, retain_tail_events,
   safe_cursor_event_id, previous_floor_event_id, new_floor_event_id,
@@ -195,6 +202,7 @@ INSERT INTO memory_projection_prune_runs (
 		"memory_vector_documents_2560",
 		"memory_retrieval_runs",
 		"memory_projection_retention",
+		"conversation_formation_schedules",
 	} {
 		if err := runtimeStore.pool.QueryRow(ctx, "SELECT count(*) FROM "+table).Scan(new(int)); err == nil {
 			t.Fatalf("%s did not fail closed without tenant context", table)
@@ -249,6 +257,7 @@ func TestIdentityRLSMigrationEnablesEveryServedTenantTable(t *testing.T) {
 		"source_match_decisions",
 		"source_formation_runs",
 		"source_formation_items",
+		"conversation_formation_schedules",
 		"memory_projection_events",
 		"memory_projection_cursors",
 		"memory_vector_documents",
@@ -340,6 +349,8 @@ func TestIdentityRLSMigrationAddsTenantAwareForeignKeys(t *testing.T) {
 		"source_formation_items_tenant_target_memory_fk",
 		"source_formation_items_tenant_observation_fk",
 		"source_formation_items_tenant_candidate_memory_fk",
+		"conversation_formation_schedules_tenant_continuity_fk",
+		"conversation_formation_schedules_tenant_run_fk",
 		"memory_projection_events_tenant_continuity_fk",
 		"memory_projection_events_tenant_memory_fk",
 		"memory_vector_documents_tenant_continuity_fk",

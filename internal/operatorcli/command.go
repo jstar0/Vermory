@@ -1089,58 +1089,10 @@ func withConversation(
 }
 
 func buildDirectProvider(name, model, baseURL, apiKeyEnv, grokCommand string, disableThinking bool) (provider.Provider, string, string, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		name = "grok-cli"
-	}
-	model = strings.TrimSpace(model)
-	switch name {
-	case "grok-cli":
-		if model == "" {
-			model = "grok-4.5"
-		}
-		return provider.NewGrokCLI(provider.GrokCLIConfig{Command: grokCommand}), name, model, nil
-	case "openai-compatible", "siliconflow", "duojie":
-		baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
-		apiKeyEnv = strings.TrimSpace(apiKeyEnv)
-		switch name {
-		case "siliconflow":
-			if baseURL == "" {
-				baseURL = "https://api.siliconflow.cn/v1"
-			}
-			if apiKeyEnv == "" {
-				apiKeyEnv = "SILICONFLOW_API_KEY"
-			}
-		case "duojie":
-			if baseURL == "" {
-				baseURL = "https://api.duojie.games/v1"
-			}
-			if apiKeyEnv == "" {
-				apiKeyEnv = "DUOJIE_API_KEY"
-			}
-		default:
-			if apiKeyEnv == "" {
-				apiKeyEnv = "VERMORY_PROVIDER_API_KEY"
-			}
-		}
-		if model == "" {
-			return nil, "", "", fmt.Errorf("%s provider requires --model", name)
-		}
-		if baseURL == "" {
-			return nil, "", "", fmt.Errorf("%s provider requires --base-url", name)
-		}
-		apiKey := strings.TrimSpace(os.Getenv(apiKeyEnv))
-		if apiKey == "" {
-			return nil, "", "", fmt.Errorf("%s provider requires non-empty env %s", name, apiKeyEnv)
-		}
-		return provider.NewOpenAICompatible(provider.Config{
-			BaseURL:         baseURL,
-			APIKey:          apiKey,
-			DisableThinking: disableThinking,
-		}), name, model, nil
-	default:
-		return nil, "", "", fmt.Errorf("unsupported direct provider %q", name)
-	}
+	return provider.BuildDirect(provider.DirectOptions{
+		Name: name, Model: model, BaseURL: baseURL, APIKeyEnv: apiKeyEnv,
+		GrokCommand: grokCommand, DisableThinking: disableThinking,
+	})
 }
 
 func readSourceFormationFile(path string) ([]byte, error) {

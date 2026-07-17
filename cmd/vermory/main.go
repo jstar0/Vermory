@@ -104,6 +104,7 @@ func newRootCommand() *cobra.Command {
 	rootCmd.AddCommand(newRetrievalAblationCommand())
 	rootCmd.AddCommand(newRetrievalProfileComparisonCommand())
 	rootCmd.AddCommand(newRetrievalWorkerCommand())
+	rootCmd.AddCommand(newConversationFormationWorkerCommand())
 	rootCmd.AddCommand(newRetrievalStatusCommand())
 	rootCmd.AddCommand(newRetrievalRebuildCommand())
 	rootCmd.AddCommand(newRetrievalSnapshotRebuildCommand())

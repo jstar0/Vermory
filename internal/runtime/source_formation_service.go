@@ -208,7 +208,38 @@ func (s *SourceFormationService) FormConversation(ctx context.Context, request C
 	if err != nil {
 		return SourceFormationReceipt{}, err
 	}
-	existing, found, err := s.store.LookupSourceFormation(ctx, s.tenantID, resolution.ContinuityID, request.OperationID)
+	return s.formConversationContinuity(
+		ctx,
+		resolution.ContinuityID,
+		request.OperationID,
+		request.ObservationIDs,
+		request.RecentLimit,
+	)
+}
+
+func (s *SourceFormationService) FormConversationContinuity(ctx context.Context, continuityID, operationID string, observationIDs []string) (SourceFormationReceipt, error) {
+	if err := s.configured(); err != nil {
+		return SourceFormationReceipt{}, err
+	}
+	continuityID = strings.TrimSpace(continuityID)
+	operationID = strings.TrimSpace(operationID)
+	if continuityID == "" || operationID == "" {
+		return SourceFormationReceipt{}, fmt.Errorf("continuity_id and operation_id are required")
+	}
+	if len(observationIDs) == 0 {
+		return SourceFormationReceipt{}, fmt.Errorf("observation_ids are required for direct continuity formation")
+	}
+	return s.formConversationContinuity(ctx, continuityID, operationID, observationIDs, 0)
+}
+
+func (s *SourceFormationService) formConversationContinuity(
+	ctx context.Context,
+	continuityID string,
+	operationID string,
+	observationIDs []string,
+	recentLimit int,
+) (SourceFormationReceipt, error) {
+	existing, found, err := s.store.LookupSourceFormation(ctx, s.tenantID, continuityID, operationID)
 	if err != nil {
 		return SourceFormationReceipt{}, err
 	}
@@ -216,7 +247,7 @@ func (s *SourceFormationService) FormConversation(ctx context.Context, request C
 		if existing.InputKind != SourceFormationInputConversation || existing.ProviderName != s.providerName || existing.RequestedModel != s.model {
 			return SourceFormationReceipt{}, fmt.Errorf("operation_id is already bound to another logical source formation")
 		}
-		if len(request.ObservationIDs) != 0 && !sameConversationFormationObservationIDs(existing.InputManifest, request.ObservationIDs) {
+		if len(observationIDs) != 0 && !sameConversationFormationObservationIDs(existing.InputManifest, observationIDs) {
 			return SourceFormationReceipt{}, fmt.Errorf("operation_id is already bound to another conversation observation manifest")
 		}
 		existing.Replayed = true
@@ -225,9 +256,9 @@ func (s *SourceFormationService) FormConversation(ctx context.Context, request C
 	observations, err := s.store.SelectConversationFormationObservations(
 		ctx,
 		s.tenantID,
-		resolution.ContinuityID,
-		request.ObservationIDs,
-		request.RecentLimit,
+		continuityID,
+		observationIDs,
+		recentLimit,
 	)
 	if err != nil {
 		return SourceFormationReceipt{}, err
@@ -240,9 +271,9 @@ func (s *SourceFormationService) FormConversation(ctx context.Context, request C
 	for _, observation := range observations {
 		totalBytes += len([]byte(observation.Content))
 	}
-	begin, err := s.store.BeginSourceFormation(ctx, s.tenantID, resolution.ContinuityID, SourceFormationBeginRequest{
-		OperationID:    request.OperationID,
-		SourceRef:      fmt.Sprintf("conversation:%s@%d-%d", resolution.ContinuityID, firstSequence, lastSequence),
+	begin, err := s.store.BeginSourceFormation(ctx, s.tenantID, continuityID, SourceFormationBeginRequest{
+		OperationID:    operationID,
+		SourceRef:      fmt.Sprintf("conversation:%s@%d-%d", continuityID, firstSequence, lastSequence),
 		SourceSHA256:   manifestFingerprint,
 		SourceBytes:    totalBytes,
 		InputKind:      SourceFormationInputConversation,

@@ -2,6 +2,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 
 import { VermoryClient } from "./client.js";
 import { normalizePluginConfig } from "./config.js";
+import { VermoryGovernanceCommand } from "./governance.js";
 import { resolveTurnIdentity } from "./identity.js";
 import { extractLatestAssistantOutput } from "./messages.js";
 
@@ -20,6 +21,23 @@ const plugin: ReturnType<typeof definePluginEntry> = definePluginEntry({
       ...config,
       apiToken: process.env.VERMORY_API_TOKEN,
     });
+	const operatorToken = process.env.VERMORY_OPERATOR_API_TOKEN?.trim();
+	const governance = new VermoryGovernanceCommand(operatorToken
+		? new VermoryClient({ ...config, apiToken: operatorToken })
+		: undefined);
+
+	api.registerCommand({
+		name: "vermory",
+		description: "Review and govern Vermory memory for the current OpenClaw session.",
+		acceptsArgs: true,
+		requireAuth: true,
+		handler: async (context) => {
+			if (!config.enabled) {
+				return { text: "Vermory continuity is disabled.", continueAgent: false };
+			}
+			return governance.handle(context);
+		},
+	});
 
     api.on(
       "before_prompt_build",

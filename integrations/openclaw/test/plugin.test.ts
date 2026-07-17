@@ -20,7 +20,106 @@ describe("Vermory OpenClaw plugin", () => {
     expect(plugin.kind).toBeUndefined();
     expect(harness.options.get("before_prompt_build")).toEqual({ timeoutMs: 15_000 });
     expect(harness.options.get("agent_end")).toEqual({ timeoutMs: 30_000 });
+	expect(harness.command?.name).toBe("vermory");
+	expect(harness.command?.acceptsArgs).toBe(true);
+	expect(harness.command?.requireAuth).toBe(true);
+	expect(harness.registerTool).not.toHaveBeenCalled();
   });
+
+	it("runs direct governance with a separate operator token and session-local short references", async () => {
+		vi.stubEnv("VERMORY_API_TOKEN", TEST_API_TOKEN);
+		vi.stubEnv("VERMORY_OPERATOR_API_TOKEN", OTHER_API_TOKEN);
+		const requests: Array<{ path: string; authorization: string | null; body?: Record<string, unknown> }> = [];
+		const fetchMock = vi.fn(async (input: unknown, init: RequestInit) => {
+			const path = new URL(String(input)).pathname + new URL(String(input)).search;
+			const body = init.body ? JSON.parse(String(init.body)) as Record<string, unknown> : undefined;
+			requests.push({
+				path,
+				authorization: new Headers(init.headers).get("authorization"),
+				...(body ? { body } : {}),
+			});
+			if (path.startsWith("/v1/memories/candidates?")) {
+				return jsonResponse({
+					resolution: { status: "resolved", continuity_id: "continuity-a", channel: "openclaw", thread_id: "agent:main:a", created: false },
+					candidates: [
+						candidate("aaaaaaaa-1111-1111-1111-111111111111", "submission.bundle.current", "The bundle is thesis-defense-v7.zip."),
+						candidate("aaaaaaaa-2222-2222-2222-222222222222", "submission.deadline.current", "The deadline is Tuesday at 18:00."),
+					],
+				});
+			}
+			if (path.startsWith("/v1/conversations/inspect?")) {
+				return jsonResponse({
+					resolution: { status: "resolved", continuity_id: "continuity-a", channel: "openclaw", thread_id: "agent:main:a", created: false },
+					observations: [{ id: "private-observation", content: "PRIVATE RAW CHAT" }],
+					memories: [{
+						id: "bbbbbbbb-1111-1111-1111-111111111111",
+						memory_key: "submission.topic.current",
+						lifecycle_status: "active",
+						content: "The current topic is thesis defense.",
+						effective_state: "eligible",
+					}],
+				});
+			}
+			if (path === "/v1/memories/correct") {
+				return jsonResponse(governanceReceipt("cccccccc-1111-1111-1111-111111111111", "active"));
+			}
+			const memoryId = String(body?.candidate_memory_id ?? body?.memory_id);
+			const status = path.endsWith("/reject") ? "rejected" : path.endsWith("/forget") ? "deleted" : "active";
+			return jsonResponse(governanceReceipt(memoryId, status));
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const harness = registerPlugin();
+
+		const listed = await harness.runCommand("memories", "agent:main:a");
+		expect(listed.text).toContain("aaaaaaaa1");
+		expect(listed.text).toContain("aaaaaaaa2");
+		expect(listed.text).toContain("bbbbbbbb");
+		expect(listed.text).toContain("thesis-defense-v7.zip");
+		expect(listed.text).not.toContain("PRIVATE RAW CHAT");
+		expect(listed.text).not.toContain("aaaaaaaa-1111-1111-1111-111111111111");
+
+		const callsAfterList = fetchMock.mock.calls.length;
+		const ambiguous = await harness.runCommand("accept aaaaaaaa", "agent:main:a");
+		expect(ambiguous.text).toContain("ambiguous");
+		expect(fetchMock).toHaveBeenCalledTimes(callsAfterList);
+		const wrongSession = await harness.runCommand("accept aaaaaaaa1", "agent:main:b");
+		expect(wrongSession.text).toContain("/vermory memories");
+		expect(fetchMock).toHaveBeenCalledTimes(callsAfterList);
+
+		expect((await harness.runCommand("accept aaaaaaaa1", "agent:main:a")).text).toContain("Accepted");
+		expect((await harness.runCommand("reject aaaaaaaa2", "agent:main:a")).text).toContain("Rejected");
+		expect((await harness.runCommand("correct bbbbbbbb The current topic is final defense.", "agent:main:a")).text).toContain("Corrected");
+		expect((await harness.runCommand("forget cccccccc", "agent:main:a")).text).toContain("Forgotten");
+
+		for (const request of requests) {
+			expect(request.authorization).toBe(`Bearer ${OTHER_API_TOKEN}`);
+			expect(request.path).not.toContain("PRIVATE RAW CHAT");
+		}
+		expect(requests.at(-1)?.body).toMatchObject({
+			channel: "openclaw",
+			thread_id: "agent:main:a",
+			memory_id: "cccccccc-1111-1111-1111-111111111111",
+		});
+	});
+
+	it("keeps normal lifecycle fail-open when operator governance is unavailable", async () => {
+		vi.stubEnv("VERMORY_API_TOKEN", TEST_API_TOKEN);
+		vi.stubEnv("VERMORY_OPERATOR_API_TOKEN", "");
+		const fetchMock = vi.fn(async (_input: unknown, init: RequestInit) => {
+			const body = JSON.parse(String(init.body));
+			return jsonResponse(prepareReceipt(body.operation_id, "governed context"));
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const harness = registerPlugin();
+		const command = await harness.runCommand("memories", "agent:main:a");
+		expect(command.text).toContain("operator token");
+		expect(fetchMock).not.toHaveBeenCalled();
+		await expect(harness.beforePrompt(
+			{ prompt: "hello", messages: [] },
+			{ sessionKey: "agent:main:a", runId: "run-without-operator" },
+		)).resolves.toMatchObject({ prependContext: expect.stringContaining("governed context") });
+		expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("authorization")).toBe(`Bearer ${TEST_API_TOKEN}`);
+	});
 
   it("abstains without canonical identity and while disabled", async () => {
     const fetchMock = vi.fn();
@@ -277,6 +376,8 @@ function registerPlugin(pluginConfig: Record<string, unknown> = {}) {
   const hooks = new Map<string, Function>();
   const options = new Map<string, unknown>();
   const warn = vi.fn();
+	let command: Record<string, unknown> | undefined;
+	const registerTool = vi.fn();
   plugin.register({
     pluginConfig,
     logger: { info: vi.fn(), warn, error: vi.fn() },
@@ -284,11 +385,30 @@ function registerPlugin(pluginConfig: Record<string, unknown> = {}) {
       hooks.set(name, handler);
       options.set(name, hookOptions);
     },
+	registerCommand(definition: Record<string, unknown>) {
+		command = definition;
+	},
+	registerTool,
   } as never);
 
   return {
     options,
     warn,
+	command,
+	registerTool,
+	runCommand: async (args: string, sessionKey: string, isAuthorizedSender = true) => {
+		if (!command || typeof command.handler !== "function") {
+			throw new Error("Vermory command was not registered");
+		}
+		return command.handler({
+			args,
+			commandBody: `/vermory ${args}`,
+			channel: "webchat",
+			isAuthorizedSender,
+			sessionKey,
+			config: {},
+		}) as Promise<{ text?: string }>;
+	},
     beforePrompt: hooks.get("before_prompt_build") as (
       event: { prompt: string; messages: unknown[] },
       context: Record<string, unknown>,
@@ -298,6 +418,25 @@ function registerPlugin(pluginConfig: Record<string, unknown> = {}) {
       context: Record<string, unknown>,
     ) => Promise<void>,
   };
+}
+
+function candidate(id: string, key: string, content: string) {
+	return {
+		candidate_memory_id: id,
+		memory_key: key,
+		content,
+		source_quote: content,
+		source_observation_id: "dddddddd-1111-1111-1111-111111111111",
+		decision: "new",
+		created_at: "2026-07-18T00:00:00Z",
+	};
+}
+
+function governanceReceipt(memoryId: string, status: string) {
+	return {
+		observation: { observation_id: "eeeeeeee-1111-1111-1111-111111111111", replayed: false },
+		memory: { memory_id: memoryId, status, replayed: false },
+	};
 }
 
 function jsonResponse(value: unknown): Response {
