@@ -723,6 +723,37 @@ injected transition outage. Same-host timings are not SLOs, and the run does
 not claim cross-host HA, leader election, split-brain prevention, or a database
 proxy. See [the W16 evidence](evidence/2026-07-16-postgresql-ha-pitr.md).
 
+## Protected Artifact Signing W24
+
+W24 is a security and delivery qualification rather than a memory-quality or
+model-ranking experiment. The protected pull-request workflow builds a complete
+eight-file release payload manifest in an ordinary no-OIDC test job, then a
+separate same-repository post-test job signs the exact manifest with GitHub OIDC
+and pinned Cosign `v3.0.6`.
+
+| Gate | Result |
+|---|---:|
+| protected `test` job | pass |
+| protected `sign-snapshot` job | pass |
+| release-manifest entries | `8` |
+| payload hash failures | `0` |
+| exact workflow identity and issuer | pass |
+| modified manifest accepted | `0` |
+| wrong workflow identity accepted | `0` |
+| cross-host artifact digest mismatch | `0` |
+| private signing keys or retained OIDC tokens | `0` |
+| tags or GitHub Releases created | `0` |
+
+The signed subject is the complete payload manifest, not the GitHub transport
+ZIP. Independent ARM64 Mac mini verification used the Qingdao reverse-management
+tunnel, an isolated official Cosign binary, and no `sudo` or system-wide
+installation. `test` and `sign-snapshot` are strict required checks on `main`.
+
+This does not qualify manual snapshots, tagged release publication,
+notarization, package-manager distribution, container signing, SLSA provenance,
+or external sealed evaluation. See
+[the W24 evidence](evidence/2026-07-18-protected-artifact-signing.md).
+
 ## Duojie Core Matrix Findings
 
 Tested models:
