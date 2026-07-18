@@ -2,15 +2,18 @@ export interface PluginConfig {
   enabled: boolean;
   baseUrl: string;
   timeoutMs: number;
+	toolAllowlist: string[];
 }
 
 const DEFAULT_CONFIG: PluginConfig = {
   enabled: true,
   baseUrl: "http://127.0.0.1:8787",
   timeoutMs: 5000,
+	toolAllowlist: [],
 };
 
-const CONFIG_FIELDS = new Set(["enabled", "baseUrl", "timeoutMs"]);
+const CONFIG_FIELDS = new Set(["enabled", "baseUrl", "timeoutMs", "toolAllowlist"]);
+const TOOL_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 
 export function normalizePluginConfig(input: unknown): PluginConfig {
   if (input === undefined) {
@@ -60,9 +63,31 @@ export function normalizePluginConfig(input: unknown): PluginConfig {
     throw new Error("Vermory baseUrl must not contain credentials");
   }
 
+	const rawToolAllowlist = values.toolAllowlist ?? DEFAULT_CONFIG.toolAllowlist;
+	if (!Array.isArray(rawToolAllowlist) || rawToolAllowlist.length > 64) {
+		throw new Error("Vermory toolAllowlist must be an array of at most 64 tool names");
+	}
+	const toolAllowlist: string[] = [];
+	const seenTools = new Set<string>();
+	for (const raw of rawToolAllowlist) {
+		if (typeof raw !== "string") {
+			throw new Error("Vermory toolAllowlist entries must be strings");
+		}
+		const tool = raw.trim();
+		if (!TOOL_NAME_PATTERN.test(tool)) {
+			throw new Error("Vermory toolAllowlist contains an invalid tool name");
+		}
+		if (seenTools.has(tool)) {
+			throw new Error("Vermory toolAllowlist contains a duplicate tool name");
+		}
+		seenTools.add(tool);
+		toolAllowlist.push(tool);
+	}
+
   return {
     enabled,
     baseUrl: configuredBaseUrl.trim().replace(/\/+$/, ""),
     timeoutMs,
+	toolAllowlist,
   };
 }

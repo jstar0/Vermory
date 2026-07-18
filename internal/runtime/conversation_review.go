@@ -15,7 +15,8 @@ func (s *Store) ListConversationReviewCandidates(ctx context.Context, tenantID, 
 	rows, err := s.pool.Query(ctx, `
 SELECT candidate.id::text, candidate.memory_key, candidate.content,
        item.quote, item.evidence_observation_id::text, item.decision,
-       COALESCE(item.target_memory_id::text, ''), candidate.created_at
+       COALESCE(item.target_memory_id::text, ''), candidate.created_at,
+       evidence.observation_kind, COALESCE(tool.tool_name, '')
 FROM governed_memories candidate
 JOIN observations origin
   ON origin.tenant_id = candidate.tenant_id
@@ -29,6 +30,14 @@ JOIN source_formation_runs run
   ON run.tenant_id = item.tenant_id
  AND run.continuity_id = item.continuity_id
  AND run.id = item.run_id
+JOIN observations evidence
+  ON evidence.tenant_id = item.tenant_id
+ AND evidence.continuity_id = item.continuity_id
+ AND evidence.id = item.evidence_observation_id
+LEFT JOIN conversation_tool_results tool
+  ON tool.tenant_id = evidence.tenant_id
+ AND tool.continuity_id = evidence.continuity_id
+ AND tool.observation_id = evidence.id
 WHERE candidate.tenant_id = $1
   AND candidate.continuity_id = $2::uuid
   AND candidate.lifecycle_status = 'proposed'
@@ -55,6 +64,8 @@ LIMIT $3`, tenantID, continuityID, maxConversationReviewCandidates)
 			&candidate.Decision,
 			&candidate.TargetMemoryID,
 			&candidate.CreatedAt,
+			&candidate.SourceKind,
+			&candidate.SourceLabel,
 		); err != nil {
 			return nil, fmt.Errorf("scan conversation review candidate: %w", err)
 		}

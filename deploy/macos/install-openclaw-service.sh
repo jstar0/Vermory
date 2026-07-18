@@ -26,12 +26,31 @@ WRAPPER_PATH="$OPENCLAW_DIR/openclaw-vermory"
 GROK_WRAPPER_PATH=${VERMORY_GROK_WRAPPER_PATH:-"$APP_DIR/grok/grok-vermory-isolated"}
 PORT=${OPENCLAW_GATEWAY_PORT:-18789}
 JQ=${JQ:-/usr/bin/jq}
+VERMORY_BASE_URL=${VERMORY_OPENCLAW_BASE_URL:-http://127.0.0.1:8787}
+TOOL_ALLOWLIST_JSON=${VERMORY_OPENCLAW_TOOL_ALLOWLIST_JSON:-[]}
 
 case "$PORT" in
   *[!0-9]*|'') echo "invalid OPENCLAW_GATEWAY_PORT" >&2; exit 2 ;;
 esac
 if [ ! -x "$JQ" ]; then
   echo "jq is unavailable: $JQ" >&2
+  exit 2
+fi
+if ! "$JQ" -en --arg url "$VERMORY_BASE_URL" '
+  $url
+  | capture("^http://(?:127\\.0\\.0\\.1|localhost):(?<port>[0-9]{1,5})$")
+  | (.port | tonumber) >= 1 and (.port | tonumber) <= 65535
+' >/dev/null; then
+  echo "VERMORY_OPENCLAW_BASE_URL must be a loopback HTTP URL with a valid port" >&2
+  exit 2
+fi
+if ! /usr/bin/printf '%s\n' "$TOOL_ALLOWLIST_JSON" | "$JQ" -e '
+  type == "array"
+  and length <= 64
+  and all(.[]; type == "string" and test("^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"))
+  and (unique | length) == length
+' >/dev/null; then
+  echo "VERMORY_OPENCLAW_TOOL_ALLOWLIST_JSON must be a unique array of valid tool names" >&2
   exit 2
 fi
 
@@ -60,6 +79,8 @@ merge_openclaw_config() {
   "$JQ" \
     --arg workspace "$WORKSPACE_DIR" \
     --arg grokCommand "$GROK_WRAPPER_PATH" \
+    --arg vermoryBaseURL "$VERMORY_BASE_URL" \
+    --argjson toolAllowlist "$TOOL_ALLOWLIST_JSON" \
     --argjson grokEnabled "$(if [ -x "$GROK_WRAPPER_PATH" ]; then echo true; else echo false; fi)" \
     --argjson port "$PORT" \
     '
@@ -95,12 +116,14 @@ merge_openclaw_config() {
             allowConversationAccess: true,
             timeouts: {
               before_prompt_build: 15000,
+              after_tool_call: 15000,
               agent_end: 30000
             }
           },
           config: {
-            baseUrl: "http://127.0.0.1:8787",
-            timeoutMs: 5000
+            baseUrl: $vermoryBaseURL,
+            timeoutMs: 5000,
+            toolAllowlist: $toolAllowlist
           }
         })
     ' "$input_path" >"$merged_path"

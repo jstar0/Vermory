@@ -144,6 +144,39 @@ describe("VermoryClient", () => {
     ]);
   });
 
+  it("posts an exact bounded tool-result request and validates its receipt", async () => {
+	await withServer(async (request, response) => {
+		expect(request.method).toBe("POST");
+		expect(request.url).toBe("/v1/integrations/openclaw/turns/tool-results");
+		expect(JSON.parse(await readRequest(request))).toEqual({
+			operation_id: "openclaw:run-tool-1",
+			session_key: "agent:main:a",
+			run_id: "run-tool-1",
+			tool_name: "device.storage_check",
+			tool_call_id: "call-storage-1",
+			content: "Storage has 87 GB available and is 82 percent used.",
+		});
+		writeJSON(response, {
+			turn_id: "11111111-1111-1111-1111-111111111111",
+			observation_id: "22222222-2222-2222-2222-222222222222",
+			tool_name: "device.storage_check",
+			replayed: false,
+		});
+	}, async (baseUrl) => {
+		const client = new VermoryClient({ baseUrl, timeoutMs: 1000 });
+		const receipt = await client.recordToolResult({
+			operationId: "openclaw:run-tool-1",
+			sessionKey: "agent:main:a",
+			runId: "run-tool-1",
+			toolName: "device.storage_check",
+			toolCallId: "call-storage-1",
+			content: "Storage has 87 GB available and is 82 percent used.",
+		});
+		expect(receipt.toolName).toBe("device.storage_check");
+		expect(receipt.replayed).toBe(false);
+	});
+  });
+
   it("uses an operator token for scoped review and governance requests", async () => {
 	const requests: Array<{ method: string; path: string; authorization?: string; body?: unknown }> = [];
 	await withServer(async (request, response) => {
@@ -163,6 +196,7 @@ describe("VermoryClient", () => {
 					content: "The bundle is thesis-defense-v7.zip.",
 					source_quote: "The bundle is thesis-defense-v7.zip.",
 					source_observation_id: "22222222-2222-2222-2222-222222222222",
+					source_kind: "user_message",
 					decision: "new",
 					created_at: "2026-07-18T00:00:00Z",
 				}],

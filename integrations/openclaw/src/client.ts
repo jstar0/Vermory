@@ -27,6 +27,20 @@ export interface FailTurnRequest extends TurnIdentityInput {
   failureMessage: string;
 }
 
+export interface ToolResultRequest extends TurnIdentityInput {
+	runId: string;
+	toolName: string;
+	toolCallId: string;
+	content: string;
+}
+
+export interface ToolResultReceipt {
+	turnId: string;
+	observationId: string;
+	toolName: string;
+	replayed: boolean;
+}
+
 export interface TurnReceipt {
   turnId: string;
   operationId: string;
@@ -51,6 +65,8 @@ export interface ReviewCandidate {
   content: string;
   sourceQuote: string;
   sourceObservationId: string;
+	sourceKind: "user_message" | "tool_result";
+	sourceLabel?: string;
   decision: "new" | "update";
   targetMemoryId?: string;
   createdAt: string;
@@ -108,6 +124,19 @@ export class VermoryClient {
     });
     return parseReceipt(body, "fail", request.operationId, false);
   }
+
+	async recordToolResult(request: ToolResultRequest): Promise<ToolResultReceipt> {
+		const toolName = requireValue(request.toolName, "tool name");
+		const body = await this.request("POST", "/v1/integrations/openclaw/turns/tool-results", {
+			operation_id: requireValue(request.operationId, "operation ID"),
+			session_key: requireValue(request.sessionKey, "session key"),
+			run_id: requireValue(request.runId, "run ID"),
+			tool_name: toolName,
+			tool_call_id: requireValue(request.toolCallId, "tool call ID"),
+			content: requireValue(request.content, "tool result content"),
+		}, "tool result");
+		return parseToolResultReceipt(body, toolName);
+	}
 
   async listCandidates(sessionKey: string): Promise<ReviewInbox> {
 	const query = new URLSearchParams({ channel: "openclaw", thread_id: requireValue(sessionKey, "session key") });
@@ -222,8 +251,10 @@ function parseReviewInbox(value: unknown): ReviewInbox {
 		if (!isRecord(raw) || !isUUID(raw.candidate_memory_id) || typeof raw.memory_key !== "string" || raw.memory_key === "" ||
 			typeof raw.content !== "string" || raw.content === "" || typeof raw.source_quote !== "string" || raw.source_quote === "" ||
 			!isUUID(raw.source_observation_id) || (raw.decision !== "new" && raw.decision !== "update") ||
+			(raw.source_kind !== "user_message" && raw.source_kind !== "tool_result") ||
 			typeof raw.created_at !== "string" || Number.isNaN(Date.parse(raw.created_at)) ||
-			(raw.target_memory_id !== undefined && !isUUID(raw.target_memory_id))) {
+			(raw.target_memory_id !== undefined && !isUUID(raw.target_memory_id)) ||
+			(raw.source_label !== undefined && (typeof raw.source_label !== "string" || raw.source_label === ""))) {
 			throw new Error("Vermory candidate list returned an invalid receipt");
 		}
 		return {
@@ -232,12 +263,27 @@ function parseReviewInbox(value: unknown): ReviewInbox {
 			content: raw.content,
 			sourceQuote: raw.source_quote,
 			sourceObservationId: raw.source_observation_id,
+			sourceKind: raw.source_kind,
+			...(typeof raw.source_label === "string" ? { sourceLabel: raw.source_label } : {}),
 			decision: raw.decision,
 			...(typeof raw.target_memory_id === "string" ? { targetMemoryId: raw.target_memory_id } : {}),
 			createdAt: raw.created_at,
 		};
 	});
 	return { continuityId: value.resolution.continuity_id, candidates };
+}
+
+function parseToolResultReceipt(value: unknown, expectedToolName: string): ToolResultReceipt {
+	if (!isRecord(value) || !isUUID(value.turn_id) || !isUUID(value.observation_id) ||
+		value.tool_name !== expectedToolName || typeof value.replayed !== "boolean") {
+		throw new Error("Vermory tool result returned an invalid receipt");
+	}
+	return {
+		turnId: value.turn_id,
+		observationId: value.observation_id,
+		toolName: value.tool_name,
+		replayed: value.replayed,
+	};
 }
 
 function parseCurrentMemories(value: unknown): CurrentMemory[] {

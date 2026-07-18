@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
 	defaultRecentConversationObservations = 12
 	maxRecentConversationObservations     = 50
+	maxConversationToolResultsPerTurn     = 16
+	maxConversationToolResultBytes        = 8 * 1024
+	maxConversationToolResultTotalBytes   = 64 * 1024
 )
 
 type ChatTurnStatus string
@@ -169,6 +173,82 @@ type FailExternalConversationTurnRequest struct {
 	FailureMessage string             `json:"failure_message"`
 }
 
+type RecordConversationToolResultRequest struct {
+	OperationID string             `json:"operation_id"`
+	Anchor      ConversationAnchor `json:"-"`
+	RunID       string             `json:"run_id"`
+	ToolName    string             `json:"tool_name"`
+	ToolCallID  string             `json:"tool_call_id"`
+	Content     string             `json:"content"`
+}
+
+func (r *RecordConversationToolResultRequest) Validate() error {
+	r.OperationID = strings.TrimSpace(r.OperationID)
+	r.RunID = strings.TrimSpace(r.RunID)
+	r.ToolName = strings.TrimSpace(r.ToolName)
+	r.ToolCallID = strings.TrimSpace(r.ToolCallID)
+	r.Content = strings.TrimSpace(r.Content)
+	if r.OperationID == "" {
+		return fmt.Errorf("operation_id is required")
+	}
+	if r.RunID == "" {
+		return fmt.Errorf("run_id is required")
+	}
+	if r.ToolName == "" {
+		return fmt.Errorf("tool_name is required")
+	}
+	if r.ToolCallID == "" {
+		return fmt.Errorf("tool_call_id is required")
+	}
+	if r.Content == "" {
+		return fmt.Errorf("content is required")
+	}
+	if len(r.OperationID) > 512 {
+		return fmt.Errorf("operation_id is too long")
+	}
+	if len(r.RunID) > 512 {
+		return fmt.Errorf("run_id is too long")
+	}
+	if len(r.ToolName) > 128 || !validConversationToolName(r.ToolName) {
+		return fmt.Errorf("tool_name is unsupported")
+	}
+	if len(r.ToolCallID) > 512 {
+		return fmt.Errorf("tool_call_id is too long")
+	}
+	if !utf8.ValidString(r.Content) {
+		return fmt.Errorf("content is not valid UTF-8")
+	}
+	if len(r.Content) > maxConversationToolResultBytes {
+		return fmt.Errorf("content is too long")
+	}
+	anchor, err := r.Anchor.Normalized()
+	if err != nil {
+		return err
+	}
+	r.Anchor = anchor
+	return nil
+}
+
+func validConversationToolName(value string) bool {
+	for index, current := range []byte(value) {
+		if current >= 'a' && current <= 'z' || current >= 'A' && current <= 'Z' || current >= '0' && current <= '9' {
+			continue
+		}
+		if index > 0 && (current == '_' || current == '-' || current == '.' || current == ':') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+type ConversationToolResultReceipt struct {
+	TurnID        string `json:"turn_id"`
+	ObservationID string `json:"observation_id"`
+	ToolName      string `json:"tool_name"`
+	Replayed      bool   `json:"replayed"`
+}
+
 func (r *FailExternalConversationTurnRequest) Validate() error {
 	r.OperationID = strings.TrimSpace(r.OperationID)
 	r.FailureCode = strings.TrimSpace(r.FailureCode)
@@ -214,6 +294,8 @@ type ConversationReviewCandidate struct {
 	Content             string                  `json:"content"`
 	SourceQuote         string                  `json:"source_quote"`
 	SourceObservationID string                  `json:"source_observation_id"`
+	SourceKind          ObservationKind         `json:"source_kind"`
+	SourceLabel         string                  `json:"source_label,omitempty"`
 	Decision            SourceFormationDecision `json:"decision"`
 	TargetMemoryID      string                  `json:"target_memory_id,omitempty"`
 	CreatedAt           time.Time               `json:"created_at"`

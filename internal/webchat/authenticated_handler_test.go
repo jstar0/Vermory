@@ -118,6 +118,82 @@ func TestAuthenticatedHandlerUsesPrincipalTenantAndRolePolicy(t *testing.T) {
 	}
 }
 
+func TestAuthenticatedOpenClawToolResultUsesClientTenantAndHidesRejectedContent(t *testing.T) {
+	_, store := testHandler(t, provider.Mock{Output: "unused"})
+	authenticator := staticAuthenticator{principals: map[string]authn.Principal{
+		"client-tool": principal("identity-tool", authn.RoleClient),
+	}}
+	handler := NewAuthenticatedHandler(store, provider.Mock{Output: "unused"}, "test-model", authenticator)
+
+	prepared := performAuthenticatedJSON(t, handler, "client-tool", http.MethodPost, "/v1/integrations/openclaw/turns/prepare", `{
+  "operation_id":"openclaw:run-tool-http",
+  "session_key":"agent:main:tool-http",
+  "message":"Inspect the keyboard state."
+}`)
+	if prepared.Code != http.StatusOK {
+		t.Fatalf("tool turn prepare failed: %d %s", prepared.Code, prepared.Body.String())
+	}
+
+	accepted := performAuthenticatedJSON(t, handler, "client-tool", http.MethodPost, "/v1/integrations/openclaw/turns/tool-results", `{
+  "operation_id":"openclaw:run-tool-http",
+  "session_key":"agent:main:tool-http",
+  "run_id":"run-tool-http",
+  "tool_name":"device.keyboard_diagnostic",
+  "tool_call_id":"call-tool-http",
+  "content":"Keyboard diagnostic processed 1,333,470 events."
+}`)
+	if accepted.Code != http.StatusOK {
+		t.Fatalf("client tool result failed: %d %s", accepted.Code, accepted.Body.String())
+	}
+	var receipt runtime.ConversationToolResultReceipt
+	decodeResponse(t, accepted, &receipt)
+	if receipt.ObservationID == "" || receipt.ToolName != "device.keyboard_diagnostic" || receipt.Replayed {
+		t.Fatalf("unexpected tool result receipt: %#v", receipt)
+	}
+
+	requestAuthority := performAuthenticatedJSON(t, handler, "client-tool", http.MethodPost, "/v1/integrations/openclaw/turns/tool-results", `{
+  "operation_id":"openclaw:run-tool-http",
+  "session_key":"agent:main:tool-http",
+  "run_id":"run-tool-http",
+  "tool_name":"device.keyboard_diagnostic",
+  "tool_call_id":"call-request-authority",
+  "content":"ok",
+  "tenant_id":"attacker"
+}`)
+	if requestAuthority.Code != http.StatusBadRequest || strings.Contains(requestAuthority.Body.String(), "attacker") {
+		t.Fatalf("request-owned authority was not rejected safely: %d %s", requestAuthority.Code, requestAuthority.Body.String())
+	}
+
+	const sensitive = "api_token=W23_SYNTHETIC_SECRET_MUST_NOT_PERSIST"
+	rejected := performAuthenticatedJSON(t, handler, "client-tool", http.MethodPost, "/v1/integrations/openclaw/turns/tool-results", `{
+  "operation_id":"openclaw:run-tool-http",
+  "session_key":"agent:main:tool-http",
+  "run_id":"run-tool-http",
+  "tool_name":"device.debug",
+  "tool_call_id":"call-sensitive-http",
+  "content":"`+sensitive+`"
+}`)
+	if rejected.Code != http.StatusBadRequest {
+		t.Fatalf("sensitive tool result returned %d: %s", rejected.Code, rejected.Body.String())
+	}
+	if strings.Contains(rejected.Body.String(), sensitive) || strings.Contains(rejected.Body.String(), "device.debug") {
+		t.Fatalf("rejected tool result leaked input: %s", rejected.Body.String())
+	}
+
+	resolution, err := store.ResolveConversation(context.Background(), "identity-tool", runtime.ConversationAnchor{
+		Channel: "openclaw", ThreadID: "agent:main:tool-http",
+	})
+	if err != nil || resolution.Status != runtime.ResolutionResolved {
+		t.Fatalf("authenticated tool result did not use principal tenant: resolution=%#v err=%v", resolution, err)
+	}
+	other, err := store.ResolveConversation(context.Background(), "attacker", runtime.ConversationAnchor{
+		Channel: "openclaw", ThreadID: "agent:main:tool-http",
+	})
+	if err != nil || other.Status != runtime.ResolutionUnresolved {
+		t.Fatalf("request-owned tenant gained a binding: resolution=%#v err=%v", other, err)
+	}
+}
+
 func TestAuthenticatedConversationCandidateReviewIsOperatorOnlyAndSessionScoped(t *testing.T) {
 	_, store := testHandler(t, provider.Mock{Output: "unused"})
 	tenantID := "review-http"

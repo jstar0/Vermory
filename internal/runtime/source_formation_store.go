@@ -714,6 +714,9 @@ func normalizeSourceFormationInputManifest(kind SourceFormationInputKind, manife
 		entry := raw
 		entry.ID = strings.TrimSpace(entry.ID)
 		entry.SHA256 = strings.ToLower(strings.TrimSpace(entry.SHA256))
+		if entry.Kind == "" {
+			entry.Kind = ObservationKindUserMessage
+		}
 		if entry.ID == "" || len(entry.ID) > 64 {
 			return nil, fmt.Errorf("conversation formation input observation %d has an invalid id", index+1)
 		}
@@ -725,6 +728,9 @@ func normalizeSourceFormationInputManifest(kind SourceFormationInputKind, manife
 			return nil, fmt.Errorf("conversation formation input observations must follow authoritative sequence order")
 		}
 		previousSequence = entry.Sequence
+		if !eligibleConversationFormationObservationKind(entry.Kind) {
+			return nil, fmt.Errorf("conversation formation input observation %q has an ineligible kind", entry.ID)
+		}
 		if entry.Bytes <= 0 || entry.Bytes > 65536 {
 			return nil, fmt.Errorf("conversation formation input observation %q has invalid byte length", entry.ID)
 		}
@@ -778,8 +784,15 @@ FOR SHARE`, tenantID, continuityID, expected.ID).Scan(&sequence, &kind, &content
 		if err != nil {
 			return fmt.Errorf("verify conversation formation input observation: %w", err)
 		}
-		if kind != ObservationKindUserMessage {
-			return fmt.Errorf("conversation formation input observation %q is not a user message", expected.ID)
+		if kind != expected.Kind || !eligibleConversationFormationObservationKind(kind) {
+			return fmt.Errorf("conversation formation input observation %q is not eligible", expected.ID)
+		}
+		eligible, err := conversationFormationObservationCompleted(ctx, tx, tenantID, continuityID, expected.ID, kind)
+		if err != nil {
+			return err
+		}
+		if !eligible {
+			return fmt.Errorf("conversation formation input observation %q is not eligible", expected.ID)
 		}
 		if content == "" || content == "[redacted]" || !utf8.ValidString(content) || strings.IndexByte(content, 0) >= 0 {
 			return fmt.Errorf("conversation formation input observation %q is unavailable", expected.ID)
@@ -818,7 +831,29 @@ func (s *Store) SelectConversationFormationObservations(
 SELECT id::text, observation_seq, observation_kind, content
 FROM observations
 WHERE tenant_id = $1 AND continuity_id = $2::uuid
-  AND observation_kind = 'user_message' AND content <> '[redacted]'
+  AND observation_kind IN ('user_message', 'tool_result') AND content <> '[redacted]'
+  AND (
+    (observation_kind = 'user_message' AND EXISTS (
+      SELECT 1 FROM conversation_turns turn
+      WHERE turn.tenant_id = observations.tenant_id
+        AND turn.continuity_id = observations.continuity_id
+        AND turn.user_observation_id = observations.id
+        AND turn.status = 'completed'
+    ))
+    OR
+    (observation_kind = 'tool_result' AND EXISTS (
+      SELECT 1
+      FROM conversation_tool_results result
+      JOIN conversation_turns turn
+        ON turn.tenant_id = result.tenant_id
+       AND turn.continuity_id = result.continuity_id
+       AND turn.id = result.turn_id
+      WHERE result.tenant_id = observations.tenant_id
+        AND result.continuity_id = observations.continuity_id
+        AND result.observation_id = observations.id
+        AND turn.status = 'completed'
+    ))
+  )
 ORDER BY observation_seq DESC
 LIMIT $3`, tenantID, continuityID, recentLimit)
 		if err != nil {
@@ -863,6 +898,13 @@ WHERE tenant_id = $1 AND continuity_id = $2::uuid AND id::text = $3`, tenantID, 
 			if err != nil {
 				return nil, fmt.Errorf("select conversation formation observation: %w", err)
 			}
+			eligible, err := conversationFormationObservationCompleted(ctx, s.pool, tenantID, continuityID, observation.ID, observation.Kind)
+			if err != nil {
+				return nil, err
+			}
+			if !eligible {
+				return nil, fmt.Errorf("conversation formation observation %q is not eligible", id)
+			}
 			observations = append(observations, observation)
 		}
 		sort.Slice(observations, func(i, j int) bool { return observations[i].Sequence < observations[j].Sequence })
@@ -872,8 +914,8 @@ WHERE tenant_id = $1 AND continuity_id = $2::uuid AND id::text = $3`, tenantID, 
 	}
 	totalBytes := 0
 	for _, observation := range observations {
-		if observation.Kind != ObservationKindUserMessage {
-			return nil, fmt.Errorf("conversation formation observation %q is not a user message", observation.ID)
+		if !eligibleConversationFormationObservationKind(observation.Kind) {
+			return nil, fmt.Errorf("conversation formation observation %q is not eligible", observation.ID)
 		}
 		if observation.Content == "" || observation.Content == "[redacted]" || !utf8.ValidString(observation.Content) || strings.IndexByte(observation.Content, 0) >= 0 {
 			return nil, fmt.Errorf("conversation formation observation %q is unavailable", observation.ID)
@@ -898,11 +940,53 @@ func sourceFormationManifestFromObservations(observations []ConversationObservat
 		manifest[index] = SourceFormationInputObservation{
 			ID:       observation.ID,
 			Sequence: observation.Sequence,
+			Kind:     observation.Kind,
 			SHA256:   sourceMatchSHA256([]byte(observation.Content)),
 			Bytes:    len([]byte(observation.Content)),
 		}
 	}
 	return manifest
+}
+
+type conversationFormationQueryRower interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+func eligibleConversationFormationObservationKind(kind ObservationKind) bool {
+	return kind == ObservationKindUserMessage || kind == ObservationKindToolResult
+}
+
+func conversationFormationObservationCompleted(
+	ctx context.Context,
+	query conversationFormationQueryRower,
+	tenantID string,
+	continuityID string,
+	observationID string,
+	kind ObservationKind,
+) (bool, error) {
+	var eligible bool
+	if err := query.QueryRow(ctx, `
+SELECT CASE
+  WHEN $4 = 'user_message' THEN EXISTS (
+    SELECT 1 FROM conversation_turns turn
+    WHERE turn.tenant_id = $1 AND turn.continuity_id = $2::uuid
+      AND turn.user_observation_id = $3::uuid AND turn.status = 'completed'
+  )
+  WHEN $4 = 'tool_result' THEN EXISTS (
+    SELECT 1
+    FROM conversation_tool_results result
+    JOIN conversation_turns turn
+      ON turn.tenant_id = result.tenant_id
+     AND turn.continuity_id = result.continuity_id
+     AND turn.id = result.turn_id
+    WHERE result.tenant_id = $1 AND result.continuity_id = $2::uuid
+      AND result.observation_id = $3::uuid AND turn.status = 'completed'
+  )
+  ELSE false
+END`, tenantID, continuityID, observationID, kind).Scan(&eligible); err != nil {
+		return false, fmt.Errorf("check conversation formation observation eligibility: %w", err)
+	}
+	return eligible, nil
 }
 
 func validateSourceFormationDocument(run SourceFormationReceipt, sourceDocument []byte) (string, string) {

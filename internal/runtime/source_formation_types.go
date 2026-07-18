@@ -38,10 +38,11 @@ type SourceFormationBeginRequest struct {
 }
 
 type SourceFormationInputObservation struct {
-	ID       string `json:"id"`
-	Sequence int64  `json:"sequence"`
-	SHA256   string `json:"sha256"`
-	Bytes    int    `json:"bytes"`
+	ID       string          `json:"id"`
+	Sequence int64           `json:"sequence"`
+	Kind     ObservationKind `json:"kind"`
+	SHA256   string          `json:"sha256"`
+	Bytes    int             `json:"bytes"`
 }
 
 type SourceFormationProviderItem struct {

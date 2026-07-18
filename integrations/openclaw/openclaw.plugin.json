@@ -17,6 +17,10 @@
     "timeoutMs": {
       "label": "Request timeout (ms)",
       "help": "Maximum time each Vermory HTTP request may take."
+	},
+	"toolAllowlist": {
+	  "label": "Tool-result allowlist",
+	  "help": "Exact OpenClaw tool names whose successful text results may be proposed for review."
     }
   },
   "configSchema": {
@@ -36,6 +40,16 @@
         "minimum": 250,
         "maximum": 30000,
         "default": 5000
+	  },
+	  "toolAllowlist": {
+		"type": "array",
+		"maxItems": 64,
+		"uniqueItems": true,
+		"default": [],
+		"items": {
+		  "type": "string",
+		  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+		}
       }
     }
   }

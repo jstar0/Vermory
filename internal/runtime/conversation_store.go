@@ -719,7 +719,7 @@ SET status = 'completed', delivery_id = $1::uuid, assistant_observation_id = $2:
 WHERE id = $6::uuid`, deliveryID, assistant.ObservationID, answer, conversationContentFingerprint(answer), model, turnID); err != nil {
 		return ChatTurnReceipt{}, fmt.Errorf("complete conversation turn: %w", err)
 	}
-	if _, err := enqueueConversationFormationTx(ctx, tx, tenantID, continuityID, userObservationID); err != nil {
+	if _, err := enqueueConversationFormationTx(ctx, tx, tenantID, continuityID, turnID, userObservationID); err != nil {
 		return ChatTurnReceipt{}, err
 	}
 	receipt, found, err := lookupConversationTurnTx(ctx, tx, tenantID, operationID)

@@ -18,7 +18,7 @@ func TestConversationFormationScheduleMigrationIsTenantScopedAndPreservesParentO
 	store := openTestStore(t)
 	ctx := context.Background()
 
-	if version, err := store.SchemaVersion(ctx); err != nil || version != 20 {
+	if version, err := store.SchemaVersion(ctx); err != nil || version != 21 {
 		t.Fatalf("schema version=%d err=%v", version, err)
 	}
 	for _, column := range []string{
@@ -183,6 +183,100 @@ WHERE tenant_id = 'schedule-turns' AND continuity_id = $1::uuid`, completed.Cont
 	}
 	if len(claim.Observations) != 1 || claim.Observations[0].ID != completed.UserObservationID || claim.Observations[0].Kind != ObservationKindUserMessage {
 		t.Fatalf("automatic formation included anything other than the completed user observation: %#v", claim)
+	}
+}
+
+func TestCompletedTurnSchedulesUserAndToolResultsButExcludesAssistantAndFailedTurns(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	service := NewConversationService(store, "schedule-tool-results", nil, "", ConversationServiceConfig{})
+	anchor := ConversationAnchor{Channel: "openclaw", ThreadID: "tool-results"}
+	prepared, err := service.PrepareExternalTurn(ctx, ExternalConversationTurnRequest{
+		OperationID: "openclaw:schedule-tool-success",
+		Anchor:      anchor,
+		Message:     "Check current storage.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tool, err := service.RecordToolResult(ctx, RecordConversationToolResultRequest{
+		OperationID: prepared.OperationID,
+		Anchor:      anchor,
+		RunID:       "schedule-tool-success",
+		ToolName:    "device.storage_check",
+		ToolCallID:  "call-storage-success",
+		Content:     "Storage has 87 GB available and is 82 percent used.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := service.CompleteExternalTurn(ctx, CompleteExternalConversationTurnRequest{
+		OperationID: prepared.OperationID,
+		Anchor:      anchor,
+		Answer:      "Storage check completed.",
+		Model:       "fixture-client-model",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var toolSequence int64
+	if err := store.pool.QueryRow(ctx, `SELECT observation_seq FROM observations WHERE id = $1::uuid`, tool.ObservationID).Scan(&toolSequence); err != nil {
+		t.Fatal(err)
+	}
+	schedule, err := store.ConversationFormationSchedule(ctx, "schedule-tool-results", completed.ContinuityID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if schedule.RequestedThroughSequence != toolSequence {
+		t.Fatalf("schedule stopped before the final eligible tool result: %#v tool_seq=%d", schedule, toolSequence)
+	}
+	claim, found, err := store.ClaimConversationFormation(ctx, "schedule-tool-results", time.Minute, time.Second)
+	if err != nil || !found {
+		t.Fatalf("tool formation claim found=%t err=%v", found, err)
+	}
+	if len(claim.Observations) != 2 || claim.Observations[0].Kind != ObservationKindUserMessage || claim.Observations[1].Kind != ObservationKindToolResult {
+		t.Fatalf("claim did not contain exactly user and tool evidence: %#v", claim.Observations)
+	}
+	for _, observation := range claim.Observations {
+		if observation.ID == completed.AssistantObservationID {
+			t.Fatalf("assistant observation entered automatic formation: %#v", claim.Observations)
+		}
+	}
+
+	failedAnchor := ConversationAnchor{Channel: "openclaw", ThreadID: "failed-tool-result"}
+	failedPrepared, err := service.PrepareExternalTurn(ctx, ExternalConversationTurnRequest{
+		OperationID: "openclaw:schedule-tool-failed",
+		Anchor:      failedAnchor,
+		Message:     "Attempt the removal.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	failedTool, err := service.RecordToolResult(ctx, RecordConversationToolResultRequest{
+		OperationID: failedPrepared.OperationID,
+		Anchor:      failedAnchor,
+		RunID:       "schedule-tool-failed",
+		ToolName:    "device.remove_bundle",
+		ToolCallID:  "call-failed-turn",
+		Content:     "A partial result that must not be formed after the turn fails.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.FailExternalTurn(ctx, FailExternalConversationTurnRequest{
+		OperationID: failedPrepared.OperationID,
+		Anchor:      failedAnchor,
+		FailureCode: "openclaw_agent_error",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	formation := NewSourceFormationService(store, "schedule-tool-results", provider.Mock{Output: `{"candidates":[],"reason":"none"}`}, "fixture", "fixture")
+	if _, err := formation.FormConversation(ctx, ConversationFormationRequest{
+		OperationID:    "failed-tool-result-formation",
+		Anchor:         failedAnchor,
+		ObservationIDs: []string{failedTool.ObservationID},
+	}); err == nil || !strings.Contains(err.Error(), "eligible") {
+		t.Fatalf("failed-turn tool result entered formation: %v", err)
 	}
 }
 

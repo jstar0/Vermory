@@ -96,13 +96,14 @@ func bearerCredential(request *http.Request) (string, bool) {
 
 func authenticatedRouteAccess(method, path string) routeAccess {
 	clientRoutes := map[string]struct{}{
-		"POST /v1/chat/turn":                            {},
-		"POST /v1/integrations/openclaw/turns/prepare":  {},
-		"POST /v1/integrations/openclaw/turns/complete": {},
-		"POST /v1/integrations/openclaw/turns/fail":     {},
-		"POST /v1/integrations/hermes/turns/prepare":    {},
-		"POST /v1/integrations/hermes/turns/complete":   {},
-		"POST /v1/integrations/hermes/turns/fail":       {},
+		"POST /v1/chat/turn":                                {},
+		"POST /v1/integrations/openclaw/turns/prepare":      {},
+		"POST /v1/integrations/openclaw/turns/complete":     {},
+		"POST /v1/integrations/openclaw/turns/fail":         {},
+		"POST /v1/integrations/openclaw/turns/tool-results": {},
+		"POST /v1/integrations/hermes/turns/prepare":        {},
+		"POST /v1/integrations/hermes/turns/complete":       {},
+		"POST /v1/integrations/hermes/turns/fail":           {},
 	}
 	operatorRoutes := map[string]struct{}{
 		"POST /v1/memories/confirm":           {},

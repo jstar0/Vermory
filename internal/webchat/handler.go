@@ -38,6 +38,7 @@ func newHandler(service *runtime.ConversationService, defaults *runtime.GlobalDe
 	handler.mux.HandleFunc("POST /v1/integrations/openclaw/turns/prepare", handler.prepareOpenClawTurn)
 	handler.mux.HandleFunc("POST /v1/integrations/openclaw/turns/complete", handler.completeOpenClawTurn)
 	handler.mux.HandleFunc("POST /v1/integrations/openclaw/turns/fail", handler.failOpenClawTurn)
+	handler.mux.HandleFunc("POST /v1/integrations/openclaw/turns/tool-results", handler.recordOpenClawToolResult)
 	handler.mux.HandleFunc("POST /v1/integrations/hermes/turns/prepare", handler.prepareHermesTurn)
 	handler.mux.HandleFunc("POST /v1/integrations/hermes/turns/complete", handler.completeHermesTurn)
 	handler.mux.HandleFunc("POST /v1/integrations/hermes/turns/fail", handler.failHermesTurn)
@@ -97,6 +98,14 @@ type failOpenClawTurnInput struct {
 	openClawTurnInput
 	FailureCode    string `json:"failure_code"`
 	FailureMessage string `json:"failure_message"`
+}
+
+type recordOpenClawToolResultInput struct {
+	openClawTurnInput
+	RunID      string `json:"run_id"`
+	ToolName   string `json:"tool_name"`
+	ToolCallID string `json:"tool_call_id"`
+	Content    string `json:"content"`
 }
 
 type confirmMemoryInput struct {
@@ -256,6 +265,26 @@ func (h *Handler) completeExternalTurn(response http.ResponseWriter, request *ht
 
 func (h *Handler) failOpenClawTurn(response http.ResponseWriter, request *http.Request) {
 	h.failExternalTurn(response, request, "openclaw")
+}
+
+func (h *Handler) recordOpenClawToolResult(response http.ResponseWriter, request *http.Request) {
+	var input recordOpenClawToolResultInput
+	if !decodeRequestJSON(response, request, &input) {
+		return
+	}
+	receipt, err := h.service.RecordToolResult(request.Context(), runtime.RecordConversationToolResultRequest{
+		OperationID: input.OperationID,
+		Anchor:      runtime.ConversationAnchor{Channel: "openclaw", ThreadID: input.SessionKey},
+		RunID:       input.RunID,
+		ToolName:    input.ToolName,
+		ToolCallID:  input.ToolCallID,
+		Content:     input.Content,
+	})
+	if err != nil {
+		writeServiceError(response, err)
+		return
+	}
+	writeJSON(response, http.StatusOK, receipt)
 }
 
 func (h *Handler) failHermesTurn(response http.ResponseWriter, request *http.Request) {
@@ -674,6 +703,10 @@ func isSafeClientError(message string) bool {
 		"must be different",
 		"duplicate item",
 		"is unsupported",
+		"contains sensitive data",
+		"too many tool results",
+		"total content is too long",
+		"does not match the prepared operation",
 	} {
 		if strings.Contains(message, fragment) {
 			return true

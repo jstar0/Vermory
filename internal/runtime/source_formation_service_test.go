@@ -727,6 +727,147 @@ func TestConversationFormationRecentWindowReplayKeepsBoundManifest(t *testing.T)
 	}
 }
 
+func TestConversationFormationUsesLabeledToolResultEvidenceAndForgetsItCompletely(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	tenantID := "conversation-tool-formation"
+	anchor := ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:device-maintenance"}
+	conversation := NewConversationService(store, tenantID, nil, "", ConversationServiceConfig{})
+	prepared, err := conversation.PrepareExternalTurn(ctx, ExternalConversationTurnRequest{
+		OperationID: "openclaw:run-tool-formation",
+		Anchor:      anchor,
+		Message:     "Remove the retired diagnostic bundle and report the result.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tool, err := conversation.RecordToolResult(ctx, RecordConversationToolResultRequest{
+		OperationID: prepared.OperationID,
+		Anchor:      anchor,
+		RunID:       "run-tool-formation",
+		ToolName:    "device.remove_diagnostic_bundle",
+		ToolCallID:  "call-remove-bundle",
+		Content:     "The retired diagnostic bundle was removed successfully.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := conversation.CompleteExternalTurn(ctx, CompleteExternalConversationTurnRequest{
+		OperationID: prepared.OperationID,
+		Anchor:      anchor,
+		Answer:      "I removed every diagnostic bundle, including unrelated chat apps.",
+		Model:       "fixture-client-model",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	llm := &sourceFormationTestProvider{response: provider.GenerateResponse{
+		Output: fmt.Sprintf(`{"candidates":[{"decision":"new","memory_key":"device.diagnostic_bundle.removal","source_observation_id":%q,"quote":"The retired diagnostic bundle was removed successfully.","occurrence":1,"content":"The retired diagnostic bundle was removed successfully.","reason":"The allowed tool reported a durable completed outcome."}],"reason":"One tool-reported outcome is reviewable."}`, tool.ObservationID),
+		Model:  "resolved-tool-formation-model",
+	}}
+	formation := NewSourceFormationService(store, tenantID, llm, "test-provider", "requested-tool-formation-model")
+	receipt, err := formation.FormConversation(ctx, ConversationFormationRequest{
+		OperationID:    "tool-formation",
+		Anchor:         anchor,
+		ObservationIDs: []string{prepared.UserObservationID, tool.ObservationID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt.Status != SourceFormationCompleted || len(receipt.Items) != 1 || receipt.Items[0].CandidateStatus != "proposed" {
+		t.Fatalf("unexpected tool formation receipt: %#v", receipt)
+	}
+	if len(llm.calls) != 1 {
+		t.Fatalf("tool formation provider calls=%d", len(llm.calls))
+	}
+	packet := llm.calls[0].ContextPacket
+	for _, required := range []string{`"kind": "user_message"`, `"kind": "tool_result"`, tool.ObservationID, "removed successfully"} {
+		if !strings.Contains(packet, required) {
+			t.Fatalf("tool formation packet omitted %q: %s", required, packet)
+		}
+	}
+	if strings.Contains(packet, completed.Answer) {
+		t.Fatalf("assistant claim entered tool formation packet: %s", packet)
+	}
+
+	inbox, err := conversation.ReviewCandidates(ctx, anchor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inbox.Candidates) != 1 || inbox.Candidates[0].SourceKind != ObservationKindToolResult ||
+		inbox.Candidates[0].SourceLabel != "device.remove_diagnostic_bundle" {
+		t.Fatalf("tool review provenance is incomplete: %#v", inbox)
+	}
+	if _, err := formation.FormConversation(ctx, ConversationFormationRequest{
+		OperationID:    "assistant-formation-rejected",
+		Anchor:         anchor,
+		ObservationIDs: []string{completed.AssistantObservationID},
+	}); err == nil || !strings.Contains(err.Error(), "eligible") {
+		t.Fatalf("assistant observation entered formation: %v", err)
+	}
+
+	accepted, err := conversation.AcceptCandidate(ctx, ReviewConversationCandidateRequest{
+		OperationID: "accept-tool-formation",
+		Anchor:      anchor,
+		MemoryID:    receipt.Items[0].CandidateMemoryID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := conversation.PrepareExternalTurn(ctx, ExternalConversationTurnRequest{
+		OperationID: "openclaw:fresh-tool-recall",
+		Anchor:      anchor,
+		Message:     "What happened to the retired diagnostic bundle?",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(fresh.Context, "removed successfully") {
+		t.Fatalf("accepted tool-origin memory was not recalled: %s", fresh.Context)
+	}
+
+	if _, err := conversation.Forget(ctx, ForgetConversationMemoryRequest{
+		OperationID: "forget-tool-formation",
+		Anchor:      anchor,
+		MemoryID:    accepted.Memory.MemoryID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RebuildProjection(ctx, tenantID, receipt.ContinuityID); err != nil {
+		t.Fatal(err)
+	}
+	var observationContent, itemQuote, itemContent string
+	if err := store.pool.QueryRow(ctx, `SELECT content FROM observations WHERE id = $1::uuid`, tool.ObservationID).Scan(&observationContent); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.pool.QueryRow(ctx, `
+SELECT quote, content FROM source_formation_items WHERE candidate_memory_id = $1::uuid`, accepted.Memory.MemoryID).Scan(&itemQuote, &itemContent); err != nil {
+		t.Fatal(err)
+	}
+	if observationContent != "[redacted]" || itemQuote != "[redacted]" || itemContent != "[redacted]" {
+		t.Fatalf("tool-origin evidence survived forgetting: observation=%q quote=%q content=%q", observationContent, itemQuote, itemContent)
+	}
+	postForget, err := conversation.PrepareExternalTurn(ctx, ExternalConversationTurnRequest{
+		OperationID: "openclaw:post-tool-forget",
+		Anchor:      anchor,
+		Message:     "What happened to the retired diagnostic bundle?",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(postForget.Context, "removed successfully") {
+		t.Fatalf("forgotten tool-origin memory remained deliverable: %s", postForget.Context)
+	}
+	postInbox, err := conversation.ReviewCandidates(ctx, anchor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(postInbox.Candidates) != 0 {
+		t.Fatalf("forgotten tool candidate remained reviewable: %#v", postInbox)
+	}
+}
+
 func persistFormationConversationTurn(
 	t *testing.T,
 	service *ConversationService,

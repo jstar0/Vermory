@@ -21,6 +21,7 @@ var runtimeReadWriteTables = []string{
 	"memory_deliveries",
 	"memory_search_documents",
 	"conversation_turns",
+	"conversation_tool_results",
 	"bridge_operations",
 	"bridge_events",
 	"bridge_memory_effects",

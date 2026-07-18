@@ -159,12 +159,13 @@ func (s *Store) ResetForTest(ctx context.Context) error {
 	  memory_eligibility_operations,
 	  memory_projection_prune_runs, memory_projection_retention,
 	  memory_retrieval_runs, memory_vector_documents_2560, memory_vector_documents,
-  memory_projection_cursors, memory_projection_events,
-  conversation_formation_schedules,
-  source_formation_items, source_formation_runs, source_match_decisions,
-  conversation_links, bridge_memory_effects, bridge_events, bridge_operations,
-  memory_search_documents, memory_deliveries, governed_memories,
-  conversation_turns, observations, conversation_bindings, continuity_bindings, continuity_spaces CASCADE`)
+	  memory_projection_cursors, memory_projection_events,
+	  conversation_formation_schedules,
+	  source_formation_items, source_formation_runs, source_match_decisions,
+	  conversation_links, bridge_memory_effects, bridge_events, bridge_operations,
+	  memory_search_documents, memory_deliveries, governed_memories,
+	  conversation_tool_results, conversation_turns, observations,
+	  conversation_bindings, continuity_bindings, continuity_spaces CASCADE`)
 	if err != nil {
 		return fmt.Errorf("reset runtime store: %w", err)
 	}
@@ -228,6 +229,7 @@ WHERE rolname = current_user`).Scan(&canLogin, &superuser, &bypassRLS); err != n
 	readWriteTables := []string{
 		"continuity_spaces", "continuity_bindings", "conversation_bindings", "observations",
 		"memory_deliveries", "memory_search_documents", "conversation_turns",
+		"conversation_tool_results",
 		"bridge_operations", "bridge_events", "bridge_memory_effects", "conversation_links",
 		"source_match_decisions", "source_formation_runs", "source_formation_items",
 		"conversation_formation_schedules",

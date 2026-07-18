@@ -16,17 +16,26 @@ const (
 	conversationFormationWindowBytes = 65536
 )
 
-func enqueueConversationFormationTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, userObservationID string) (ConversationFormationSchedule, error) {
+func enqueueConversationFormationTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, turnID, userObservationID string) (ConversationFormationSchedule, error) {
 	var sequence int64
 	if err := tx.QueryRow(ctx, `
-SELECT observation_seq
-FROM observations
-WHERE tenant_id = $1 AND continuity_id = $2::uuid AND id = $3::uuid
-  AND observation_kind = 'user_message' AND content <> '[redacted]'`,
-		tenantID, continuityID, userObservationID,
+SELECT max(observation.observation_seq)
+FROM observations observation
+WHERE observation.tenant_id = $1 AND observation.continuity_id = $2::uuid
+  AND observation.content <> '[redacted]'
+  AND (
+    (observation.id = $3::uuid AND observation.observation_kind = 'user_message')
+    OR
+    (observation.observation_kind = 'tool_result' AND EXISTS (
+      SELECT 1 FROM conversation_tool_results result
+      WHERE result.tenant_id = $1 AND result.continuity_id = $2::uuid
+        AND result.turn_id = $4::uuid AND result.observation_id = observation.id
+    ))
+  )`,
+		tenantID, continuityID, userObservationID, turnID,
 	).Scan(&sequence); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return ConversationFormationSchedule{}, fmt.Errorf("user observation is not eligible for automatic formation")
+			return ConversationFormationSchedule{}, fmt.Errorf("conversation turn has no eligible automatic formation observations")
 		}
 		return ConversationFormationSchedule{}, fmt.Errorf("lookup automatic formation observation: %w", err)
 	}
@@ -391,8 +400,30 @@ func selectConversationFormationWindowTx(ctx context.Context, tx pgx.Tx, tenantI
 SELECT id::text, observation_seq, observation_kind, content
 FROM observations
 WHERE tenant_id = $1 AND continuity_id = $2::uuid
-  AND observation_kind = 'user_message' AND content <> '[redacted]'
+  AND observation_kind IN ('user_message', 'tool_result') AND content <> '[redacted]'
   AND observation_seq > $3 AND observation_seq <= $4
+  AND (
+    (observation_kind = 'user_message' AND EXISTS (
+      SELECT 1 FROM conversation_turns turn
+      WHERE turn.tenant_id = observations.tenant_id
+        AND turn.continuity_id = observations.continuity_id
+        AND turn.user_observation_id = observations.id
+        AND turn.status = 'completed'
+    ))
+    OR
+    (observation_kind = 'tool_result' AND EXISTS (
+      SELECT 1
+      FROM conversation_tool_results result
+      JOIN conversation_turns turn
+        ON turn.tenant_id = result.tenant_id
+       AND turn.continuity_id = result.continuity_id
+       AND turn.id = result.turn_id
+      WHERE result.tenant_id = observations.tenant_id
+        AND result.continuity_id = observations.continuity_id
+        AND result.observation_id = observations.id
+        AND turn.status = 'completed'
+    ))
+  )
 ORDER BY observation_seq
 LIMIT $5`, tenantID, continuityID, processed, requested, conversationFormationWindowLimit)
 	if err != nil {
@@ -428,7 +459,29 @@ SELECT id::text, observation_seq, observation_kind, content
 FROM observations
 WHERE tenant_id = $1 AND continuity_id = $2::uuid
   AND id = ANY($3::uuid[])
-  AND observation_kind = 'user_message' AND content <> '[redacted]'
+  AND observation_kind IN ('user_message', 'tool_result') AND content <> '[redacted]'
+  AND (
+    (observation_kind = 'user_message' AND EXISTS (
+      SELECT 1 FROM conversation_turns turn
+      WHERE turn.tenant_id = observations.tenant_id
+        AND turn.continuity_id = observations.continuity_id
+        AND turn.user_observation_id = observations.id
+        AND turn.status = 'completed'
+    ))
+    OR
+    (observation_kind = 'tool_result' AND EXISTS (
+      SELECT 1
+      FROM conversation_tool_results result
+      JOIN conversation_turns turn
+        ON turn.tenant_id = result.tenant_id
+       AND turn.continuity_id = result.continuity_id
+       AND turn.id = result.turn_id
+      WHERE result.tenant_id = observations.tenant_id
+        AND result.continuity_id = observations.continuity_id
+        AND result.observation_id = observations.id
+        AND turn.status = 'completed'
+    ))
+  )
 ORDER BY array_position($3::uuid[], id)`, tenantID, continuityID, ids)
 	if err != nil {
 		return nil, fmt.Errorf("load automatic conversation formation window: %w", err)

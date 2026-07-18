@@ -47,6 +47,8 @@ func TestInstallOpenClawServicePreservesGeneratedAuthAndExistingConfig(t *testin
 		command.Env = append(os.Environ(),
 			"HOME="+home,
 			"VERMORY_APP_DIR="+appDir,
+			"VERMORY_OPENCLAW_BASE_URL=http://127.0.0.1:8793",
+			`VERMORY_OPENCLAW_TOOL_ALLOWLIST_JSON=["device.storage_check","device.remove_bundle"]`,
 			"FAKE_OPENCLAW_ROOT="+root,
 		)
 		if output, err := command.CombinedOutput(); err != nil {
@@ -80,8 +82,15 @@ func TestInstallOpenClawServicePreservesGeneratedAuthAndExistingConfig(t *testin
 	if got := nestedString(config, "plugins", "entries", "fixture-plugin", "marker"); got != "preserve-plugin" {
 		t.Fatalf("unrelated plugin config was overwritten: %q", got)
 	}
-	if got := nestedString(config, "plugins", "entries", "vermory", "config", "baseUrl"); got != "http://127.0.0.1:8787" {
+	if got := nestedString(config, "plugins", "entries", "vermory", "config", "baseUrl"); got != "http://127.0.0.1:8793" {
 		t.Fatalf("Vermory plugin config missing: %q", got)
+	}
+	allowlist := nestedStrings(config, "plugins", "entries", "vermory", "config", "toolAllowlist")
+	if strings.Join(allowlist, ",") != "device.storage_check,device.remove_bundle" {
+		t.Fatalf("Vermory tool allowlist mismatch: %#v", allowlist)
+	}
+	if got := nestedNumber(config, "plugins", "entries", "vermory", "hooks", "timeouts", "after_tool_call"); got != 15000 {
+		t.Fatalf("after_tool_call timeout = %v, want 15000", got)
 	}
 	info, err := os.Stat(configPath)
 	if err != nil {
@@ -251,6 +260,43 @@ func nestedString(value map[string]any, path ...string) string {
 	}
 	text, _ := current.(string)
 	return text
+}
+
+func nestedStrings(value map[string]any, path ...string) []string {
+	var current any = value
+	for _, key := range path {
+		object, ok := current.(map[string]any)
+		if !ok {
+			return nil
+		}
+		current = object[key]
+	}
+	values, ok := current.([]any)
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		text, ok := value.(string)
+		if !ok {
+			return nil
+		}
+		result = append(result, text)
+	}
+	return result
+}
+
+func nestedNumber(value map[string]any, path ...string) float64 {
+	var current any = value
+	for _, key := range path {
+		object, ok := current.(map[string]any)
+		if !ok {
+			return 0
+		}
+		current = object[key]
+	}
+	number, _ := current.(float64)
+	return number
 }
 
 const fakeOpenClawCLI = `#!/bin/sh

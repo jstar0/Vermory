@@ -20,10 +20,88 @@ describe("Vermory OpenClaw plugin", () => {
     expect(plugin.kind).toBeUndefined();
     expect(harness.options.get("before_prompt_build")).toEqual({ timeoutMs: 15_000 });
     expect(harness.options.get("agent_end")).toEqual({ timeoutMs: 30_000 });
+	expect(harness.options.get("after_tool_call")).toEqual({ timeoutMs: 15_000 });
 	expect(harness.command?.name).toBe("vermory");
 	expect(harness.command?.acceptsArgs).toBe(true);
 	expect(harness.command?.requireAuth).toBe(true);
 	expect(harness.registerTool).not.toHaveBeenCalled();
+  });
+
+  it("captures only successful allowlisted exact-identity tool results", async () => {
+	vi.stubEnv("VERMORY_API_TOKEN", TEST_API_TOKEN);
+	const requests: Array<{ path: string; body: Record<string, unknown> }> = [];
+	const fetchMock = vi.fn(async (input: unknown, init: RequestInit) => {
+		const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+		requests.push({ path: new URL(String(input)).pathname, body });
+		return jsonResponse({
+			turn_id: "11111111-1111-1111-1111-111111111111",
+			observation_id: "22222222-2222-2222-2222-222222222222",
+			tool_name: body.tool_name,
+			replayed: false,
+		});
+	});
+	vi.stubGlobal("fetch", fetchMock);
+	const harness = registerPlugin({ toolAllowlist: ["device.storage_check"] });
+
+	await harness.afterToolCall(
+		{
+			toolName: "device.storage_check",
+			params: { includeHidden: true },
+			runId: "run-tool-hook",
+			toolCallId: "call-tool-hook",
+			result: { content: [{ type: "text", text: "Storage has 87 GB available and is 82 percent used." }] },
+		},
+		{
+			sessionKey: "agent:main:device",
+			runId: "run-tool-hook",
+			toolName: "device.storage_check",
+			toolCallId: "call-tool-hook",
+		},
+	);
+
+	expect(requests).toEqual([{
+		path: "/v1/integrations/openclaw/turns/tool-results",
+		body: {
+			operation_id: "openclaw:run-tool-hook",
+			session_key: "agent:main:device",
+			run_id: "run-tool-hook",
+			tool_name: "device.storage_check",
+			tool_call_id: "call-tool-hook",
+			content: "Storage has 87 GB available and is 82 percent used.",
+		},
+	}]);
+	expect(JSON.stringify(requests)).not.toContain("includeHidden");
+  });
+
+  it.each([
+	["unallowed", { toolName: "weather", params: {}, runId: "run-ignore", toolCallId: "call-ignore", result: "sunny" }, { sessionKey: "agent:main:a", runId: "run-ignore", toolName: "weather", toolCallId: "call-ignore" }],
+	["failed", { toolName: "device.check", params: {}, runId: "run-ignore", toolCallId: "call-ignore", result: "partial", error: "failed" }, { sessionKey: "agent:main:a", runId: "run-ignore", toolName: "device.check", toolCallId: "call-ignore" }],
+	["missing identity", { toolName: "device.check", params: {}, result: "ok" }, { sessionKey: "agent:main:a", toolName: "device.check" }],
+	["run mismatch", { toolName: "device.check", params: {}, runId: "run-a", toolCallId: "call-a", result: "ok" }, { sessionKey: "agent:main:a", runId: "run-b", toolName: "device.check", toolCallId: "call-a" }],
+	["call mismatch", { toolName: "device.check", params: {}, runId: "run-a", toolCallId: "call-a", result: "ok" }, { sessionKey: "agent:main:a", runId: "run-a", toolName: "device.check", toolCallId: "call-b" }],
+	["tool mismatch", { toolName: "device.check", params: {}, runId: "run-a", toolCallId: "call-a", result: "ok" }, { sessionKey: "agent:main:a", runId: "run-a", toolName: "device.other", toolCallId: "call-a" }],
+	["unsupported result", { toolName: "device.check", params: {}, runId: "run-a", toolCallId: "call-a", result: { output: "hidden" } }, { sessionKey: "agent:main:a", runId: "run-a", toolName: "device.check", toolCallId: "call-a" }],
+	["sensitive result", { toolName: "device.check", params: {}, runId: "run-a", toolCallId: "call-a", result: "api_token=W23_SYNTHETIC_SECRET_MUST_NOT_PERSIST" }, { sessionKey: "agent:main:a", runId: "run-a", toolName: "device.check", toolCallId: "call-a" }],
+  ])("ignores %s tool events", async (_name, event, context) => {
+	const fetchMock = vi.fn();
+	vi.stubGlobal("fetch", fetchMock);
+	const harness = registerPlugin({ toolAllowlist: ["device.check"] });
+	await expect(harness.afterToolCall(event, context)).resolves.toBeUndefined();
+	expect(fetchMock).not.toHaveBeenCalled();
+	expect(harness.warn).not.toHaveBeenCalled();
+  });
+
+  it("keeps tool execution fail-open when persistence fails", async () => {
+	vi.stubGlobal("fetch", vi.fn(async () => new Response("private-result", { status: 503 })));
+	const harness = registerPlugin({ toolAllowlist: ["device.check"] });
+	await expect(harness.afterToolCall(
+		{ toolName: "device.check", params: {}, runId: "run-fail-open", toolCallId: "call-fail-open", result: "visible tool result" },
+		{ sessionKey: "agent:main:a", runId: "run-fail-open", toolName: "device.check", toolCallId: "call-fail-open" },
+	)).resolves.toBeUndefined();
+	const warning = harness.warn.mock.calls[0]?.[0] ?? "";
+	expect(warning).toContain("tool result");
+	expect(warning).not.toContain("visible tool result");
+	expect(warning).not.toContain("private-result");
   });
 
 	it("runs direct governance with a separate operator token and session-local short references", async () => {
@@ -42,7 +120,7 @@ describe("Vermory OpenClaw plugin", () => {
 				return jsonResponse({
 					resolution: { status: "resolved", continuity_id: "continuity-a", channel: "openclaw", thread_id: "agent:main:a", created: false },
 					candidates: [
-						candidate("aaaaaaaa-1111-1111-1111-111111111111", "submission.bundle.current", "The bundle is thesis-defense-v7.zip."),
+						candidate("aaaaaaaa-1111-1111-1111-111111111111", "submission.bundle.current", "The bundle is thesis-defense-v7.zip.", "tool_result", "device.storage_check"),
 						candidate("aaaaaaaa-2222-2222-2222-222222222222", "submission.deadline.current", "The deadline is Tuesday at 18:00."),
 					],
 				});
@@ -75,7 +153,9 @@ describe("Vermory OpenClaw plugin", () => {
 		expect(listed.text).toContain("aaaaaaaa2");
 		expect(listed.text).toContain("bbbbbbbb");
 		expect(listed.text).toContain("thesis-defense-v7.zip");
+		expect(listed.text).toContain("tool device.storage_check");
 		expect(listed.text).not.toContain("PRIVATE RAW CHAT");
+		expect(listed.text).not.toContain("tool_call_id");
 		expect(listed.text).not.toContain("aaaaaaaa-1111-1111-1111-111111111111");
 
 		const callsAfterList = fetchMock.mock.calls.length;
@@ -417,16 +497,28 @@ function registerPlugin(pluginConfig: Record<string, unknown> = {}) {
       event: { success: boolean; messages: unknown[] },
       context: Record<string, unknown>,
     ) => Promise<void>,
+	afterToolCall: hooks.get("after_tool_call") as (
+	  event: Record<string, unknown>,
+	  context: Record<string, unknown>,
+	) => Promise<void>,
   };
 }
 
-function candidate(id: string, key: string, content: string) {
+function candidate(
+	id: string,
+	key: string,
+	content: string,
+	sourceKind: "user_message" | "tool_result" = "user_message",
+	sourceLabel?: string,
+) {
 	return {
 		candidate_memory_id: id,
 		memory_key: key,
 		content,
 		source_quote: content,
 		source_observation_id: "dddddddd-1111-1111-1111-111111111111",
+		source_kind: sourceKind,
+		...(sourceLabel ? { source_label: sourceLabel } : {}),
 		decision: "new",
 		created_at: "2026-07-18T00:00:00Z",
 	};

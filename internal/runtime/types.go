@@ -25,6 +25,7 @@ const (
 	ObservationKindBridgePromote    ObservationKind = "bridge_promote"
 	ObservationKindSourceCandidate  ObservationKind = "source_candidate"
 	ObservationKindCandidateReject  ObservationKind = "candidate_rejection"
+	ObservationKindToolResult       ObservationKind = "tool_result"
 )
 
 type WorkspaceAnchor struct {
@@ -150,7 +151,8 @@ func (k ObservationKind) Valid() bool {
 		ObservationKindGlobalDefaultSet,
 		ObservationKindBridgePromote,
 		ObservationKindSourceCandidate,
-		ObservationKindCandidateReject:
+		ObservationKindCandidateReject,
+		ObservationKindToolResult:
 		return true
 	default:
 		return false

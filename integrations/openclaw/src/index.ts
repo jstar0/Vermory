@@ -5,6 +5,7 @@ import { normalizePluginConfig } from "./config.js";
 import { VermoryGovernanceCommand } from "./governance.js";
 import { resolveTurnIdentity } from "./identity.js";
 import { extractLatestAssistantOutput } from "./messages.js";
+import { extractToolResultText } from "./tool-results.js";
 
 const REFERENCE_CONTEXT_PREFIX = [
   "Vermory reference data follows.",
@@ -75,6 +76,45 @@ const plugin: ReturnType<typeof definePluginEntry> = definePluginEntry({
     );
 
     api.on(
+	  "after_tool_call",
+	  async (event, context) => {
+		if (!config.enabled || event.error !== undefined) {
+		  return;
+		}
+		const sessionKey = context.sessionKey?.trim();
+		const eventRunID = event.runId?.trim();
+		const contextRunID = context.runId?.trim();
+		const eventToolCallID = event.toolCallId?.trim();
+		const contextToolCallID = context.toolCallId?.trim();
+		const eventToolName = event.toolName.trim();
+		const contextToolName = context.toolName.trim();
+		if (!sessionKey || !eventRunID || !contextRunID || eventRunID !== contextRunID ||
+		  !eventToolCallID || !contextToolCallID || eventToolCallID !== contextToolCallID ||
+		  eventToolName === "" || eventToolName !== contextToolName ||
+		  !config.toolAllowlist.includes(eventToolName)) {
+		  return;
+		}
+		const content = extractToolResultText(event.result);
+		if (!content) {
+		  return;
+		}
+		try {
+		  await client.recordToolResult({
+			operationId: `openclaw:${eventRunID}`,
+			sessionKey,
+			runId: eventRunID,
+			toolName: eventToolName,
+			toolCallId: eventToolCallID,
+			content,
+		  });
+		} catch {
+		  api.logger.warn("Vermory tool result persistence failed; OpenClaw tool execution remains available.");
+		}
+	  },
+	  { timeoutMs: 15_000 },
+	);
+
+	api.on(
       "agent_end",
       async (event, context) => {
         if (!config.enabled) {

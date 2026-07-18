@@ -16,6 +16,8 @@ type ReferenceEntry = {
   content: string;
   decision?: "new" | "update";
   sourceQuote?: string;
+	sourceKind?: "user_message" | "tool_result";
+	sourceLabel?: string;
   ref: string;
 };
 
@@ -87,7 +89,10 @@ export class VermoryGovernanceCommand {
     if (pendingEntries.length > 0) {
       lines.push("Pending candidates:");
       for (const entry of pendingEntries) {
-        lines.push(`[${entry.ref}] ${entry.decision} ${entry.key}: ${oneLine(entry.content)} | source: ${oneLine(entry.sourceQuote ?? "")}`);
+		const source = entry.sourceKind === "tool_result"
+			? `tool ${entry.sourceLabel ?? "unknown"}`
+			: "user message";
+		lines.push(`[${entry.ref}] ${entry.decision} ${entry.key}: ${oneLine(entry.content)} | source: ${source} | quote: ${oneLine(entry.sourceQuote ?? "")}`);
       }
       if (inbox.candidates.length > pendingEntries.length) {
         lines.push(`... ${inbox.candidates.length - pendingEntries.length} more pending candidates not shown.`);
@@ -208,6 +213,8 @@ function candidateEntry(candidate: ReviewCandidate): Omit<ReferenceEntry, "ref">
     content: candidate.content,
     decision: candidate.decision,
     sourceQuote: candidate.sourceQuote,
+	sourceKind: candidate.sourceKind,
+	...(candidate.sourceLabel ? { sourceLabel: candidate.sourceLabel } : {}),
   };
 }
 
