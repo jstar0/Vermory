@@ -868,6 +868,181 @@ SELECT quote, content FROM source_formation_items WHERE candidate_memory_id = $1
 	}
 }
 
+func TestConversationFormationForgetRedactsOnlySharedToolEvidenceSpan(t *testing.T) {
+	store := openTestStore(t)
+	ctx := context.Background()
+	tenantID := "conversation-shared-tool-evidence"
+	anchor := ConversationAnchor{Channel: "openclaw", ThreadID: "agent:main:shared-device-inspection"}
+	conversation := NewConversationService(store, tenantID, nil, "", ConversationServiceConfig{})
+	prepared, err := conversation.PrepareExternalTurn(ctx, ExternalConversationTurnRequest{
+		OperationID: "openclaw:run-shared-tool-evidence",
+		Anchor:      anchor,
+		Message:     "Inspect storage capacity and cleanup bundle staging safety.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const toolResult = "Free capacity is 412 GB. Cleanup bundle staging is safe."
+	tool, err := conversation.RecordToolResult(ctx, RecordConversationToolResultRequest{
+		OperationID: prepared.OperationID,
+		Anchor:      anchor,
+		RunID:       "run-shared-tool-evidence",
+		ToolName:    "read",
+		ToolCallID:  "call-shared-device-inspection",
+		Content:     toolResult,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, err := conversation.CompleteExternalTurn(ctx, CompleteExternalConversationTurnRequest{
+		OperationID: prepared.OperationID,
+		Anchor:      anchor,
+		Answer:      "Inspection completed.",
+		Model:       "fixture-client-model",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	llm := &sourceFormationTestProvider{response: provider.GenerateResponse{
+		Output: fmt.Sprintf(`{"candidates":[{"decision":"new","memory_key":"device.storage.free_capacity","source_observation_id":%q,"quote":"Free capacity is 412 GB.","occurrence":1,"content":"Device free storage capacity is 412 GB.","reason":"The allowed tool reported the current free capacity."},{"decision":"new","memory_key":"device.cleanup_bundle.staging_safe","source_observation_id":%q,"quote":"Cleanup bundle staging is safe.","occurrence":1,"content":"Cleanup bundle staging is safe.","reason":"The allowed tool reported a durable staging safety result."}],"reason":"Two tool-reported facts are reviewable."}`, tool.ObservationID, tool.ObservationID),
+		Model:  "resolved-shared-tool-model",
+	}}
+	formation := NewSourceFormationService(store, tenantID, llm, "test-provider", "requested-shared-tool-model")
+	receipt, err := formation.FormConversation(ctx, ConversationFormationRequest{
+		OperationID:    "shared-tool-formation",
+		Anchor:         anchor,
+		ObservationIDs: []string{prepared.UserObservationID, tool.ObservationID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if receipt.Status != SourceFormationCompleted || len(receipt.Items) != 2 {
+		t.Fatalf("unexpected shared tool formation receipt: %#v", receipt)
+	}
+	itemsByKey := make(map[string]SourceFormationItemReceipt, len(receipt.Items))
+	for _, item := range receipt.Items {
+		itemsByKey[item.MemoryKey] = item
+	}
+	capacityItem := itemsByKey["device.storage.free_capacity"]
+	safetyItem := itemsByKey["device.cleanup_bundle.staging_safe"]
+	if capacityItem.CandidateMemoryID == "" || safetyItem.CandidateMemoryID == "" {
+		t.Fatalf("shared tool candidates are incomplete: %#v", receipt.Items)
+	}
+
+	capacityAccepted, err := conversation.AcceptCandidate(ctx, ReviewConversationCandidateRequest{
+		OperationID: "accept-shared-capacity",
+		Anchor:      anchor,
+		MemoryID:    capacityItem.CandidateMemoryID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	safetyAccepted, err := conversation.AcceptCandidate(ctx, ReviewConversationCandidateRequest{
+		OperationID: "accept-shared-safety",
+		Anchor:      anchor,
+		MemoryID:    safetyItem.CandidateMemoryID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversation.Forget(ctx, ForgetConversationMemoryRequest{
+		OperationID: "forget-shared-capacity",
+		Anchor:      anchor,
+		MemoryID:    capacityAccepted.Memory.MemoryID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RebuildProjection(ctx, tenantID, receipt.ContinuityID); err != nil {
+		t.Fatal(err)
+	}
+
+	var evidenceContent string
+	if err := store.pool.QueryRow(ctx, `SELECT content FROM observations WHERE id = $1::uuid`, tool.ObservationID).Scan(&evidenceContent); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(evidenceContent, "412 GB") || !strings.Contains(evidenceContent, "Cleanup bundle staging is safe.") {
+		t.Fatalf("shared evidence redaction damaged the wrong span: %q", evidenceContent)
+	}
+	if len([]byte(evidenceContent)) != len([]byte(toolResult)) {
+		t.Fatalf("shared evidence redaction shifted byte offsets: got=%d want=%d content=%q", len([]byte(evidenceContent)), len([]byte(toolResult)), evidenceContent)
+	}
+
+	var capacityQuote, capacityContent, safetyQuote, safetyContent string
+	if err := store.pool.QueryRow(ctx, `SELECT quote, content FROM source_formation_items WHERE candidate_memory_id = $1::uuid`, capacityAccepted.Memory.MemoryID).Scan(&capacityQuote, &capacityContent); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT quote, content FROM source_formation_items WHERE candidate_memory_id = $1::uuid`, safetyAccepted.Memory.MemoryID).Scan(&safetyQuote, &safetyContent); err != nil {
+		t.Fatal(err)
+	}
+	if capacityQuote != "[redacted]" || capacityContent != "[redacted]" {
+		t.Fatalf("forgotten shared candidate metadata survived: quote=%q content=%q", capacityQuote, capacityContent)
+	}
+	if safetyQuote != "Cleanup bundle staging is safe." || safetyContent != "Cleanup bundle staging is safe." {
+		t.Fatalf("active sibling provenance was redacted: quote=%q content=%q", safetyQuote, safetyContent)
+	}
+
+	var capacityStatus, capacityMemoryContent, safetyStatus, safetyMemoryContent string
+	if err := store.pool.QueryRow(ctx, `SELECT lifecycle_status, content FROM governed_memories WHERE id = $1::uuid`, capacityAccepted.Memory.MemoryID).Scan(&capacityStatus, &capacityMemoryContent); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT lifecycle_status, content FROM governed_memories WHERE id = $1::uuid`, safetyAccepted.Memory.MemoryID).Scan(&safetyStatus, &safetyMemoryContent); err != nil {
+		t.Fatal(err)
+	}
+	if capacityStatus != "deleted" || capacityMemoryContent != "[redacted]" {
+		t.Fatalf("forgotten capacity memory survived: status=%q content=%q", capacityStatus, capacityMemoryContent)
+	}
+	if safetyStatus != "active" || safetyMemoryContent != "Cleanup bundle staging is safe." {
+		t.Fatalf("active safety sibling was damaged: status=%q content=%q", safetyStatus, safetyMemoryContent)
+	}
+
+	var capacityProjection, safetyProjection, assistantEvidence int
+	if err := store.pool.QueryRow(ctx, `SELECT count(*) FROM memory_search_documents WHERE memory_id = $1::uuid`, capacityAccepted.Memory.MemoryID).Scan(&capacityProjection); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT count(*) FROM memory_search_documents WHERE memory_id = $1::uuid`, safetyAccepted.Memory.MemoryID).Scan(&safetyProjection); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT count(*) FROM source_formation_items WHERE evidence_observation_id = $1::uuid`, completed.AssistantObservationID).Scan(&assistantEvidence); err != nil {
+		t.Fatal(err)
+	}
+	if capacityProjection != 0 || safetyProjection != 1 || assistantEvidence != 0 {
+		t.Fatalf("shared evidence hard gates failed: capacity_projection=%d safety_projection=%d assistant_evidence=%d", capacityProjection, safetyProjection, assistantEvidence)
+	}
+
+	fresh, err := conversation.PrepareExternalTurn(ctx, ExternalConversationTurnRequest{
+		OperationID: "openclaw:shared-tool-post-forget",
+		Anchor:      anchor,
+		Message:     "Is cleanup bundle staging safe?",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(fresh.Context, "Cleanup bundle staging is safe.") || strings.Contains(fresh.Context, "412 GB") {
+		t.Fatalf("post-forget delivery did not preserve only the active sibling: %s", fresh.Context)
+	}
+
+	if _, err := conversation.Forget(ctx, ForgetConversationMemoryRequest{
+		OperationID: "forget-shared-safety-last",
+		Anchor:      anchor,
+		MemoryID:    safetyAccepted.Memory.MemoryID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT content FROM observations WHERE id = $1::uuid`, tool.ObservationID).Scan(&evidenceContent); err != nil {
+		t.Fatal(err)
+	}
+	if evidenceContent != "[redacted]" {
+		t.Fatalf("last shared candidate deletion left tool evidence residue: %q", evidenceContent)
+	}
+	if err := store.pool.QueryRow(ctx, `SELECT count(*) FROM memory_search_documents WHERE memory_id = $1::uuid`, safetyAccepted.Memory.MemoryID).Scan(&safetyProjection); err != nil {
+		t.Fatal(err)
+	}
+	if safetyProjection != 0 {
+		t.Fatalf("last shared candidate projection survived deletion: %d", safetyProjection)
+	}
+}
+
 func persistFormationConversationTurn(
 	t *testing.T,
 	service *ConversationService,

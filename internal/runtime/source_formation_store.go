@@ -1162,31 +1162,58 @@ func validateSourceFormationSHA256(value, label string) error {
 	return nil
 }
 
+type sourceFormationEvidenceSpan struct {
+	observationID string
+	byteStart     int
+	byteEnd       int
+}
+
 func redactSourceFormationMemoryTx(ctx context.Context, tx pgx.Tx, tenantID, continuityID, memoryID string) error {
 	evidenceRows, err := tx.Query(ctx, `
-SELECT DISTINCT evidence_observation_id::text
+SELECT DISTINCT evidence_observation_id::text, byte_start, byte_end
 FROM source_formation_items
 WHERE tenant_id = $1 AND continuity_id = $2::uuid
   AND candidate_memory_id = $3::uuid
-  AND evidence_observation_id IS NOT NULL`, tenantID, continuityID, memoryID)
+	AND evidence_observation_id IS NOT NULL
+ORDER BY evidence_observation_id::text, byte_start, byte_end`, tenantID, continuityID, memoryID)
 	if err != nil {
-		return fmt.Errorf("list source formation evidence observations for redaction: %w", err)
+		return fmt.Errorf("list source formation evidence spans for redaction: %w", err)
 	}
+	evidenceSpans := make([]sourceFormationEvidenceSpan, 0)
 	evidenceObservationIDs := make([]string, 0)
+	seenEvidenceObservationIDs := make(map[string]struct{})
 	for evidenceRows.Next() {
-		var observationID string
-		if err := evidenceRows.Scan(&observationID); err != nil {
+		var span sourceFormationEvidenceSpan
+		if err := evidenceRows.Scan(&span.observationID, &span.byteStart, &span.byteEnd); err != nil {
 			evidenceRows.Close()
-			return fmt.Errorf("scan source formation evidence observation for redaction: %w", err)
+			return fmt.Errorf("scan source formation evidence span for redaction: %w", err)
 		}
-		evidenceObservationIDs = append(evidenceObservationIDs, observationID)
+		evidenceSpans = append(evidenceSpans, span)
+		if _, seen := seenEvidenceObservationIDs[span.observationID]; !seen {
+			seenEvidenceObservationIDs[span.observationID] = struct{}{}
+			evidenceObservationIDs = append(evidenceObservationIDs, span.observationID)
+		}
 	}
 	if err := evidenceRows.Err(); err != nil {
 		evidenceRows.Close()
-		return fmt.Errorf("iterate source formation evidence observations for redaction: %w", err)
+		return fmt.Errorf("iterate source formation evidence spans for redaction: %w", err)
 	}
 	evidenceRows.Close()
+	spansByObservation := make(map[string][]sourceFormationEvidenceSpan, len(evidenceObservationIDs))
+	for _, span := range evidenceSpans {
+		spansByObservation[span.observationID] = append(spansByObservation[span.observationID], span)
+	}
 	for _, observationID := range evidenceObservationIDs {
+		shared, err := sourceFormationEvidenceHasSurvivingSiblingTx(ctx, tx, tenantID, continuityID, observationID, memoryID)
+		if err != nil {
+			return err
+		}
+		if shared {
+			if err := redactSourceFormationEvidenceSpansTx(ctx, tx, tenantID, continuityID, observationID, spansByObservation[observationID]); err != nil {
+				return err
+			}
+			continue
+		}
 		if err := redactConversationObservationTx(ctx, tx, tenantID, continuityID, observationID); err != nil {
 			return err
 		}
@@ -1306,6 +1333,96 @@ WHERE id = $1::uuid AND tenant_id = $2`, run.id, tenantID, snapshotJSON, snapsho
 		}
 	}
 	return nil
+}
+
+func sourceFormationEvidenceHasSurvivingSiblingTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID string,
+	continuityID string,
+	observationID string,
+	memoryID string,
+) (bool, error) {
+	var shared bool
+	if err := tx.QueryRow(ctx, `
+SELECT EXISTS (
+  SELECT 1
+  FROM source_formation_items item
+  LEFT JOIN governed_memories candidate
+    ON candidate.tenant_id = item.tenant_id
+   AND candidate.continuity_id = item.continuity_id
+   AND candidate.id = item.candidate_memory_id
+  LEFT JOIN governed_memories target
+    ON target.tenant_id = item.tenant_id
+   AND target.continuity_id = item.continuity_id
+   AND target.id = item.target_memory_id
+  WHERE item.tenant_id = $1
+    AND item.continuity_id = $2::uuid
+    AND item.evidence_observation_id = $3::uuid
+    AND item.candidate_memory_id IS DISTINCT FROM $4::uuid
+    AND (
+      (item.candidate_memory_id IS NOT NULL AND candidate.lifecycle_status <> 'deleted')
+      OR
+      (item.candidate_memory_id IS NULL AND item.target_memory_id IS NOT NULL AND target.lifecycle_status <> 'deleted')
+    )
+)`, tenantID, continuityID, observationID, memoryID).Scan(&shared); err != nil {
+		return false, fmt.Errorf("inspect shared source formation evidence: %w", err)
+	}
+	return shared, nil
+}
+
+func redactSourceFormationEvidenceSpansTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	tenantID string,
+	continuityID string,
+	observationID string,
+	spans []sourceFormationEvidenceSpan,
+) error {
+	var content string
+	if err := tx.QueryRow(ctx, `
+SELECT content
+FROM observations
+WHERE tenant_id = $1 AND continuity_id = $2::uuid AND id = $3::uuid
+FOR UPDATE`, tenantID, continuityID, observationID).Scan(&content); err != nil {
+		return fmt.Errorf("load shared source formation evidence for redaction: %w", err)
+	}
+	contentBytes := []byte(content)
+	sort.Slice(spans, func(left, right int) bool {
+		if spans[left].byteStart == spans[right].byteStart {
+			return spans[left].byteEnd < spans[right].byteEnd
+		}
+		return spans[left].byteStart < spans[right].byteStart
+	})
+	lastEnd := -1
+	for _, span := range spans {
+		if span.byteStart < 0 || span.byteEnd <= span.byteStart || span.byteEnd > len(contentBytes) {
+			return fmt.Errorf("source formation evidence span [%d,%d) is outside observation %s", span.byteStart, span.byteEnd, observationID)
+		}
+		if span.byteStart < lastEnd {
+			return fmt.Errorf("source formation evidence redaction spans overlap for observation %s", observationID)
+		}
+		copy(contentBytes[span.byteStart:span.byteEnd], sourceFormationRedactionBytes(span.byteEnd-span.byteStart))
+		lastEnd = span.byteEnd
+	}
+	if !utf8.Valid(contentBytes) {
+		return fmt.Errorf("source formation evidence redaction produced invalid UTF-8 for observation %s", observationID)
+	}
+	if _, err := tx.Exec(ctx, `
+UPDATE observations
+SET content = $4
+WHERE tenant_id = $1 AND continuity_id = $2::uuid AND id = $3::uuid`, tenantID, continuityID, observationID, string(contentBytes)); err != nil {
+		return fmt.Errorf("redact shared source formation evidence spans: %w", err)
+	}
+	return nil
+}
+
+func sourceFormationRedactionBytes(length int) []byte {
+	redacted := bytes.Repeat([]byte{'*'}, length)
+	if length >= len("[redacted]") {
+		copy(redacted, "[redacted]")
+	}
+	return redacted
 }
 
 func truncateSourceFormationText(value string, limit int) string {
