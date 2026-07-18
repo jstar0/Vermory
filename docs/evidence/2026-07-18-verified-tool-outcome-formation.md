@@ -477,6 +477,13 @@ comparison also failed because of nested `awk` escaping and is retained
 separately. A pre-commit zero-unchecked-item assertion also mishandled
 `rg`'s no-match output; the corrected explicit count passed.
 
+The first post-documentation protected run, `29640295425`, failed before
+packaging. Under CI load, a legacy 50 ms request deadline expired before
+`BeginSourceMatch` committed, so the test never reached the provider-stage
+deadline behavior it intended to verify. The failure is retained. The test now
+uses a controllable deadline that expires only after the pending match is
+persisted; production timeout behavior is unchanged.
+
 ## Scope
 
 This run qualifies, for the executed F03 trajectory:

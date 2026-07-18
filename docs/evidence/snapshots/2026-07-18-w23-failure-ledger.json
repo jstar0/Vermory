@@ -303,6 +303,22 @@
       "outcome": "failed",
       "summary": "The first combined pre-commit static assertion treated ripgrep's no-match output as an empty string instead of a zero unchecked-item count.",
       "accepted_resolution": "Use an explicit awk count for unchecked checklist rows and require the resulting numeric count to equal zero."
+    },
+    {
+      "id": "FINALHEAD-01",
+      "scope": "protected_ci",
+      "stage": "final_head_run_discovery",
+      "outcome": "failed",
+      "summary": "The first final-head run discovery loop guessed the full commit SHA from its short form and waited for a non-existent value.",
+      "accepted_resolution": "Cancel the loop, read the exact SHA with git rev-parse, and select run 29640295425 from the actual head value."
+    },
+    {
+      "id": "FINALHEAD-02",
+      "scope": "protected_ci",
+      "stage": "postgresql_full_suite",
+      "outcome": "failed",
+      "summary": "Protected run 29640295425 failed because a legacy 50 ms request deadline expired before BeginSourceMatch committed under CI load.",
+      "accepted_resolution": "Preserve the failed run and make the test trigger a controllable request deadline only after the pending source match is persisted; production timeout behavior remains unchanged."
     }
   ]
 }

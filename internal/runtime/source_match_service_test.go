@@ -195,9 +195,14 @@ func TestSourceMatchingServicePersistsFailureAfterRequestDeadline(t *testing.T) 
 		t.Fatal(err)
 	}
 	addSourceMatchFact(t, governance, repoRoot, "deadline-signing", "release.signing.mode", "Use signer A.", "fixture:signer:a")
-	service := NewSourceMatchingService(store, "service-deadline", sourceMatchDeadlineProvider{}, "test-provider", "test-model")
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
+	ctx := newSourceFormationDeadlineContext(context.Background())
+	service := NewSourceMatchingService(
+		store,
+		"service-deadline",
+		sourceMatchDeadlineProvider{beforeWait: ctx.expire},
+		"test-provider",
+		"test-model",
+	)
 	receipt, err := service.MatchSource(ctx, repoRoot, SourceMatchRequest{
 		OperationID:   "service-deadline-match",
 		SourceRef:     "fixture:signer:b",
@@ -296,9 +301,14 @@ type sourceMatchTestProvider struct {
 	beforeReturn func()
 }
 
-type sourceMatchDeadlineProvider struct{}
+type sourceMatchDeadlineProvider struct {
+	beforeWait func()
+}
 
-func (sourceMatchDeadlineProvider) Generate(ctx context.Context, _ provider.GenerateRequest) (provider.GenerateResponse, error) {
+func (p sourceMatchDeadlineProvider) Generate(ctx context.Context, _ provider.GenerateRequest) (provider.GenerateResponse, error) {
+	if p.beforeWait != nil {
+		p.beforeWait()
+	}
 	<-ctx.Done()
 	return provider.GenerateResponse{}, ctx.Err()
 }
