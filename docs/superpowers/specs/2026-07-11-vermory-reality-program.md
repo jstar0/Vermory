@@ -45,13 +45,20 @@ Examples include a repository changing decisions over several sessions, a long-r
 Priority sources are:
 
 1. Authorized real local workflows across varied projects and domains.
-2. Real Codex, Grok, domestic coding-tool, Web Chat, and everyday-assistant trajectories. Gemini CLI is retired and is not an active client target.
+2. Real Codex, Grok, cursor-agent, domestic coding-tool, Web Chat, OpenClaw, Hermes, and everyday-assistant trajectories. `cursor-agent` is a real external-client target and is not interchangeable with editor implementation delegation. Gemini CLI is retired and is not an active client target.
 3. Authorized long-running conversation matters with privacy-safe anonymization.
 4. Public repositories, issues, pull requests, releases, documentation, and migrations.
 5. Official or verified public benchmark datasets where licensing permits.
 6. Synthetic mutations, secrets, attacks, and load records where real data would be unsafe or insufficient.
 
 No single repository, client, model family, or domain may dominate the quality corpus.
+
+When one client is unavailable, another client may execute a separate trajectory
+against the same platform contract. The unavailable-client failure remains in
+the evidence, and the substitute result must name its own client, version,
+permissions, and interaction boundary. A cursor-agent pass therefore cannot be
+reported as a Grok CLI pass, and an implementation delegation report is not a
+cursor-agent runtime qualification.
 
 ## 5. Initial Discovery Batch
 

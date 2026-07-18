@@ -45,6 +45,10 @@ jobs:
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           version: 0.11.28
+      - name: Verify repository policy
+        run: bash scripts/repository-policy.sh
+      - name: Lint GitHub Actions workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
       - name: Install PostgreSQL 18 client tools
         run: |
           sudo install -d -m 0755 /usr/share/postgresql-common/pgdg

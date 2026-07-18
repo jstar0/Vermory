@@ -135,6 +135,22 @@ manifest 外证据拒绝、离线 replay、input drift、active snapshot drift �
 failed-audit 删除缺口。详见
 [Conversation Formation Loop 实证](docs/evidence/2026-07-18-conversation-formation-loop.md)。
 
+W22 把 conversation formation 改成真实客户端内可审查的异步闭环。OpenClaw
+和 Hermes 完成 turn 后只入队同 continuity 的 durable work，不等待模型；受限
+worker 形成 candidate，独立 operator 完成 accept、reject、correct 和 forget。
+真实 OpenClaw/Grok 只召回当前已接受事实，Hermes session 保持独立，worker
+停启、completion replay、RLS、package、checksum 与隐私门均通过。详见
+[自动 Conversation Formation 与审查实证](docs/evidence/2026-07-18-automatic-conversation-review.md)。
+
+W24 完成受保护制品签名资格。普通 PR test job 在无 OIDC 权限的情况下构建并
+验证覆盖 4 个 Go 归档、GoReleaser checksum、OpenClaw、Hermes 与 Hermes
+sidecar 的完整 manifest；独立的 same-repository post-test job 使用 GitHub OIDC
+和固定 Cosign `v3.0.6` 对 manifest 做 keyless 签名，并验证精确 workflow identity
+与 issuer，同时拒绝篡改 manifest 和错误 workflow identity。签名产物通过青岛
+反向管理隧道直接流到 ARM64 Mac mini 独立验签，全程没有 `sudo`、系统级 Cosign、
+长期私钥、tag 或 GitHub Release。`test` 和 `sign-snapshot` 都是 strict required
+checks。详见[受保护制品签名实证](docs/evidence/2026-07-18-protected-artifact-signing.md)。
+
 完整状态见 [Experiment 0 读数](docs/experiment-0-readout.md)。
 
 ## 快速开始
@@ -229,13 +245,15 @@ Web Chat、shadow 字节等价、cursor lag、HTTP 503、vector 清空重建、R
 
 ## 发布产物
 
-每个 Pull Request 都会生成保留 7 天的可下载 snapshot，包括带 SHA-256 校验的 `linux/amd64`、`linux/arm64`、`darwin/amd64`、`darwin/arm64` 归档，以及独立的 `@vermory/openclaw` 包和确定性的 `vermory-hermes-0.1.0.tar.gz` provider 包。每个 Go 归档固定包含 `vermory`、`LICENSE`、`README.md` 和 `README.zh-CN.md`。
+每个 Pull Request 都会生成保留 7 天的可下载签名 snapshot，包括带 SHA-256 校验的 `linux/amd64`、`linux/arm64`、`darwin/amd64`、`darwin/arm64` 归档，以及独立的 `@vermory/openclaw` 包和确定性的 `vermory-hermes-0.1.0.tar.gz` provider 包。每个 Go 归档固定包含 `vermory`、`LICENSE`、`README.md` 和 `README.zh-CN.md`。
+
+snapshot 还包含恰好覆盖 8 个 payload 的 `release-manifest.sha256`，以及绑定精确 GitHub workflow identity 的 keyless Sigstore bundle `release-manifest.sigstore.json`。普通 test job 没有 OIDC 权限，只有在受保护测试成功后，独立 `sign-snapshot` job 才能签名。
 
 ```bash
 vermory version
 ```
 
-发布二进制会输出注入的版本、完整 revision、构建时间和 Go runtime 版本。手动 Release workflow 只生成不发布的 snapshot；只有 `v*` tag 可以创建 draft GitHub Release。当前 Draft PR 不创建 tag，也不创建 GitHub Release。精确 checksum、两次构建可复现性、Actions 下载产物、本机执行和明确不承诺项见[发布打包实证](docs/evidence/2026-07-14-release-packaging.md)。
+发布二进制会输出注入的版本、完整 revision、构建时间和 Go runtime 版本。手动 Release workflow 只生成不发布的 snapshot；只有 `v*` tag 可以创建 draft GitHub Release。当前 Draft PR 不创建 tag，也不创建 GitHub Release。精确 checksum、两次构建可复现性、Actions 下载产物、本机执行和明确不承诺项见[发布打包实证](docs/evidence/2026-07-14-release-packaging.md)；完整 manifest 签名、identity、负向控制与 Mac mini 独立验签见[受保护制品签名实证](docs/evidence/2026-07-18-protected-artifact-signing.md)。
 
 ## OpenClaw 接入
 
@@ -292,6 +310,14 @@ authenticated 部署、token 生命周期、runtime role 授权、TLS 规则、R
 ```
 
 不要因为某个表、状态机、服务或中间件看起来“架构完整”就直接把它写死。永久设计必须先对应真实案例和可证伪假设。
+
+## 协作与治理
+
+新贡献者先阅读[架构说明](ARCHITECTURE.md)、[开发指南](DEVELOPMENT.md)和[贡献指南](CONTRIBUTING.md)。[仓库协作规程](docs/collaboration/repository-workflow.md)定义 issue、Reality case、评审、合并、协作者权限和发布流程；[治理规则](GOVERNANCE.md)定义维护者与重大决策权限。
+
+所有改动通过 Pull Request 进入受保护的 `main`，最新提交必须通过 `test` 与 `sign-snapshot`。PR snapshot 只是带身份签名的临时测试制品，不是正式发布。真实失败必须保留，替代客户端或替代 provider 只能形成另一份证据，不能把原失败改写成成功。
+
+安全问题按[安全策略](SECURITY.md)私下报告。Reality case 和公开证据不得包含凭据、私有原始对话、未脱敏个人路径或虚假的 `sealed` 标签。
 
 ## 许可证
 

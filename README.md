@@ -161,6 +161,18 @@ client-role denial, completion replay, RLS, package, checksum, and privacy
 gates passed without `sudo` or Mac mini NewAPI. See
 [Automatic Conversation Formation And Review Qualification](docs/evidence/2026-07-18-automatic-conversation-review.md).
 
+W24 qualifies protected artifact signing. The ordinary pull-request test job
+builds and verifies a deterministic manifest covering all four Go archives,
+GoReleaser checksums, OpenClaw, Hermes, and the Hermes sidecar without receiving
+OIDC authority. A separate same-repository post-test job uses GitHub OIDC and
+pinned Cosign `v3.0.6` to sign that complete manifest, verifies the exact
+workflow identity and issuer, and rejects both a modified manifest and a wrong
+workflow identity. The signed artifact was streamed through the Qingdao
+reverse-management tunnel and independently verified on an ARM64 Mac mini with
+no `sudo`, system-wide Cosign install, private signing key, tag, or GitHub
+Release. `test` and `sign-snapshot` are strict required checks. See
+[Protected Artifact Signing Qualification](docs/evidence/2026-07-18-protected-artifact-signing.md).
+
 Read the [Experiment 0 report](docs/experiment-0-readout.md).
 
 ## Architecture Direction
@@ -358,11 +370,16 @@ pull-request gates.
 
 ## Release Packaging
 
-Every pull request now builds a seven-day downloadable snapshot containing
+Every pull request now builds a seven-day downloadable signed snapshot containing
 checksummed `linux/amd64`, `linux/arm64`, `darwin/amd64`, and `darwin/arm64`
 archives plus the independent `@vermory/openclaw` package and deterministic
 `vermory-hermes-0.1.0.tar.gz` provider package. Each Go archive contains
 `vermory`, `LICENSE`, `README.md`, and `README.zh-CN.md`.
+
+The snapshot includes `release-manifest.sha256` with exactly eight payload
+records and `release-manifest.sigstore.json`, a GitHub OIDC keyless Sigstore
+bundle bound to the exact workflow identity. The ordinary test job has no OIDC
+permission; signing happens only after protected tests in `sign-snapshot`.
 
 ```bash
 vermory version
@@ -375,6 +392,9 @@ neither a tag nor a GitHub Release. See
 [Release Packaging Evidence](docs/evidence/2026-07-14-release-packaging.md) for
 the exact checksums, two-run reproducibility result, downloaded Actions
 artifact, host execution, and explicit non-claims.
+See [Protected Artifact Signing Qualification](docs/evidence/2026-07-18-protected-artifact-signing.md)
+for the complete-manifest signature, identity, negative controls, and independent
+Mac mini verification.
 
 Run the qualified LongMemEval oracle sample after obtaining the official source
 artifact and preparing a dedicated PostgreSQL database:
@@ -511,7 +531,12 @@ See [Backend Bake-Off Results](docs/backend-bakeoff-results.md).
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting code or evidence. Reality cases must never include credentials, private raw transcripts, unredacted personal paths, or a false `sealed` label.
+Start with [Architecture](ARCHITECTURE.md) and the [Development Guide](DEVELOPMENT.md), then read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting code or evidence. The [Repository Workflow](docs/collaboration/repository-workflow.md) defines issue, reality-case, review, merge, collaborator, and release procedures; [Governance](GOVERNANCE.md) defines maintainer and decision authority.
+
+Reality cases must never include credentials, private raw transcripts,
+unredacted personal paths, or a false `sealed` label. Pull requests use the
+repository template and must pass the protected `test` and `sign-snapshot`
+checks on the latest head.
 
 Security reports should follow [SECURITY.md](SECURITY.md).
 
