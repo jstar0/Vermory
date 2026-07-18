@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "date": "2026-07-18",
+  "slice": "W23 Verified Tool Outcome Formation",
+  "accepted_run_id": "7e76df6f05",
+  "accepted_implementation_commit": "7e76df6",
+  "accepted_evidence_root": "~/.vermory-w23/w23-shared-evidence-final-7e76df6f05",
+  "failed_instance_root": "~/.vermory-w23/w23-shared-evidence-final-7e76df6",
+  "policy": "Failures and rejected paths remain evidence and are not reclassified as successes.",
+  "entries": [
+    {
+      "id": "F04-01",
+      "scope": "failed_instance",
+      "stage": "remote_database_access",
+      "outcome": "failed",
+      "summary": "The first non-login SSH shell did not expose PostgreSQL on PATH.",
+      "accepted_resolution": "Use the explicit Homebrew psql path on the accepted run."
+    },
+    {
+      "id": "F04-02",
+      "scope": "failed_instance",
+      "stage": "token_issue",
+      "outcome": "failed",
+      "summary": "The first token issue command omitted the required expires-at value.",
+      "accepted_resolution": "Issue bounded client and operator tokens with explicit expiry."
+    },
+    {
+      "id": "F04-03",
+      "scope": "failed_instance",
+      "stage": "vector_runtime",
+      "outcome": "rejected",
+      "summary": "The first vector API path did not use the Mac login Keychain wrapper.",
+      "accepted_resolution": "Run the retrieval worker through the SiliconFlow Keychain wrapper."
+    },
+    {
+      "id": "F04-04",
+      "scope": "failed_instance",
+      "stage": "openclaw_runtime",
+      "outcome": "failed",
+      "summary": "The first OpenClaw launch used an incompatible hashed gateway runtime.",
+      "accepted_resolution": "Use the package-locked OpenClaw 2026.6.11 runtime."
+    },
+    {
+      "id": "F04-05",
+      "scope": "failed_instance",
+      "stage": "formation_provider",
+      "outcome": "failed",
+      "summary": "An isolated Grok wrapper injected a second --verbatim argument.",
+      "accepted_resolution": "Use the managed Grok wrapper directly; argv tracing confirmed Vermory emits one --verbatim argument."
+    },
+    {
+      "id": "F04-06",
+      "scope": "failed_instance",
+      "stage": "formation_provider",
+      "outcome": "failed",
+      "summary": "The first five formation attempts ended in provider failure while the wrapper path was being corrected.",
+      "accepted_resolution": "The accepted run completed formation on its first attempt with grok-cli/grok-4.5."
+    },
+    {
+      "id": "F04-07",
+      "scope": "failed_instance",
+      "stage": "sensitive_fixture",
+      "outcome": "rejected",
+      "summary": "A credential-prefixed synthetic fixture was masked by OpenClaw before the Vermory hook and therefore could not prove pre-persistence rejection of the original bytes.",
+      "accepted_resolution": "Use an exact synthetic api_token assignment that reaches the hook and prove that no tool-result row is stored."
+    },
+    {
+      "id": "F04-08",
+      "scope": "failed_instance",
+      "stage": "post_delete_model_probe",
+      "outcome": "failed",
+      "summary": "The first post-delete model response did not explicitly state that capacity was unavailable.",
+      "accepted_resolution": "Use a fresh transcript and a strict no-guessing output contract, then verify the delivery and retrieval audit independently."
+    },
+    {
+      "id": "F04-09",
+      "scope": "failed_instance",
+      "stage": "database_inspection",
+      "outcome": "failed",
+      "summary": "Two remote SQL probes failed because UUID literals were quoted incorrectly.",
+      "accepted_resolution": "Use heredoc SQL with explicit uuid casts."
+    },
+    {
+      "id": "F04-10",
+      "scope": "failed_instance",
+      "stage": "shared_evidence_deletion",
+      "outcome": "failed",
+      "summary": "Deleting one of two memories formed from the same tool result redacted the complete observation and destroyed the surviving sibling provenance.",
+      "accepted_resolution": "Commit 7e76df6 redacts only the forgotten byte span while a live sibling exists and redacts the full observation only after the last sibling is deleted."
+    },
+    {
+      "id": "FINAL-01",
+      "scope": "accepted_instance_access",
+      "stage": "ssh_route",
+      "outcome": "failed",
+      "summary": "Direct LAN SSH timed out because the operator workstation was not on the Mac mini LAN.",
+      "accepted_resolution": "Use the existing Qingdao reverse-management tunnel to Mac mini port 22."
+    },
+    {
+      "id": "FINAL-02",
+      "scope": "accepted_instance",
+      "stage": "openclaw_session_reset",
+      "outcome": "rejected",
+      "summary": "sessions.delete requested an operator scope upgrade and was rejected before mutation.",
+      "accepted_resolution": "Do not delete the session; use the official in-place reset lifecycle."
+    },
+    {
+      "id": "FINAL-03",
+      "scope": "accepted_instance",
+      "stage": "openclaw_device_approval",
+      "outcome": "failed",
+      "summary": "The package-locked CLI could not self-approve its own operator scope upgrade and produced another pending request.",
+      "accepted_resolution": "Do not mutate gateway device authorization for evidence collection."
+    },
+    {
+      "id": "FINAL-04",
+      "scope": "accepted_instance",
+      "stage": "openclaw_chat_reset",
+      "outcome": "failed",
+      "summary": "A standalone /reset submitted through the loopback WebChat route was recorded but not authorized as a reset command.",
+      "accepted_resolution": "Use OpenClaw's exported performGatewaySessionReset maintenance primitive."
+    },
+    {
+      "id": "FINAL-05",
+      "scope": "accepted_instance",
+      "stage": "openclaw_gateway_reset",
+      "outcome": "rejected",
+      "summary": "sessions.reset and a device-free gateway client were both rejected because the configured loopback credential did not grant operator.admin.",
+      "accepted_resolution": "Run the official local reset primitive as the user who owns the isolated state; no transcript file or session store was edited directly."
+    },
+    {
+      "id": "FINAL-06",
+      "scope": "evidence_generation",
+      "stage": "database_snapshot",
+      "outcome": "failed",
+      "summary": "The first credential-free snapshot query nested count inside jsonb_agg and PostgreSQL rejected the aggregate shape.",
+      "accepted_resolution": "Pre-aggregate tool counts in a CTE before building the JSON object."
+    },
+    {
+      "id": "FINAL-07",
+      "scope": "evidence_generation",
+      "stage": "rls_inspection",
+      "outcome": "failed",
+      "summary": "The first RLS query assumed pg_tables exposed forcerowsecurity.",
+      "accepted_resolution": "Read relrowsecurity and relforcerowsecurity from pg_class."
+    },
+    {
+      "id": "FINAL-08",
+      "scope": "package_runtime",
+      "stage": "openclaw_channel_discovery",
+      "outcome": "warning",
+      "summary": "OpenClaw reported missing generated setup modules for bundled iMessage and Telegram channels.",
+      "accepted_resolution": "Neither channel was enabled or used; WebChat, the Vermory plugin, and the selected model path remained operational."
+    },
+    {
+      "id": "FINAL-09",
+      "scope": "formation_provider_recovery",
+      "stage": "local_grok_auth",
+      "outcome": "failed",
+      "summary": "The workstation Grok OAuth refresh token was also rejected, so the local auth file was not a valid asset to copy to the Mac mini.",
+      "accepted_resolution": "Do not sync expired credentials; preserve the original Grok formation evidence and use an already provisioned provider for later windows."
+    },
+    {
+      "id": "FINAL-10",
+      "scope": "formation_provider_recovery",
+      "stage": "ssh_keychain_access",
+      "outcome": "rejected",
+      "summary": "A one-shot worker launched from the SSH shell could not read the Mac login Keychain.",
+      "accepted_resolution": "Run provider workers as user LaunchAgents through the existing Keychain wrapper."
+    },
+    {
+      "id": "FINAL-11",
+      "scope": "formation_provider_recovery",
+      "stage": "siliconflow_deepseek_v4_flash",
+      "outcome": "rejected",
+      "summary": "DeepSeek-V4-Flash wrapped otherwise structured output in a Markdown code fence.",
+      "accepted_resolution": "Keep the strict JSON boundary; record invalid_provider_output and create no candidate."
+    },
+    {
+      "id": "FINAL-12",
+      "scope": "formation_provider_recovery",
+      "stage": "siliconflow_qwen_30b",
+      "outcome": "rejected",
+      "summary": "Qwen3-30B-A3B-Instruct returned valid JSON but referenced an evidence observation outside the one-item manifest.",
+      "accepted_resolution": "Reject the batch with evidence_observation_outside_manifest and preserve zero semantic effects."
+    },
+    {
+      "id": "FINAL-13",
+      "scope": "formation_provider_recovery",
+      "stage": "siliconflow_qwen_235b",
+      "outcome": "failed",
+      "summary": "SiliconFlow returned HTTP 403 Model disabled for Qwen3-235B-A22B-Instruct-2507.",
+      "accepted_resolution": "Treat provider availability as external state; do not reinterpret the request as a model result."
+    },
+    {
+      "id": "FINAL-14",
+      "scope": "formation_provider_recovery",
+      "stage": "siliconflow_minimax_m2_5",
+      "outcome": "rejected",
+      "summary": "MiniMax-M2.5 returned malformed provider JSON.",
+      "accepted_resolution": "Keep the strict parser and record invalid_provider_output without forming a candidate."
+    },
+    {
+      "id": "FINAL-15",
+      "scope": "formation_provider_recovery",
+      "stage": "siliconflow_glm_4_6",
+      "outcome": "failed",
+      "summary": "SiliconFlow returned HTTP 403 Model disabled for GLM-4.6.",
+      "accepted_resolution": "Stop recovery attempts, retain all eight post-delete failure rows, preserve the cumulative attempt counter at ten, and leave the failed window bounded above the current maximum."
+    },
+    {
+      "id": "AUTOMATED-01",
+      "scope": "hermes_tests",
+      "stage": "test_invocation",
+      "outcome": "failed",
+      "summary": "A generic uv run pytest invocation failed because pytest is not declared by the locked Hermes test environment.",
+      "accepted_resolution": "Run the official locked unittest command from the Hermes integration README; 6 of 6 tests passed."
+    },
+    {
+      "id": "AUTOMATED-02",
+      "scope": "hermes_tests",
+      "stage": "workspace_pollution_gate",
+      "outcome": "failed",
+      "summary": "The first final pollution check found two stale Python 3.13 __pycache__ directories created by the earlier rejected pytest path.",
+      "accepted_resolution": "Remove only those generated cache directories, rerun the official locked unittest with bytecode disabled, and recheck that no .venv or __pycache__ remains."
+    },
+    {
+      "id": "AUTOMATED-03",
+      "scope": "evidence_validation",
+      "stage": "snapshot_assertion",
+      "outcome": "failed",
+      "summary": "The first local jq assertion for the final snapshot had an unmatched parenthesis and did not execute.",
+      "accepted_resolution": "Correct the expression and rerun the eight-attempt, shared-evidence, and delivered-memory assertions successfully."
+    }
+  ]
+}

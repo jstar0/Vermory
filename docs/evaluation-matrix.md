@@ -175,6 +175,7 @@ go run ./cmd/vermory benchmark-coverage \
 - Governed multi-fact trusted-document formation with Grok MCP: completed
 - Automatic conversation formation and direct OpenClaw review with Grok: completed
 - Official Hermes automatic-formation isolation control with direct DeepSeek-V4-Flash: completed
+- Verified OpenClaw tool-outcome formation, review, recall, isolation, replay, and shared-evidence forgetting: completed
 
 ## Completed Runs
 
@@ -197,6 +198,7 @@ go run ./cmd/vermory benchmark-coverage \
 - Governed document formation coder session: `019f6019-63fc-78e2-8eb6-41ddfabe62d8`
 - Governed document formation stale-probe session: `019f601a-fdfe-7bb0-96ac-376ba8b99515`
 - Automatic conversation review run ID: `w22-f02-20260718-b6c6154`
+- Verified tool-outcome formation run ID: `7e76df6f05`
 
 ## Automatic Conversation Review W22
 
@@ -213,6 +215,34 @@ The accepted result is `23 / 23` hard gates with zero cross-client candidate
 leakage, zero model governance tools, HTTP `403` for client-token candidate
 access, and zero credential-pattern hits in normalized evidence. See
 [Automatic Conversation Formation And Review Qualification](evidence/2026-07-18-automatic-conversation-review.md).
+
+## Verified Tool Outcome Formation W23
+
+The frozen `F03-verified-tool-outcome-formation` case executes a real
+OpenClaw/DeepSeek tool call, stores one successful allowlisted `read` result,
+forms two reviewable candidates through Grok, accepts both through direct
+OpenClaw governance, recalls both through current vector retrieval, and then
+forgets one of two memories sharing the same tool-result observation.
+
+The accepted result proves that forgetting the capacity memory removes its
+governed content, formation item, lexical projection, vector projection, and
+delivery residue without destroying the live cleanup-safety sibling or
+shifting the shared evidence byte offsets. A reset OpenClaw transcript then
+received only the safety memory; DeepSeek-V4-Flash reported safety and stated
+that capacity was unavailable. PostgreSQL independently recorded one current
+vector delivery, no degradation, and only the safety memory ID.
+
+Failed `read`, unallowlisted `exec`, and sensitive `read` controls stored zero
+tool-result rows. An unrelated `read` formed one C-204 candidate only in its
+own review inbox. Exact replay returned `replayed=true` without a third tool
+row. The run is a platform and client compatibility qualification, not a model
+ranking.
+
+The post-delete user message also produced a retained provider compatibility
+matrix. Expired Grok authentication, strict-output failures from
+DeepSeek-V4-Flash and MiniMax-M2.5, an out-of-manifest Qwen 30B reference, and
+disabled Qwen 235B and GLM-4.6 targets all failed closed and produced no new
+candidate. See [Verified Tool Outcome Formation Qualification](evidence/2026-07-18-verified-tool-outcome-formation.md).
 
 ## Explicit Source Revision Runtime
 
