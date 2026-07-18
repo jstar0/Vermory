@@ -1,0 +1,98 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestCIWorkflowKeepsOIDCOutOfTestJobAndSignsCompleteSnapshot(t *testing.T) {
+	workflow := readWorkflow(t, "ci.yml")
+	parts := strings.SplitN(workflow, "jobs:", 2)
+	if len(parts) != 2 {
+		t.Fatal("CI workflow has no jobs section")
+	}
+	if strings.Contains(parts[0], "id-token: write") {
+		t.Fatal("CI workflow-level permissions expose OIDC to the test job")
+	}
+
+	signing := workflowSection(t, workflow, "  sign-snapshot:", "")
+	for _, required := range []string{
+		"needs: test",
+		"id-token: write",
+		"github.event.pull_request.head.repo.full_name == github.repository",
+		"scripts/release-manifest.sh create dist",
+		"cosign sign-blob",
+		"cosign verify-blob",
+		"--certificate-identity",
+		"--certificate-oidc-issuer",
+		"release-manifest.sigstore.json",
+		"sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6",
+		"cosign-release: v3.0.6",
+	} {
+		if !strings.Contains(signing, required) {
+			t.Fatalf("sign-snapshot is missing %q", required)
+		}
+	}
+
+	testJob := workflowSection(t, workflow, "  test:", "\n  sign-snapshot:")
+	if strings.Contains(testJob, "id-token: write") {
+		t.Fatal("test job has OIDC signing permission")
+	}
+	if strings.Contains(testJob, "Upload release snapshot") {
+		t.Fatal("test job still uploads an unsigned release snapshot")
+	}
+}
+
+func TestReleaseWorkflowSignsManualAndTaggedPayloadManifests(t *testing.T) {
+	workflow := readWorkflow(t, "release.yml")
+	jobs := []struct {
+		name string
+		next string
+	}{
+		{name: "snapshot", next: "\n  publish:"},
+		{name: "publish"},
+	}
+	for _, job := range jobs {
+		section := workflowSection(t, workflow, "  "+job.name+":", job.next)
+		for _, required := range []string{
+			"id-token: write",
+			"scripts/release-manifest.sh create dist",
+			"cosign sign-blob",
+			"cosign verify-blob",
+			"release-manifest.sha256",
+			"release-manifest.sigstore.json",
+		} {
+			if !strings.Contains(section, required) {
+				t.Fatalf("release %s job is missing %q", job.name, required)
+			}
+		}
+	}
+}
+
+func readWorkflow(t *testing.T, name string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", ".github", "workflows", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func workflowSection(t *testing.T, workflow, start, nextPrefix string) string {
+	t.Helper()
+	startIndex := strings.Index(workflow, start)
+	if startIndex < 0 {
+		t.Fatalf("workflow section %q is missing", start)
+	}
+	rest := workflow[startIndex+len(start):]
+	if nextPrefix == "" {
+		return rest
+	}
+	endIndex := strings.Index(rest, nextPrefix)
+	if endIndex < 0 {
+		return rest
+	}
+	return rest[:endIndex]
+}

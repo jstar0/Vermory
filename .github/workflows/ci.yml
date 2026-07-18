@@ -130,7 +130,103 @@ jobs:
           EOF
           diff -u /tmp/hermes-package.expected /tmp/hermes-package.actual
           cp /tmp/hermes-package-a/vermory-hermes-0.1.0.tar.gz* dist/
-      - name: Upload release snapshot
+      - name: Build and verify complete release manifest
+        run: |
+          bash scripts/release-manifest.sh create dist
+          cp dist/release-manifest.sha256 /tmp/release-manifest.first
+          bash scripts/release-manifest.sh verify dist
+          bash scripts/release-manifest.sh create dist
+          cmp /tmp/release-manifest.first dist/release-manifest.sha256
+          cp -R dist /tmp/vermory-tampered-dist
+          printf 'tampered\n' >> /tmp/vermory-tampered-dist/vermory-openclaw-0.1.0.tgz
+          if bash scripts/release-manifest.sh verify /tmp/vermory-tampered-dist; then
+            echo "modified release payload passed manifest verification" >&2
+            exit 1
+          fi
+      - name: Verify clean diff
+        run: git diff --check
+
+  sign-snapshot:
+    needs: test
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 11.12.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: integrations/openclaw/pnpm-lock.yaml
+      - name: Install OpenClaw integration dependencies
+        run: pnpm -C integrations/openclaw install --frozen-lockfile
+      - name: Build release snapshot
+        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
+        with:
+          distribution: goreleaser
+          version: v2.17.0
+          args: release --snapshot --clean --skip=publish --config .goreleaser.yaml
+      - name: Pack OpenClaw release artifact
+        run: pnpm -C integrations/openclaw pack --pack-destination ../../dist
+      - name: Pack Hermes release artifact
+        run: integrations/hermes/package.sh dist
+      - name: Build and verify complete release manifest
+        run: |
+          bash scripts/release-manifest.sh create dist
+          bash scripts/release-manifest.sh verify dist
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.0.6
+      - name: Sign and verify complete release manifest
+        env:
+          EXPECTED_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/ci.yml@${{ github.ref }}
+          EXPECTED_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          cosign sign-blob \
+            --yes \
+            --bundle dist/release-manifest.sigstore.json \
+            dist/release-manifest.sha256
+          cosign verify-blob \
+            --bundle dist/release-manifest.sigstore.json \
+            --certificate-identity "$EXPECTED_IDENTITY" \
+            --certificate-oidc-issuer "$EXPECTED_ISSUER" \
+            dist/release-manifest.sha256
+
+          cp dist/release-manifest.sha256 /tmp/release-manifest.tampered
+          printf '\n' >> /tmp/release-manifest.tampered
+          if cosign verify-blob \
+            --bundle dist/release-manifest.sigstore.json \
+            --certificate-identity "$EXPECTED_IDENTITY" \
+            --certificate-oidc-issuer "$EXPECTED_ISSUER" \
+            /tmp/release-manifest.tampered; then
+            echo "modified manifest passed signature verification" >&2
+            exit 1
+          fi
+
+          if cosign verify-blob \
+            --bundle dist/release-manifest.sigstore.json \
+            --certificate-identity "${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@${{ github.ref }}" \
+            --certificate-oidc-issuer "$EXPECTED_ISSUER" \
+            dist/release-manifest.sha256; then
+            echo "wrong workflow identity passed signature verification" >&2
+            exit 1
+          fi
+      - name: Upload signed release snapshot
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: vermory-pr-snapshot-${{ github.sha }}
@@ -139,7 +235,7 @@ jobs:
             dist/checksums.txt
             dist/*.tgz
             dist/vermory-hermes-*.sha256
+            dist/release-manifest.sha256
+            dist/release-manifest.sigstore.json
           if-no-files-found: error
           retention-days: 7
-      - name: Verify clean diff
-        run: git diff --check
