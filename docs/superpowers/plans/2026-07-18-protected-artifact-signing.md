@@ -41,7 +41,7 @@ Design: [Protected Artifact Signing Design](../specs/2026-07-18-protected-artifa
 ## Task 7: Protected Delivery
 
 - [x] Write public evidence and update only proven documentation claims.
-- [ ] Commit without amending earlier commits and push exact heads.
-- [ ] Require and verify protected `test` and `sign-snapshot` checks.
-- [ ] Update Draft PR 1 with exactly one W24 section.
-- [ ] Keep the overall Vermory platform goal active.
+- [x] Commit without amending earlier commits and push exact heads.
+- [x] Require and verify protected `test` and `sign-snapshot` checks.
+- [x] Update Draft PR 1 with exactly one W24 section.
+- [x] Keep the overall Vermory platform goal active.
