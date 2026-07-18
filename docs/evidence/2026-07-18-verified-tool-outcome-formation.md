@@ -413,6 +413,70 @@ synthetic-secret, and common credential-prefix patterns. No raw provider token,
 Keychain secret, database password, complete environment, or OpenClaw gateway
 credential is included.
 
+## Protected Delivery
+
+Protected CI passed on exact source head
+`6a5bfb0fda2f152f24fc96dd277ed0070f198fba`:
+
+| Field | Value |
+|---|---|
+| Run / job | `29639542073` / `88067638372` |
+| Result / duration | `SUCCESS` / `4m45s` |
+| Artifact | `8428213988` |
+| Artifact name | `vermory-pr-snapshot-259f23f8ca35c57e2e1e1ea3feced9a3942fd252` |
+| Artifact bytes | `21,806,007` |
+| API and streamed ZIP SHA-256 | `7efd80877dc320906429e6d0fc1c6c93cb8bbca711cd96a95420f9b163214cbc` |
+| Synthetic merge | `259f23f8ca35c57e2e1e1ea3feced9a3942fd252` |
+| Merge verification | `verified=true`, `reason=valid` |
+| Merge second parent | exact source head `6a5bfb0fda2f152f24fc96dd277ed0070f198fba` |
+
+The artifact was streamed to the Mac mini without a persistent workstation
+copy. Because the workstation and Mac mini were not on the same LAN, transport
+used the existing Qingdao reverse-management SSH tunnel. Direct LAN access,
+`sudo`, and Mac mini NewAPI were not used.
+
+Independent Mac mini verification proved:
+
+- ZIP byte count, SHA-256, and central-directory integrity matched GitHub;
+- all four release checksums and exact four-file Go archive layouts passed;
+- every binary reported the expected `GOOS` / `GOARCH`, `CGO_ENABLED=0`,
+  `-trimpath=true`, `vcs.modified=false`, and synthetic merge revision;
+- Linux amd64 and arm64 binaries were statically linked;
+- the Darwin arm64 binary executed `version` and
+  `conversation-formation-worker --help`;
+- OpenClaw package SHA-256 was
+  `46ba8fec85ac83b09af5177dde0e9cacd35c25475e537cfa8d8f31f4a61f4b14`
+  with the exact 16-entry inventory, including `tool-results.js` and
+  `tool-results.d.ts`;
+- Hermes package SHA-256 was
+  `89030ad9ca5cbf3bfef7fe007de3508965977e9fcf7574538da2a8e27e7044bf`,
+  its sidecar passed, and its inventory contained exactly six files;
+- 22 extracted package files and 74,775 bytes had zero sensitive-name,
+  credential-pattern, or local-runtime-path hits.
+
+The protected-delivery manifest covers 74 files and passed a full recheck from
+the evidence root. Its SHA-256 is:
+
+```text
+5b210f0999f37f66a9fdfe5e73d64c620bd1068baa0c2bd3efd5b72c10221764
+```
+
+The accepted protected evidence remains under:
+
+```text
+~/.vermory-w23/w23-shared-evidence-final-7e76df6f05/runtime/evidence/
+  protected-delivery-6a5bfb0-29639542073
+```
+
+The protected-delivery ledger retains the literal-path transfer mistake, a
+rejected SHA display command, a local template-expansion failure, the missing
+`rg` prerequisite, the zero-match `pipefail` mistake, the first wrong-directory
+manifest recheck, and GitHub's non-fatal Node.js action annotation. None is
+counted as accepted verification. The first post-rsync public-ledger hash
+comparison also failed because of nested `awk` escaping and is retained
+separately. A pre-commit zero-unchecked-item assertion also mishandled
+`rg`'s no-match output; the corrected explicit count passed.
+
 ## Scope
 
 This run qualifies, for the executed F03 trajectory:

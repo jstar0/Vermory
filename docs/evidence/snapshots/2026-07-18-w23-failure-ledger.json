@@ -231,6 +231,78 @@
       "outcome": "failed",
       "summary": "The first local jq assertion for the final snapshot had an unmatched parenthesis and did not execute.",
       "accepted_resolution": "Correct the expression and rerun the eight-attempt, shared-evidence, and delivered-memory assertions successfully."
+    },
+    {
+      "id": "PROTECTED-01",
+      "scope": "protected_delivery",
+      "stage": "artifact_transport_path",
+      "outcome": "failed",
+      "summary": "The first accepted artifact stream used a remote path containing a literal $HOME directory component.",
+      "accepted_resolution": "Retain the complete hash-matching ZIP and move it inside the Mac mini to the intended W23 evidence root without redownloading."
+    },
+    {
+      "id": "PROTECTED-02",
+      "scope": "protected_delivery",
+      "stage": "artifact_post_move_display",
+      "outcome": "failed",
+      "summary": "The first post-move one-line SHA display had an awk escaping error.",
+      "accepted_resolution": "Leave the artifact unchanged and run a separate remote-only byte-count and SHA-256 check that matched the GitHub Artifact API values."
+    },
+    {
+      "id": "PROTECTED-03",
+      "scope": "protected_delivery",
+      "stage": "verifier_orchestration",
+      "outcome": "failed",
+      "summary": "The first full verifier was rejected in the local JavaScript orchestration layer because shell variable braces were parsed as template interpolation.",
+      "accepted_resolution": "Record that no SSH connection or remote change occurred and rerun with interpolation-safe shell variable forms."
+    },
+    {
+      "id": "PROTECTED-04",
+      "scope": "protected_delivery",
+      "stage": "privacy_tool_prerequisite",
+      "outcome": "failed",
+      "summary": "The second full verifier rejected the Mac mini because ripgrep was not installed in the noninteractive path.",
+      "accepted_resolution": "Use the existing system grep for the same bounded package scans without installing or downloading anything."
+    },
+    {
+      "id": "PROTECTED-05",
+      "scope": "protected_delivery",
+      "stage": "privacy_zero_match",
+      "outcome": "failed",
+      "summary": "The third verifier treated grep's expected no-match status as a pipefail failure after reaching the privacy stage.",
+      "accepted_resolution": "Directly confirm all three scans had zero output, explicitly count no-match as zero, and rerun the privacy assertions."
+    },
+    {
+      "id": "PROTECTED-06",
+      "scope": "protected_delivery",
+      "stage": "manifest_recheck",
+      "outcome": "failed",
+      "summary": "The first independent manifest recheck ran outside the evidence root, so all 74 relative paths failed and an unconditional status print was rejected.",
+      "accepted_resolution": "Regenerate the manifest after updating the ledger, change to the evidence root, use set -e, and require every checksum line to pass."
+    },
+    {
+      "id": "PROTECTED-07",
+      "scope": "protected_ci",
+      "stage": "github_actions_runtime",
+      "outcome": "warning",
+      "summary": "GitHub Actions reported that pinned actions targeting Node.js 20 were forced onto Node.js 24.",
+      "accepted_resolution": "Retain the non-fatal annotation; every protected workflow step completed successfully."
+    },
+    {
+      "id": "PROTECTED-08",
+      "scope": "protected_delivery",
+      "stage": "public_ledger_hash_comparison",
+      "outcome": "failed",
+      "summary": "The first post-rsync public-ledger hash comparison had another nested remote awk escaping error.",
+      "accepted_resolution": "Keep the synced file, read plain remote shasum output, and parse the digest on the workstation before comparing it with the local digest."
+    },
+    {
+      "id": "PROTECTED-09",
+      "scope": "evidence_validation",
+      "stage": "precommit_checklist_assertion",
+      "outcome": "failed",
+      "summary": "The first combined pre-commit static assertion treated ripgrep's no-match output as an empty string instead of a zero unchecked-item count.",
+      "accepted_resolution": "Use an explicit awk count for unchecked checklist rows and require the resulting numeric count to equal zero."
     }
   ]
 }

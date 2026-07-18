@@ -45,7 +45,7 @@ Design: [Verified Tool Outcome Formation Design](../specs/2026-07-18-verified-to
 ## Task 7: Protected Delivery
 
 - [x] Write evidence and update public documentation with only proven claims.
-- [ ] Commit without amending earlier commits and push the exact head.
-- [ ] Verify protected CI, artifacts, packages, signatures, and Mac mini evidence.
-- [ ] Update the existing Draft PR with exactly one W23 section.
-- [ ] Keep the overall Vermory platform goal active.
+- [x] Commit without amending earlier commits and push the exact head.
+- [x] Verify protected CI, artifacts, packages, signatures, and Mac mini evidence.
+- [x] Update the existing Draft PR with exactly one W23 section.
+- [x] Keep the overall Vermory platform goal active.
